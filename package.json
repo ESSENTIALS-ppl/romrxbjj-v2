@@ -1,0 +1,11 @@
+{
+  "name": "romrxbjj-v2",
+  "version": "2.0.0",
+  "description": "ROMRxBJJ v2 — Supabase-native backend with AI layer",
+  "scripts": {
+    "db:push": "supabase db push",
+    "functions:deploy": "supabase functions deploy",
+    "types:gen": "supabase gen types typescript --project-id cqzvqzwwevnflinxgnpp > src/types/database.ts",
+    "dev": "supabase start"
+  }
+}

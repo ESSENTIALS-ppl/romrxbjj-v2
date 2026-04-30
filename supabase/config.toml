@@ -1,0 +1,14 @@
+project_id = "cqzvqzwwevnflinxgnpp"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "https://romrxbjj.com"
+additional_redirect_urls = ["http://localhost:3000","https://romrxbjj.netlify.app"]
