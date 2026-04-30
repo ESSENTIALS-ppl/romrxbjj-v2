@@ -11,8 +11,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // ROMRx pays for ROMBot — uses OpenAI GPT-4o under the hood
-const ROMRX_OPENAI_KEY = Deno.env.get("ROMRX_OPENAI_KEY") ?? "";
-const ROMRX_ANTHROPIC_KEY = Deno.env.get("ROMRX_ANTHROPIC_KEY") ?? "";
+const ROMRX_OPENAI_KEY = Deno.env.get("romrx_openai_key") ?? "";
+const ROMRX_ANTHROPIC_KEY = Deno.env.get("romrx_anthropic_key") ?? "";
 
 // ---- Types ----
 interface ChatRequest {
