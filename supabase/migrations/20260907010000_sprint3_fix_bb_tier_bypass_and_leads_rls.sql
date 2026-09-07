@@ -1,7 +1,6 @@
 -- Sprint 3-lite (2026-09-06): close set_my_bb_tier payment bypass + leads anon PII SELECT
--- LIVE applied on romrxbjj-v2 as sprint3_fix_bb_tier_bypass_and_leads_rls
+-- LIVE on romrxbjj-v2 (sprint3_fix_bb_tier_bypass_and_leads_rls + sprint3_fix_set_my_bb_tier_exists_bug)
 
--- 1) set_my_bb_tier: may set tier only; MUST NOT grant bodybuilding access.
 CREATE OR REPLACE FUNCTION public.set_my_bb_tier(p_tier text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -31,7 +30,7 @@ BEGIN
   FROM public.users u
   WHERE u.id = v_uid;
 
-  IF NOT EXISTS(v_has_bb) OR v_has_bb IS NOT TRUE THEN
+  IF v_has_bb IS NOT TRUE THEN
     RETURN jsonb_build_object('ok', false, 'error', 'bodybuilding_entitlement_required');
   END IF;
 
@@ -49,6 +48,4 @@ REVOKE ALL ON FUNCTION public.set_my_bb_tier(text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.set_my_bb_tier(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_my_bb_tier(text) TO service_role;
 
--- 2) leads: drop broad SELECT of all unclaimed rows (PII).
--- Lead lookup by unlock_token stays on edge functions with service_role.
 DROP POLICY IF EXISTS leads_select_unclaimed ON public.leads;
