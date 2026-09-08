@@ -1,11 +1,14 @@
-// create-checkout-session (v23) — dual-unlock: Base+sport line_items when pending_sport set
-// Two modes:
+// create-checkout-session (v24) — coach mode + dual-unlock
+// Modes:
 //   mode: "base"   - Base checkout. Optional pending_sport (bjj|bodybuilding) adds sport
 //                    price to line_items + metadata for webhook grant.
 //   mode: "unlock" - Sport pack checkout, gated on active Base.
+//   mode: "coach"  - Coach $349/yr (also accepts plan:"coach" for CoachSignup back-compat).
+//                    Metadata uses legacy keys (plan + supabase_user_id) so stripe-webhook
+//                    upserts coaches row. Existing BJJ Coach price ID only — no new product.
 //
+// v24: restore coach checkout path broken when v17+ dropped non-base/unlock modes.
 // v23: combo CTA must charge Base+sport (not Base-only). Still uses existing price IDs.
-// v22/v17: accept pending_sport on base mode (metadata only — incomplete).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
@@ -22,6 +25,10 @@ const SPORT_PRICE_IDS: Record<string, string> = {
   bjj: "price_1TpvpxDou9Iktbw0hDQOEDwy",
   bodybuilding: "price_1TpvriDou9Iktbw0oiHxtLfB",
 };
+
+// Existing live ROMRxBJJ Coach $349/yr — do not invent products.
+const COACH_PRICE_ID = "price_1TKKTgDou9Iktbw0YqnV3411";
+const COACH_ORIGIN = Deno.env.get("COACH_ORIGIN") ?? "https://romrxbjj.com";
 
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-11-20.acacia" });
 
@@ -90,9 +97,13 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST")     return json(405, { error: "Method not allowed" });
 
   let body: {
-    mode?: "base" | "unlock";
+    mode?: "base" | "unlock" | "coach";
+    plan?: string;
     user_id?: string;
     email?: string;
+    full_name?: string;
+    gym?: string;
+    sport?: string;
     token?: string;
     price_id?: string;
     lead_token?: string;
@@ -103,7 +114,10 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-  if (body.mode === "base") {
+  // Back-compat: CoachSignup historically sent plan:"coach" without mode.
+  const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
+
+  if (mode === "base") {
     if (!body.user_id || !body.email) return json(400, { error: "user_id and email required" });
 
     if (body.lead_token) {
@@ -154,7 +168,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  if (body.mode === "unlock") {
+  if (mode === "unlock") {
     const token = body.token ?? "";
     const isSportSlug = token === "bjj" || token === "bodybuilding";
     if (!isSportSlug) return json(404, { error: "invalid_token" });
@@ -198,6 +212,47 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
       console.error("stripe unlock checkout failed", err);
+      return json(502, {
+        error: "stripe_error",
+        stripe_type: err.type ?? null,
+        stripe_code: err.code ?? null,
+        message: err.message ?? "Stripe checkout session creation failed",
+      });
+    }
+  }
+
+  if (mode === "coach") {
+    // Prefer explicit user_id; fall back to JWT caller (CoachSignup sends Bearer).
+    let userId = body.user_id ?? null;
+    if (!userId) userId = await getCallerUserId(admin, req);
+    if (!userId || !body.email) return json(400, { error: "user_id and email required" });
+
+    const gym = (body.gym ?? "").trim();
+    // Legacy metadata — stripe-webhook coach path requires plan=coach + supabase_user_id.
+    // Omit purpose so webhook does not take the Base/sport_unlock branches.
+    const meta: Record<string, string> = {
+      plan: "coach",
+      supabase_user_id: userId,
+    };
+    if (gym) meta.gym = gym;
+    if (body.sport) meta.sport = body.sport;
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        line_items: [{ price: COACH_PRICE_ID, quantity: 1 }],
+        allow_promotion_codes: true,
+        client_reference_id: userId,
+        customer_email: body.email,
+        success_url: `${COACH_ORIGIN}/onboarding/payment-success`,
+        cancel_url: `${COACH_ORIGIN}/signup/coach?checkout=cancel`,
+        metadata: meta,
+        subscription_data: { metadata: meta },
+      });
+      return json(200, { url: session.url });
+    } catch (e) {
+      const err = e as { message?: string; type?: string; code?: string };
+      console.error("stripe coach checkout failed", err);
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
