@@ -1,5 +1,6 @@
 // v37 Base cancel cascades to sport packs (Jim GO 2026-09-08 — policy wins over Option 3)
 // v36 dual-unlock pending_sport grant — Stripe constructEvent with STRIPE_WEBHOOK_SECRET
+// Sprint 2: crypto verify via constructEvent (rebased onto main 2026-09-09)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
@@ -432,7 +433,7 @@ Deno.serve(async (req: Request) => {
         const portalUrl = brand.login.replace("/login", "/dashboard/settings");
         if (!u.paywall_frozen_until) {
           await sendEmail(brand, u.email, `Action needed: your ${brand.name} payment failed`,
-            `<div style="font-family:Inter,sans-serif;padding:24px;color:#1a2e2e"><h2>Hey ${firstName},</h2><p>Your most recent ${brand.name} payment didn't go through. Update your card within 90 days.</p><p><a href="${portalUrl}">Update Payment</a></p><p>Jim</p></div>`);
+            `<div style="font-family:Inter,sans-serif;padding:24px;color:#1a2e2e"><h2>Hey ${firstName},</h2><p>Your most recent ${brand.name} payment didn't go through. Update your card within 90 days.</p><p><a href="${portalUrl}">Update Payment</a></p><p>&mdash; Jim</p></div>`);
         }
       }
     }
