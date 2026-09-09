@@ -5,6 +5,7 @@
 // From + reply_to use jim@romrxbjj.com (a send-as alias on the jim@romrx.io
 // mailbox), so all replies land in the unified jim@romrx.io inbox.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { enforceRateLimit } from "../_shared/rate_limit.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const FROM       = "Jim Scott <jim@romrxbjj.com>";
@@ -21,7 +22,14 @@ async function sendEmail(to: string, subject: string, html: string) {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type" } });
+  const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type" };
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  // Sprint 8 scaffold: signup/notify spam guard
+  {
+    const limited = enforceRateLimit(req, "notify-coach-signup", { corsHeaders: CORS });
+    if (limited) return limited;
+  }
 
   const { email, fullName, gym, paid, sendToCoach } = await req.json().catch(() => ({}));
   if (!email) return new Response(JSON.stringify({ error: "email required" }), { status: 400 });
