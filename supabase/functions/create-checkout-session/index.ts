@@ -13,6 +13,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
+import { enforceRateLimit } from "../_shared/rate_limit.ts";
 
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -95,6 +96,12 @@ async function claimLead(
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST")     return json(405, { error: "Method not allowed" });
+
+  // Sprint 8 scaffold: rate-limit only — do not change entitlement / Stripe logic
+  {
+    const limited = enforceRateLimit(req, "create-checkout-session", { corsHeaders: CORS });
+    if (limited) return limited;
+  }
 
   let body: {
     mode?: "base" | "unlock" | "coach";
