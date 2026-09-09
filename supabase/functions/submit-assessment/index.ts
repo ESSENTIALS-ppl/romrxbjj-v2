@@ -4,6 +4,7 @@
 // Previous (v8): auto-creates public.users row if missing (FK guard).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { enforceRateLimit } from "../_shared/rate_limit.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  // Sprint 8 scaffold: IP burst guard before auth work
+  {
+    const limited = enforceRateLimit(req, "submit-assessment", { corsHeaders: CORS });
+    if (limited) return limited;
+  }
+
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
@@ -37,6 +44,15 @@ Deno.serve(async (req) => {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "Unauthorized" }, 401);
+
+  // Re-check keyed by authenticated user (same window store)
+  {
+    const limited = enforceRateLimit(req, "submit-assessment", {
+      userId: user.id,
+      corsHeaders: CORS,
+    });
+    if (limited) return limited;
+  }
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
