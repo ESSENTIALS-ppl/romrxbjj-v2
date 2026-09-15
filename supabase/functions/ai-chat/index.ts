@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
 
   // Hourly IP burst guard
   {
-    const limited = enforceRateLimit(req, "ai-chat", { corsHeaders: CORS });
+    const limited = await enforceRateLimit(req, "ai-chat", { corsHeaders: CORS });
     if (limited) return limited;
   }
 
@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
       userId = JSON.parse(atob(token.split(".")[1]))?.sub;
     } catch { /* ignore */ }
     if (userId) {
-      const hourly = enforceRateLimit(req, "ai-chat", {
+      const hourly = await enforceRateLimit(req, "ai-chat", {
         userId,
         corsHeaders: CORS,
       });
@@ -55,9 +55,9 @@ Deno.serve(async (req: Request) => {
         userId,
         ip: clientIp(req),
       });
-      const monthly = checkRateLimit(
+      const monthly = await checkRateLimit(
         monthlyKey,
-        DEFAULT_LIMITS["ai-chat-monthly"],
+        DEFAULT_LIMITS["ai-chat-monthly"]!,
       );
       if (!monthly.allowed) return tooManyRequests(monthly, CORS);
     }
