@@ -1,15 +1,16 @@
 /**
- * Sprint 8 rate-limit scaffold (beta ~300 readiness).
+ * Sprint 8 rate-limit (table-backed, cross-isolate).
  *
- * Approach: in-memory sliding/fixed window counters keyed by
- *   `${edgeName}:${userId|ip}`
+ * Approach: Postgres `rate_limit_buckets` + atomic `rate_limit_hit` RPC
+ * keyed by `${edgeName}:${userId|ip}`. Survives Deno isolate churn so Field
+ * can observe real 429 + Retry-After under burst.
  *
- * Caveats (documented intentionally for follow-up):
- * - In-memory is per Deno isolate / edge instance — not globally consistent.
- *   Fine for scaffold + burst abuse; for hard caps across instances use a
- *   Supabase table (e.g. rate_limit_buckets) or Redis later.
- * - Limits below are TBD / tunable placeholders — not production-final.
- * - Env overrides: RATE_LIMIT_DISABLED=true bypasses checks (local/dev).
+ * Behavior:
+ * - RATE_LIMIT_DISABLED=true → fail-open (local/dev bypass)
+ * - RPC / DB error → fail-open + console.error (do not break ROMBot on
+ *   transient DB blips; Grant Field PASS depends on RPC working — keep table
+ *   + grants healthy)
+ * - Denied → tooManyRequests with Retry-After + X-RateLimit-*
  *
  * Suggested defaults (tune before world invite):
  * | Edge                    | Key          | Limit | Window   | Why                          |
@@ -21,11 +22,9 @@
  * | create-checkout-session | user|ip      | 15    | 1 hour   | Checkout spam                |
  * | notify-coach-signup     | ip           | 10    | 1 hour   | Signup email spam            |
  * | set-password / auth*    | ip|user      | 10    | 1 hour   | Auth abuse (not in this repo)|
- *
- * *Auth-related edges (set-password, admin-reset-password, etc.) live in
- *  deployed Supabase but are not present under supabase/functions/ on main
- *  in this repo — wire when those sources are checked in.
  */
+
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 export type RateLimitConfig = {
   /** Max requests allowed in the window */
@@ -42,10 +41,6 @@ export type RateLimitResult = {
   key: string;
 };
 
-type Bucket = { count: number; resetAt: number };
-
-const store = new Map<string, Bucket>();
-
 /** Documented placeholder limits — override per call or via env later. */
 export const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   "ai-chat": { limit: 60, windowMs: 60 * 60 * 1000 },
@@ -57,6 +52,22 @@ export const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   "set-password": { limit: 10, windowMs: 60 * 60 * 1000 },
   default: { limit: 30, windowMs: 60 * 60 * 1000 },
 };
+
+let _admin: SupabaseClient | null = null;
+
+function serviceClient(): SupabaseClient | null {
+  if (_admin) return _admin;
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) {
+    console.error("[rate_limit] missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    return null;
+  }
+  _admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return _admin;
+}
 
 export function clientIp(req: Request): string {
   const xf = req.headers.get("x-forwarded-for");
@@ -77,13 +88,13 @@ export function rateLimitKey(
 }
 
 /**
- * Fixed-window counter. Returns whether the request may proceed.
- * Fail-open if RATE_LIMIT_DISABLED=true.
+ * Table-backed fixed-window counter via rate_limit_hit RPC.
+ * Fail-open if RATE_LIMIT_DISABLED=true or on DB/RPC error.
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   config: RateLimitConfig,
-): RateLimitResult {
+): Promise<RateLimitResult> {
   if ((Deno.env.get("RATE_LIMIT_DISABLED") ?? "").toLowerCase() === "true") {
     return {
       allowed: true,
@@ -94,31 +105,74 @@ export function checkRateLimit(
     };
   }
 
-  const now = Date.now();
-  let bucket = store.get(key);
-  if (!bucket || now >= bucket.resetAt) {
-    bucket = { count: 0, resetAt: now + config.windowMs };
-    store.set(key, bucket);
-  }
-
-  if (bucket.count >= config.limit) {
+  const admin = serviceClient();
+  if (!admin) {
+    console.error("[rate_limit] fail-open: no service client", { key });
     return {
-      allowed: false,
+      allowed: true,
       limit: config.limit,
-      remaining: 0,
-      resetAt: bucket.resetAt,
+      remaining: config.limit,
+      resetAt: Date.now() + config.windowMs,
       key,
     };
   }
 
-  bucket.count += 1;
-  return {
-    allowed: true,
-    limit: config.limit,
-    remaining: Math.max(0, config.limit - bucket.count),
-    resetAt: bucket.resetAt,
-    key,
-  };
+  try {
+    const { data, error } = await admin.rpc("rate_limit_hit", {
+      p_key: key,
+      p_limit: config.limit,
+      p_window_ms: config.windowMs,
+    });
+
+    if (error) {
+      console.error("[rate_limit] RPC error — fail-open", { key, error });
+      return {
+        allowed: true,
+        limit: config.limit,
+        remaining: config.limit,
+        resetAt: Date.now() + config.windowMs,
+        key,
+      };
+    }
+
+    const row = data as {
+      allowed?: boolean;
+      limit?: number;
+      remaining?: number;
+      reset_at?: number;
+    } | null;
+
+    if (!row || typeof row.allowed !== "boolean") {
+      console.error("[rate_limit] unexpected RPC payload — fail-open", { key, data });
+      return {
+        allowed: true,
+        limit: config.limit,
+        remaining: config.limit,
+        resetAt: Date.now() + config.windowMs,
+        key,
+      };
+    }
+
+    return {
+      allowed: row.allowed,
+      limit: typeof row.limit === "number" ? row.limit : config.limit,
+      remaining: typeof row.remaining === "number" ? row.remaining : 0,
+      resetAt:
+        typeof row.reset_at === "number"
+          ? row.reset_at
+          : Date.now() + config.windowMs,
+      key,
+    };
+  } catch (err) {
+    console.error("[rate_limit] exception — fail-open", { key, err });
+    return {
+      allowed: true,
+      limit: config.limit,
+      remaining: config.limit,
+      resetAt: Date.now() + config.windowMs,
+      key,
+    };
+  }
 }
 
 export function rateLimitHeaders(result: RateLimitResult): Record<string, string> {
@@ -160,7 +214,7 @@ export function tooManyRequests(
 /**
  * Convenience: resolve config for an edge, check, return null if OK else 429.
  */
-export function enforceRateLimit(
+export async function enforceRateLimit(
   req: Request,
   edgeName: string,
   opts: {
@@ -168,13 +222,13 @@ export function enforceRateLimit(
     config?: RateLimitConfig;
     corsHeaders?: Record<string, string>;
   } = {},
-): Response | null {
+): Promise<Response | null> {
   const config = opts.config ?? DEFAULT_LIMITS[edgeName] ?? DEFAULT_LIMITS.default!;
   const key = rateLimitKey(edgeName, {
     userId: opts.userId,
     ip: clientIp(req),
   });
-  const result = checkRateLimit(key, config);
+  const result = await checkRateLimit(key, config);
   if (result.allowed) return null;
   return tooManyRequests(result, opts.corsHeaders ?? {});
 }
