@@ -54,6 +54,33 @@ function jointKeyOf(row) {
   return row?.joint_key ?? row?.joint ?? row?.key ?? "";
 }
 
+function scoreNumFromJoint(score) {
+  if (score === 1 || score === "1" || score === "at_risk" || score === "red" || score === "needs_focus") {
+    return 1;
+  }
+  if (score === 2 || score === "2" || score === "building" || score === "yellow") {
+    return 2;
+  }
+  if (score === 3 || score === "3" || score === "steady" || score === "green") {
+    return 3;
+  }
+  return null;
+}
+
+/** Worst joint_scores band → Needs focus / Building / Steady. Null if none. */
+function overallBandFromJointScores(jointScores) {
+  let worst = null;
+  for (const row of jointScores ?? []) {
+    const n = scoreNumFromJoint(row?.score);
+    if (n == null) continue;
+    if (worst == null || n < worst) worst = n;
+  }
+  if (worst === 1) return "Needs focus";
+  if (worst === 2) return "Building";
+  if (worst === 3) return "Steady";
+  return null;
+}
+
 function formatMobilityBands(jointScores) {
   const needs = [];
   const building = [];
@@ -184,17 +211,35 @@ function CBase(n) {
   const p = n.saved_game_plans;
   const jointScores = n.joint_scores;
   const bandsBlock = formatMobilityBands(jointScores);
+  const overallBand = overallBandFromJointScores(jointScores);
+  const overallLine = overallBand
+    ? `Overall mobility band: ${overallBand}`
+    : "Overall mobility band: pending (no joint scores yet)";
   const hasJoints =
     (Array.isArray(jointScores) && jointScores.length > 0) ||
     (Array.isArray(h) && h.length > 0) ||
     (Array.isArray(m) && m.length > 0);
-  const priorityLine = h?.map((e) => R(e)).join(", ") ?? (hasJoints ? "See Needs focus band" : "No assessment yet");
+  const scoreByKey = {};
+  for (const row of jointScores ?? []) {
+    const key = jointKeyOf(row);
+    if (!key) continue;
+    scoreByKey[key] = row?.score;
+    const base = String(key).replace(/_(l|r)$/, "");
+    if (scoreByKey[base] == null) scoreByKey[base] = row?.score;
+  }
+  const priorityLine = h && h.length > 0
+    ? h.map((e) => {
+        const band = bandFromScore(scoreByKey[e] ?? scoreByKey[String(e).replace(/_(l|r)$/, "")]) ?? "Needs focus";
+        return `${R(e)} (${band})`;
+      }).join(", ")
+    : (hasJoints ? "See Needs focus band" : "No assessment yet");
   const i = formatSavedPlans(p);
 
   return `You are ROMBot, the AI mobility intelligence assistant for ROMRx.
 
 ## Profile
 Name: ${g} | Sport: BASE (general mobility)
+${overallLine}
 Mobility bands from joint scores (1 Needs focus / 2 Building / 3 Steady):
 ${bandsBlock}
 Priority joints: ${priorityLine}
@@ -206,7 +251,10 @@ ${formatProtocol(m)}
 ${i}
 
 ## How to answer
-Use this pattern: band name (Needs focus / Building / Steady) → joint → ease benefit → small plan → leave the choice with them ("your call").
+Always name Overall mobility band first when asked about bands or readiness (Needs focus / Building / Steady).
+Then name priority joints with their band.
+When listing mobility, always include all three category names (Needs focus, Building, Steady) even if a list is empty ("None listed" is OK).
+Pattern after Overall: band name → joint → ease benefit → small plan → leave the choice with them ("your call").
 Chip shorthand: Focus · Building · Steady. Internal alias at_risk maps to Needs focus; do not say "at risk" to the user.
 
 ## Critical Rules
