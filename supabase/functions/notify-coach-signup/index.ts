@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
 
   // Sprint 8 scaffold: signup/notify spam guard
   {
-    const limited = enforceRateLimit(req, "notify-coach-signup", { corsHeaders: CORS });
+    const limited = await enforceRateLimit(req, "notify-coach-signup", { corsHeaders: CORS });
     if (limited) return limited;
   }
 
