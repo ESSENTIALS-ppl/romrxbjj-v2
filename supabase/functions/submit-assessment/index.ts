@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
   // Sprint 8 scaffold: IP burst guard before auth work
   {
-    const limited = enforceRateLimit(req, "submit-assessment", { corsHeaders: CORS });
+    const limited = await enforceRateLimit(req, "submit-assessment", { corsHeaders: CORS });
     if (limited) return limited;
   }
 
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
   // Re-check keyed by authenticated user (same window store)
   {
-    const limited = enforceRateLimit(req, "submit-assessment", {
+    const limited = await enforceRateLimit(req, "submit-assessment", {
       userId: user.id,
       corsHeaders: CORS,
     });

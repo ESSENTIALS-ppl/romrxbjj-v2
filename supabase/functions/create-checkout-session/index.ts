@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
 
   // Sprint 8 scaffold: rate-limit only — do not change entitlement / Stripe logic
   {
-    const limited = enforceRateLimit(req, "create-checkout-session", { corsHeaders: CORS });
+    const limited = await enforceRateLimit(req, "create-checkout-session", { corsHeaders: CORS });
     if (limited) return limited;
   }
 
