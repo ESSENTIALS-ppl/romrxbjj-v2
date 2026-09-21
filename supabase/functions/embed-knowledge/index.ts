@@ -1,8 +1,9 @@
 // ============================================================
 // ROMRx embed-knowledge — Supabase Edge Function
 // Sprint 2: require x-romrx-cron-secret or Authorization Bearer matching ROMRX_CRON_SECRET/CRON_SECRET
-// Embeds all rombot_knowledge rows that lack an embedding
-// Uses OpenAI text-embedding-ada-002
+// Embeds rombot_knowledge rows that lack an embedding
+// Uses OpenAI text-embedding-ada-002 (1536-d; prior lock)
+// Optional JSON body: { "sport": "general" } — only embed that sport's null rows
 // ============================================================
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -29,7 +30,6 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-romrx-cron-secret" } });
   }
 
-  // Sprint 2: require cron secret (header or Bearer). verify_jwt stays false for cron callers.
   const expected = Deno.env.get("ROMRX_CRON_SECRET") ?? Deno.env.get("CRON_SECRET") ?? "";
   const headerSecret = req.headers.get("x-romrx-cron-secret") ?? "";
   const auth = req.headers.get("authorization") ?? "";
@@ -43,11 +43,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    let sportFilter: string | null = null;
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        if (body && typeof body.sport === "string" && body.sport.trim()) {
+          sportFilter = body.sport.trim().toLowerCase();
+        }
+      } catch { /* empty body OK */ }
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const { data: rows, error: fetchError } = await supabase.from("rombot_knowledge").select("id, topic, chunk").is("embedding", null);
+    let q = supabase.from("rombot_knowledge").select("id, topic, chunk").is("embedding", null);
+    if (sportFilter) q = q.eq("sport", sportFilter);
+    const { data: rows, error: fetchError } = await q;
     if (fetchError) throw new Error(`Failed to fetch rows: ${fetchError.message}`);
     if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ message: "No rows to embed", embedded: 0 }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      return new Response(JSON.stringify({ message: "No rows to embed", embedded: 0, sport: sportFilter }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
     let embedded = 0, failed = 0;
     const errors: string[] = [];
@@ -58,7 +70,7 @@ Deno.serve(async (req: Request) => {
       if (updateError) { failed++; errors.push(`Row ${row.id}: ${updateError.message}`); } else { embedded++; }
       await new Promise(r => setTimeout(r, 100));
     }
-    return new Response(JSON.stringify({ message: "Embedding complete", total_rows: rows.length, embedded, failed, errors: errors.length > 0 ? errors : undefined }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(JSON.stringify({ message: "Embedding complete", total_rows: rows.length, embedded, failed, sport: sportFilter, errors: errors.length > 0 ? errors : undefined }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
