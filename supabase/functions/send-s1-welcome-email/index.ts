@@ -1,4 +1,4 @@
-// send-s1-welcome-email v21 (2026-09-21): restore full branded HTML from PR #28 + keep v20 email_sends.
+// send-s1-welcome-email v22 (2026-09-21): restore full branded HTML from PR #28 + keep email_sends (redeploy after v21 stub).
 // - v17: Base/general = Kai A1 Personalized Readiness Profile (not Position; not Personal).
 //   Beta Dec 31 2026 / Jan 1 2027. BJJ keeps Position Readiness. 2026-09-08.
 // - v16: only the auth.users INSERT trigger (service-role bearer) may call this function.
@@ -6,7 +6,8 @@
 // - v19/#28: claim public.email_sends(user_id, email_id=s1_1_welcome) before Resend; release on failure;
 //        Resend Idempotency-Key / X-Entity-Ref-ID = s1_1_welcome-{userId} (stable, like drip v11).
 // - v20: recovery after PLACEHOLDER mishap kept claim + stable key but compact interim HTML.
-// - v21: full branded Kai A1 / PRP / sport templates restored; logging + Idempotency-Key unchanged.
+// - v21: brief stub mishap (superseded).
+// - v22: full branded Kai A1 / PRP / sport templates restored; logging + Idempotency-Key unchanged.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/events.ts";
