@@ -1,14 +1,9 @@
-// activate-beta-base (v1) — Grant Base dashboard during beta WITHOUT Stripe.
-// Jim lock: Base free through Dec 31 2026; billing starts Jan 1 2027.
-// base_status is protected (guard_users_protected_columns) — only service_role
-// may set it. Never set client-side (incident 2026-06-10).
-//
-// Behavior:
-//   - Requires caller JWT (Authorization Bearer).
-//   - If now < 2027-01-01Z → set public.users.base_status='active' for caller.
-//   - Else → 402 { error: "beta_ended", checkout_required: true } (FE falls back to Stripe).
-// Idempotent when already active. Does NOT invent sport entitlements or Stripe IDs.
-// Rate limit: lightweight inline (fail-open) — no shared import so deploy is single-file.
+// activate-beta-base (v2) — TEMP free Unlock gated by ops.feature_flags.free_unlock
+// Jim corrected 2026-09-22: NOT permanent Dec31 free. TEMP for Heavy audit only.
+// After audit cleanup residue 0: SET ops.feature_flags.enabled=false WHERE key='free_unlock'
+// → Unlock falls through to Stripe (paywall = billing + bot/security).
+// base_status only via service_role (never client-side — incident 2026-06-10).
+// Idempotent. Does NOT invent sport entitlements or Stripe IDs.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -19,10 +14,9 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-/** Exclusive end of free beta (UTC). Billing begins 2027-01-01. */
-const BETA_ENDS_AT = new Date("2027-01-01T00:00:00.000Z");
 const RL_LIMIT = 20;
 const RL_WINDOW_MS = 3_600_000;
+const FLAG_KEY = "free_unlock";
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -42,14 +36,13 @@ async function rateLimitOrNull(identity: string): Promise<Response | null> {
       p_limit: RL_LIMIT,
       p_window_ms: RL_WINDOW_MS,
     });
-    if (error) return null; // fail-open
-    const row = data as { allowed?: boolean; reset_at?: number } | null;
+    if (error) return null;
+    const row = data as { allowed?: boolean } | null;
     if (row && row.allowed === false) {
-      const retry = Math.max(1, Math.ceil(((row.reset_at ?? Date.now() + RL_WINDOW_MS) - Date.now()) / 1000));
-      return json(429, { error: "rate_limit_exceeded", message: "Too many requests. Please try again later." });
+      return json(429, { error: "rate_limited" });
     }
   } catch {
-    // fail-open
+    /* fail-open */
   }
   return null;
 }
@@ -58,14 +51,8 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
 
-  const xf = req.headers.get("x-forwarded-for");
-  const ip = (xf ? xf.split(",")[0]!.trim() : null)
-    ?? req.headers.get("cf-connecting-ip")
-    ?? req.headers.get("x-real-ip")
-    ?? "unknown";
-
   {
-    const limited = await rateLimitOrNull(ip);
+    const limited = await rateLimitOrNull(req.headers.get("x-forwarded-for") ?? "ip");
     if (limited) return limited;
   }
 
@@ -86,23 +73,33 @@ Deno.serve(async (req: Request) => {
     if (limited) return limited;
   }
 
-  const now = new Date();
-  if (now >= BETA_ENDS_AT) {
-    return json(402, {
-      error: "beta_ended",
-      checkout_required: true,
-      message: "Beta free unlock ended. Use Stripe checkout.",
-      beta_ends_at: BETA_ENDS_AT.toISOString(),
-    });
-  }
-
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
 
-  // Ensure public.users row exists (orphan-safe) without touching entitlements.
+  // TEMP flag: ops.feature_flags.free_unlock must be true. Env FREE_UNLOCK_ENABLED=true also works as override.
+  const envOn = (Deno.env.get("FREE_UNLOCK_ENABLED") ?? "").toLowerCase() === "true";
+  let flagOn = envOn;
+  if (!flagOn) {
+    const { data: flagRow } = await admin
+      .schema("ops")
+      .from("feature_flags")
+      .select("enabled")
+      .eq("key", FLAG_KEY)
+      .maybeSingle();
+    flagOn = flagRow?.enabled === true;
+  }
+
+  if (!flagOn) {
+    return json(402, {
+      error: "free_unlock_disabled",
+      checkout_required: true,
+      message: "Temporary free Unlock is off. Use Stripe checkout.",
+    });
+  }
+
   await admin.from("users").upsert({
     id: user.id,
     email: user.email ?? `${user.id}@unknown.local`,
@@ -116,16 +113,14 @@ Deno.serve(async (req: Request) => {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!before) {
-    return json(500, { error: "profile_missing" });
-  }
+  if (!before) return json(500, { error: "profile_missing" });
 
   if (before.base_status === "active") {
     return json(200, {
       ok: true,
       already_active: true,
       base_status: "active",
-      beta_ends_at: BETA_ENDS_AT.toISOString(),
+      free_unlock: true,
     });
   }
 
@@ -150,13 +145,14 @@ Deno.serve(async (req: Request) => {
     user_id: user.id,
     from: before.base_status,
     to: "active",
-    at: now.toISOString(),
+    flag: FLAG_KEY,
+    at: new Date().toISOString(),
   }));
 
   return json(200, {
     ok: true,
     already_active: false,
     base_status: "active",
-    beta_ends_at: BETA_ENDS_AT.toISOString(),
+    free_unlock: true,
   });
 });
