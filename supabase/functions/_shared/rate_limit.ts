@@ -7,6 +7,7 @@ export const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   "submit-assessment": { limit: 20, windowMs: 3600000 },
   "submit-lead-assessment": { limit: 10, windowMs: 3600000 },
   "create-checkout-session": { limit: 15, windowMs: 3600000 },
+  "activate-beta-base": { limit: 20, windowMs: 3600000 },
   "notify-coach-signup": { limit: 10, windowMs: 3600000 },
   "set-password": { limit: 10, windowMs: 3600000 },
   default: { limit: 30, windowMs: 3600000 },
