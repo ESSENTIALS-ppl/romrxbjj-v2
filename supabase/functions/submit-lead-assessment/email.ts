@@ -1,4 +1,10 @@
-// Base lead results email (pure render, no Deno/network). submit-lead-assessment v17, 2026-09-24.
+// Base lead results email (pure render, no Deno/network). submit-lead-assessment v18, 2026-09-24.
+// v18 (Fix A, Jim LOCK via Grant 2026-09-24 5:32 PM ET): the /100 and per-joint % use the ONE Base
+//      formula shared with the app. MUST STAY IN SYNC with romrx-io-web app/src/lib/mobilityBands.ts
+//      (jointPercent / mobilityScoreForAssessment / clampPercentToBand). Port any change there here.
+//        per-joint %  = floor(100 * min(1, worse / target)), clamped into the joint's band
+//        /100         = floor(mean of min(1, worse/target) * 100 over measured joints), clamped into
+//                       the overall band: Needs focus min(s, 89); Building max(90, min(s, 99)); Steady 100.
 // v17: Needs focus variant no longer repeats "top three problem areas" in back-to-back paragraphs.
 // Base bands only: Needs focus / Building / Steady (Jim LOCK via Grant 2026-09-24).
 // Band logic mirrors romrx-io-web app/src/lib/mobilityBands.ts overallBandForAssessment()
@@ -10,41 +16,86 @@ export type BaseBand = "Needs focus" | "Building" | "Steady";
 type JointMap = Record<string, number | null | undefined>;
 
 /** Same joints + targets as mobilityBands.ts ASSESSMENT_JOINTS / JOINT_SCORE_TARGETS. */
-const BAND_JOINTS: ReadonlyArray<{ target: number; l?: string; r?: string; single?: string }> = [
-  { target: 45, l: "hip_er_l", r: "hip_er_r" },
-  { target: 45, l: "hip_ir_l", r: "hip_ir_r" },
-  { target: 90, l: "hip_abd_l", r: "hip_abd_r" },
-  { target: 120, l: "hip_flex_l", r: "hip_flex_r" },
-  { target: 90, l: "shoulder_er_l", r: "shoulder_er_r" },
-  { target: 180, l: "shoulder_flex_l", r: "shoulder_flex_r" },
-  { target: 20, l: "ankle_df_l", r: "ankle_df_r" },
-  { target: 80, l: "cervical_rot_l", r: "cervical_rot_r" },
-  { target: 45, l: "cervical_lat_l", r: "cervical_lat_r" },
-  { target: 60, single: "lumbar_flex" },
-  { target: 25, single: "lumbar_ext" },
-  { target: 50, single: "cervical_flex" },
-  { target: 60, single: "cervical_ext" },
+const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
+  { target: 45, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
+  { target: 45, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
+  { target: 90, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
+  { target: 120, key: "hip_flex", l: "hip_flex_l", r: "hip_flex_r" },
+  { target: 90, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
+  { target: 180, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
+  { target: 20, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
+  { target: 80, key: "cervical_rot", l: "cervical_rot_l", r: "cervical_rot_r" },
+  { target: 45, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
+  { target: 60, key: "lumbar_flex", single: "lumbar_flex" },
+  { target: 25, key: "lumbar_ext", single: "lumbar_ext" },
+  { target: 50, key: "cervical_flex", single: "cervical_flex" },
+  { target: 60, key: "cervical_ext", single: "cervical_ext" },
 ];
 
 const num = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
 
+/** Worse side: midline, else lower of L/R, else the one side (same as the app's worseSideValue). */
+function worseOf(data: JointMap, j: { l?: string; r?: string; single?: string }): number | null {
+  if (j.single) return num(data[j.single]);
+  const l = num(data[j.l!]), r = num(data[j.r!]);
+  return l != null && r != null ? Math.min(l, r) : (l ?? r);
+}
+
+/** compute_joint_scores() band for one ratio: >= 1.00 Steady, >= 0.90 Building, else Needs focus. */
+function bandFromRatio(worse: number, target: number): 1 | 2 | 3 {
+  const ratio = worse / target;
+  return ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
+}
+
+/** Same as the app's clampPercentToBand(). */
+export function clampPercentToBand(pct: number, band: 1 | 2 | 3): number {
+  if (band === 3) return 100;
+  if (band === 2) return Math.max(90, Math.min(pct, 99));
+  return Math.max(0, Math.min(pct, 89));
+}
+
 /** 1 Needs focus, 2 Building, 3 Steady; null when no banded joint is measured. */
 export function overallBandScore(data: JointMap): 1 | 2 | 3 | null {
   let worst: 1 | 2 | 3 | null = null;
   for (const j of BAND_JOINTS) {
-    let worse: number | null = null;
-    if (j.single) worse = num(data[j.single]);
-    else {
-      const l = num(data[j.l!]), r = num(data[j.r!]);
-      worse = l != null && r != null ? Math.min(l, r) : (l ?? r);
-    }
+    const worse = worseOf(data, j);
     if (worse == null) continue;
-    const ratio = worse / j.target;
-    const band: 1 | 2 | 3 = ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
+    const band = bandFromRatio(worse, j.target);
     if (worst == null || band < worst) worst = band;
   }
   return worst;
+}
+
+/** Per-joint % (same as the app's jointPercent()), keyed by joint (hip_er, lumbar_ext, ...). */
+export function jointPercents(data: JointMap): Record<string, { pct: number; band: 1 | 2 | 3 }> {
+  const out: Record<string, { pct: number; band: 1 | 2 | 3 }> = {};
+  for (const j of BAND_JOINTS) {
+    const worse = worseOf(data, j);
+    if (worse == null) continue;
+    const band = bandFromRatio(worse, j.target);
+    const raw = Math.min(1, Math.max(0, worse / j.target)) * 100;
+    out[j.key] = { pct: clampPercentToBand(Math.floor(raw), band), band };
+  }
+  return out;
+}
+
+/**
+ * THE /100 (same as the app's mobilityScoreForAssessment()). Same joints, same order, same
+ * arithmetic, so the float result is bit-identical. null when no banded joint is measured.
+ */
+export function mobilityScore(data: JointMap): number | null {
+  let sum = 0;
+  let n = 0;
+  for (const j of BAND_JOINTS) {
+    const worse = worseOf(data, j);
+    if (worse == null) continue;
+    sum += Math.min(1, Math.max(0, worse / j.target)) * 100;
+    n += 1;
+  }
+  if (n === 0) return null;
+  const band = overallBandScore(data) ?? 3;
+  return clampPercentToBand(Math.floor(sum / n), band);
 }
 
 export const BAND_LABEL: Record<1 | 2 | 3, BaseBand> = { 1: "Needs focus", 2: "Building", 3: "Steady" };
