@@ -1,4 +1,6 @@
-// send-s1-welcome-email v22 (2026-09-21): restore full branded HTML from PR #28 + keep email_sends (redeploy after v21 stub).
+// send-s1-welcome-email v23 (2026-09-24): Base/general copy says "top three problem areas" (Jim LOCK via Grant).
+//   BJJ / Bodybuilding brands untouched (sport packs keep their own copy).
+// - v22 (2026-09-21): restore full branded HTML from PR #28 + keep email_sends (redeploy after v21 stub).
 // - v17: Base/general = Kai A1 Personalized Readiness Profile (not Position; not Personal).
 //   Beta Dec 31 2026 / Jan 1 2027. BJJ keeps Position Readiness. 2026-09-08.
 // - v16: only the auth.users INSERT trigger (service-role bearer) may call this function.
@@ -117,9 +119,9 @@ const BRANDS: Record<string, Brand> = {
     accent: "#1e6fd9",
     protocol: "Personalized Readiness Profile&trade;",
     markerCount: "key ROM markers",
-    contextLine: "your Top 3 Priority Joints and a clear next step for longevity, self-care, and mobility",
+    contextLine: "your top three problem areas and a clear next step for longevity, self-care, and mobility",
     introLine: "Most people who get real results with ROMRx do one thing first: complete the assessment that builds your <strong>Personalized Readiness Profile&trade;</strong>.",
-    durationLine: "It takes about 10 minutes on your phone. You'll see your Top 3 Priority Joints and a clear next step for longevity, self-care, and mobility.",
+    durationLine: "It takes about 10 minutes on your phone. You'll see your top three problem areas and a clear next step for longevity, self-care, and mobility.",
     baseNote: "You don't need to train a sport. Base is for taking care of your body for the long run.",
     ctaLabel: "&rarr; Start My Assessment",
     subject: "Your ROMRx account is ready. Here's your first move.",
