@@ -96,7 +96,7 @@ function formatMobilityBands(jointScores) {
   }
   const line = (arr) => (arr.length > 0 ? arr.join(", ") : "None listed");
   return [
-    `  Needs focus (Focus): ${line(needs)}`,
+    `  Needs focus: ${line(needs)}`,
     `  Building: ${line(building)}`,
     `  Steady: ${line(steady)}`,
   ].join("\n");
@@ -203,6 +203,27 @@ Keep responses concise and actionable. Use bullet points. Always tie advice to a
 Answer in short plain sentences. Prefer simple correct answers over fancy prose. No filler.`;
 }
 
+/** Base only: first three distinct joints from worst_joints (sides collapsed), in order. */
+function topThreeProblemAreas(worst) {
+  const out = [];
+  const seen = new Set();
+  for (const k of worst ?? []) {
+    const base = String(k ?? "").replace(/_(l|r)$/, "");
+    if (!base || seen.has(base)) continue;
+    seen.add(base);
+    out.push(k);
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
+/** Base only: "hip_abd_l" -> "left hip abduction". */
+function baseJointLabel(k) {
+  const m = String(k ?? "").match(/^(.*)_(l|r)$/);
+  if (m && J[m[1]]) return `${m[2] === "l" ? "left" : "right"} ${R(m[1])}`;
+  return R(k);
+}
+
 /** Base / general athlete prompt: mobility bands, no technique GREEN/YELLOW/RED. */
 function CBase(n) {
   const g = n.full_name ?? "Athlete";
@@ -227,10 +248,11 @@ function CBase(n) {
     const base = String(key).replace(/_(l|r)$/, "");
     if (scoreByKey[base] == null) scoreByKey[base] = row?.score;
   }
-  const priorityLine = h && h.length > 0
-    ? h.map((e) => {
+  const problemAreas = topThreeProblemAreas(h);
+  const priorityLine = problemAreas.length > 0
+    ? problemAreas.map((e) => {
         const band = bandFromScore(scoreByKey[e] ?? scoreByKey[String(e).replace(/_(l|r)$/, "")]) ?? "Needs focus";
-        return `${R(e)} (${band})`;
+        return `${baseJointLabel(e)} (${band})`;
       }).join(", ")
     : (hasJoints ? "See Needs focus band" : "No assessment yet");
   const i = formatSavedPlans(p);
@@ -242,7 +264,7 @@ Name: ${g} | Sport: BASE (general mobility)
 ${overallLine}
 Mobility bands from joint scores (1 Needs focus / 2 Building / 3 Steady):
 ${bandsBlock}
-Priority joints: ${priorityLine}
+Top three problem areas: ${priorityLine}
 
 ## Priority mobility protocol
 ${formatProtocol(m)}
@@ -252,15 +274,15 @@ ${i}
 
 ## How to answer
 Always name Overall mobility band first when asked about bands or readiness (Needs focus / Building / Steady).
-Then name priority joints with their band.
+Then name the top three problem areas with their band.
 When listing mobility, always include all three category names (Needs focus, Building, Steady) even if a list is empty ("None listed" is OK).
 Pattern after Overall: band name → joint → ease benefit → small plan → leave the choice with them ("your call").
-Chip shorthand: Focus · Building · Steady. Internal alias at_risk maps to Needs focus; do not say "at risk" to the user.
+Use only these band names: Needs focus, Building, Steady. Always say "Needs focus" in full. Never use any other tier, risk, or readiness label.
 
 ## Critical Rules
 - NEVER invent techniques or sport technique tiers. Base has no GREEN/YELLOW/RED technique readiness.
 - NEVER reveal specific degree values or ROM thresholds
-- If joint scores, priority joints, or protocol are present, NEVER say the assessment was not completed or is missing
+- If joint scores, top three problem areas, or protocol are present, NEVER say the assessment was not completed or is missing
 - When protocol/daily plan rows are present, answer daily-plan questions from them; do not say there is no plan
 - Not medical advice. Never give medical advice, treatment, icing/self-care instructions, diagnosis, or emergency triage beyond directing to emergency services. If asked about injury treatment, icing, or meds, refuse and steer to a clinician or ER.
 
