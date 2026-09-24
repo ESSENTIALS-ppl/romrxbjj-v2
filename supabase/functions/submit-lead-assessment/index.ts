@@ -1,4 +1,9 @@
-// submit-lead-assessment v17 (2026-09-24): Needs focus email copy de-duplicated (see email.ts). Logic unchanged.
+// submit-lead-assessment v18 (2026-09-24, Fix A, Jim LOCK via Grant 5:32 PM ET): the /100 now uses the ONE Base
+//        formula from email.ts mobilityScore() (floor of mean min(1, worse/target)*100 over the banded joints,
+//        clamped into the overall band), identical to romrx-io-web app/src/lib/mobilityBands.ts
+//        mobilityScoreForAssessment(). KEEP IN SYNC with that file. The old average of % of target over every
+//        whitelisted field (computePRS) is gone. dry_run also returns per-joint % + band (joints).
+// - v17 (2026-09-24): Needs focus email copy de-duplicated (see email.ts). Logic unchanged.
 // - v16 (2026-09-24, Jim LOCK via Grant)
 // - v16: Base lead results email uses the Base bands (Needs focus / Building / Steady) and
 //        "top three problem areas"; score + band shown as "NN/100 · Band". No ELITE/STRONG/AT RISK in
@@ -22,7 +27,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import { logEvent } from "../_shared/events.ts";
-import { BAND_LABEL, overallBandScore, renderEmail, renderSubject } from "./email.ts";
+import { BAND_LABEL, jointPercents, mobilityScore, overallBandScore, renderEmail, renderSubject } from "./email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -45,8 +50,8 @@ function json(status: number, body: unknown) {
 
 type JointMap = Record<string, number | null | undefined>;
 
-// Single source of truth for Base targets = compute-tiers v37 JOINT_TARGETS (kept in sync by hand until
-// every scorer reads public.rom_thresholds).
+// Whitelist of accepted joint fields (stored as-is). The /100 + band only score the 13 banded joints in
+// email.ts BAND_JOINTS (targets = app JOINT_SCORE_TARGETS / public.compute_joint_scores()).
 const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 45, hip_er_r: 45, hip_ir_l: 45, hip_ir_r: 45,
   hip_abd_l: 90, hip_abd_r: 90, hip_flex_l: 120, hip_flex_r: 120,
@@ -78,15 +83,9 @@ function sanitize(input: unknown): { data: JointMap; count: number } {
   return { data: out, count };
 }
 
+/** THE Base /100 (see email.ts mobilityScore). 0 only when no banded joint is measured. */
 function computePRS(data: JointMap): number {
-  const scores: number[] = [];
-  for (const [k, target] of Object.entries(JOINT_TARGETS)) {
-    const v = data[k];
-    if (typeof v !== "number" || !isFinite(v)) continue;
-    scores.push(Math.max(0, Math.min(100, (v / target) * 100)));
-  }
-  if (!scores.length) return 0;
-  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  return mobilityScore(data) ?? 0;
 }
 
 // Legacy internal tier: still written to leads.tier / returned to the app (never shown in customer copy).
@@ -155,6 +154,9 @@ Deno.serve(async (req: Request) => {
       dry_run: true,
       prs_score: score,
       band: band == null ? null : BAND_LABEL[band],
+      joints: Object.fromEntries(
+        Object.entries(jointPercents(data)).map(([k, v]) => [k, { pct: v.pct, band: BAND_LABEL[v.band] }]),
+      ),
       subject: renderSubject(score, band),
       html: renderEmail(score, band, "DRYRUN", "preview@romrx.io", PUBLIC_ORIGIN),
     });
