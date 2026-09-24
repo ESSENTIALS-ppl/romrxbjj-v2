@@ -414,6 +414,8 @@ async function G(n, l, g, c, o, m) {
         messages: [{ role: "system", content: c }, ...h],
         max_tokens: 800,
         temperature: 0.2,
+        // Privacy: do not keep this completion as a stored conversation at OpenAI.
+        store: false,
       }),
     });
     const r = await a.json();
@@ -437,6 +439,7 @@ async function G(n, l, g, c, o, m) {
         system: c,
         messages: h,
         max_tokens: 1200,
+        // Anthropic Messages API has no store parameter (dormant branch).
       }),
     });
     const r = await a.json();
