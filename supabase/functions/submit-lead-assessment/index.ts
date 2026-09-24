@@ -1,4 +1,5 @@
-// submit-lead-assessment v16 (2026-09-24, Jim LOCK via Grant)
+// submit-lead-assessment v17 (2026-09-24): Needs focus email copy de-duplicated (see email.ts). Logic unchanged.
+// - v16 (2026-09-24, Jim LOCK via Grant)
 // - v16: Base lead results email uses the Base bands (Needs focus / Building / Steady) and
 //        "top three problem areas"; score + band shown as "NN/100 · Band". No ELITE/STRONG/AT RISK in
 //        customer copy (this function is Base-only, sport=general; sport-pack emails are separate and

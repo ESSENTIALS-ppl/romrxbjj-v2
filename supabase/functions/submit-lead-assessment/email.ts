@@ -1,4 +1,5 @@
-// Base lead results email (pure render, no Deno/network). submit-lead-assessment v16, 2026-09-24.
+// Base lead results email (pure render, no Deno/network). submit-lead-assessment v17, 2026-09-24.
+// v17: Needs focus variant no longer repeats "top three problem areas" in back-to-back paragraphs.
 // Base bands only: Needs focus / Building / Steady (Jim LOCK via Grant 2026-09-24).
 // Band logic mirrors romrx-io-web app/src/lib/mobilityBands.ts overallBandForAssessment()
 // and public.compute_joint_scores(): per joint worse side / target, >= 1.00 Steady,
@@ -83,6 +84,10 @@ export function renderEmail(
     ? ""
     : `<div style="margin-top:12px;display:inline-block;padding:6px 14px;border-radius:999px;background:${color}1A;color:${color};font-size:13px;font-weight:700;letter-spacing:0.02em;">${BAND_LABEL[band]}</div>`;
   const unlockUrl = `${publicOrigin}/app/unlock/${unlockToken}`;
+  // Needs focus intro already names the top three problem areas; avoid repeating it in the next paragraph.
+  const unlockWhat = band === 1
+    ? "your joints, which ones to work on first, and your next step"
+    : "your joints, your top three problem areas, and your next step";
   return `<!doctype html><html><body style="margin:0;padding:0;background:#F8FAFC;font-family:'Inter Tight',-apple-system,sans-serif;color:#0F172A;">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
   <div style="text-align:center;margin-bottom:24px;">
@@ -98,7 +103,7 @@ export function renderEmail(
     <p style="margin:24px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">Hey there,</p>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">Your ROM score is ${formatScoreBand(score, band)}.</p>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">${intro}</p>
-    <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">This is the start of your Personalized Readiness Profile for longevity, self-care, and mobility. Unlock your dashboard to see your joints, your top three problem areas, and your next step.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">This is the start of your Personalized Readiness Profile for longevity, self-care, and mobility. Unlock your dashboard to see ${unlockWhat}.</p>
     <div style="margin:28px 0;text-align:center;">
       <a href="${unlockUrl}" style="display:inline-block;padding:14px 28px;background:#1D4ED8;color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;">Unlock My Dashboard</a>
       <div style="font-size:11px;color:#64748B;margin-top:10px;">ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.</div>
