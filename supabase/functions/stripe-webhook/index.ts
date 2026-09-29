@@ -8,12 +8,12 @@
 //   - Sport unlock checkout.session.completed: the old "Your {sport} pack is unlocked" email is replaced by Stacy's
 //     3c-2 ("Your {Sport pack} is unlocked: terms and how to cancel"), incl. the [VERIFY] line
 //     "Canceling {Sport pack} does not cancel your Base plan." (sport unlock = its own Stripe subscription).
-//   - Canceled state: customer.subscription.updated/deleted store cancel_at_period_end, cancel_at (or
-//     current_period_end when canceling at period end) and canceled_at on users (base_*) and sport_entitlements.
-//     Written in a separate update so a missing column can never block the base_status update.
-//   - When Base is scheduled to cancel, separate sport-pack subscriptions are scheduled to cancel at their period end
-//     too (metadata romrx_cascade=base_cancel), and un-scheduled if Base is resumed, so "Canceling Base also cancels
-//     any sport packs" holds even though both free periods end at the same instant on Jan 1, 2027.
+//   - Jim 2026-09-29 (decision c): cancel = access ends IMMEDIATELY, no future charges, no refunds, free period
+//     included. Base access is revoked on customer.subscription.deleted and on any Base update with status canceled.
+//     A Base update that only schedules a cancel (cancel_at_period_end / cancel_at) is converted to an immediate
+//     Stripe cancel (prorate=false, invoice_now=false) and access is revoked right away. Separate pack subs cancel too.
+//   - cancel_at / canceled_at are still stored for records on users (base_*) and sport_entitlements, in a separate
+//     update so a missing column can never block the base_status update.
 //   - Fixture-only TEST mode: events signed with STRIPE_TEST_WEBHOOK_SECRET (livemode=false) are processed only for
 //     users where public.is_test_account(email) is true, use STRIPE_TEST_SECRET_KEY for Stripe calls, and skip Jim's
 //     internal PAID alerts. Live events are verified and handled exactly as before.
@@ -85,9 +85,10 @@ async function sendEmail(brand: Brand, to: string, subject: string, html: string
 // v40: which Stripe key to use for API calls for the event being handled (live unless a verified test event).
 let CURRENT_CANCEL_KEY = STRIPE_SECRET_FOR_CANCEL;
 
+// Jim 2026-09-29 (decision c): cancel = immediate, no future charges, no refunds (no proration, no final invoice).
 async function cancelStripeSub(subId: string) {
   if (!CURRENT_CANCEL_KEY || !subId) return;
-  await fetch(`https://api.stripe.com/v1/subscriptions/${subId}`, {
+  await fetch(`https://api.stripe.com/v1/subscriptions/${subId}?prorate=false&invoice_now=false`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${CURRENT_CANCEL_KEY}` },
   });
@@ -145,27 +146,6 @@ async function recordSportCancelState(supabase: ReturnType<typeof createClient>,
   } catch (e) { console.error("sport cancel state error", (e as Error)?.message); }
 }
 /** v40: Base scheduled to cancel (or resumed) -> schedule (or un-schedule) the user's SEPARATE sport-pack subscriptions. */
-async function cascadeBaseScheduledCancel(supabase: ReturnType<typeof createClient>, userId: string, baseSubId: string, scheduled: boolean) {
-  if (!CURRENT_CANCEL_KEY) return;
-  const { data: rows } = await supabase.from("sport_entitlements")
-    .select("sport, stripe_subscription_id, status").eq("user_id", userId);
-  for (const r of rows ?? []) {
-    const sid = r.stripe_subscription_id as string | null;
-    if (!sid || sid === baseSubId || r.status === "canceled") continue;
-    const auth = { Authorization: `Bearer ${CURRENT_CANCEL_KEY}` };
-    if (!scheduled) {
-      const cur = await fetch(`https://api.stripe.com/v1/subscriptions/${sid}`, { headers: auth }).then((x) => x.json()).catch(() => null);
-      if (cur?.metadata?.romrx_cascade !== "base_cancel") continue; // only undo what Base scheduled
-    }
-    const form = new URLSearchParams(scheduled
-      ? { cancel_at_period_end: "true", "metadata[romrx_cascade]": "base_cancel" }
-      : { cancel_at_period_end: "false", "metadata[romrx_cascade]": "" });
-    const res = await fetch(`https://api.stripe.com/v1/subscriptions/${sid}`, {
-      method: "POST", headers: { ...auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString(),
-    });
-    if (!res.ok) console.error("sport cascade schedule failed", sid, res.status);
-  }
-}
 
 /** v40: yearly unit amounts (cents) in line-item order: from arl_amounts metadata, else from the subscription items. */
 async function arlAmounts(stripe: Stripe, meta: Record<string, string>, subId: string | undefined): Promise<number[]> {
@@ -549,22 +529,30 @@ Deno.serve(async (req: Request) => {
     const userId     = meta.user_id ?? meta.supabase_user_id ?? null;
 
     if (purpose === "base" && userId) {
+      // Jim 2026-09-29 (decision c): on cancel, Base access ends IMMEDIATELY (free period included). A scheduled
+      // cancel (cancel_at_period_end / cancel_at, e.g. portal still in period-end mode) is converted to an immediate
+      // Stripe cancel with no proration, and access is revoked now. Status canceled revokes too.
+      const st = cancelState(obj, false);
+      const scheduled = stripeStatus !== "canceled" && (st.cancel_at_period_end || !!st.cancel_at);
+      const revoked = stripeStatus === "canceled" || scheduled;
       const { error: baseUpdErr } = await supabase.from("users").update({
-        base_status: toBaseStatus(stripeStatus),
+        base_status: revoked ? "canceled" : toBaseStatus(stripeStatus),
         base_expiry: expiry,
         base_stripe_subscription_id: subId,
         stripe_customer_id: customerId,
       }).eq("id", userId);
       if (baseUpdErr) console.error("base_status update failed", stripeStatus, baseUpdErr.message);
 
-      // v40: canceled-but-not-ended state, and schedule/unschedule separate sport subs with Base.
-      const st = cancelState(obj, false);
-      await recordBaseCancelState(supabase, userId, st);
-      const prev = ((event.data as unknown as { previous_attributes?: Record<string, unknown> }).previous_attributes) ?? {};
-      if (type === "customer.subscription.updated" && ("cancel_at_period_end" in prev || "cancel_at" in prev)) {
-        // Sport-pack side effect: never allowed to break or block the Base update above.
-        try { await cascadeBaseScheduledCancel(supabase, userId, subId, st.cancel_at_period_end || !!st.cancel_at); }
-        catch (e) { console.error("sport cascade error (Base unaffected)", (e as Error)?.message); }
+      // v40: keep cancel_at / canceled_at for records.
+      await recordBaseCancelState(supabase, userId, { ...st, canceled_at: st.canceled_at ?? (revoked ? new Date().toISOString() : null) });
+      if (revoked) {
+        if (scheduled) {
+          try { await cancelStripeSub(subId); } catch (e) { console.error("immediate cancel failed", subId, (e as Error)?.message); }
+        }
+        // Combo pack rides on this subscription; separate pack subs are canceled too (Jim lock 2026-09-08).
+        try { await cancelAllSportPacksForUser(supabase, userId, { alsoCancelStripe: true, skipSubId: subId }); }
+        catch (e) { console.error("sport cascade error (Base already revoked)", (e as Error)?.message); }
+        return new Response(JSON.stringify({ received: true, base_revoked: true }), { headers: { "Content-Type": "application/json" } });
       }
 
       // Dual-unlock pending_sport mirrors Base standing

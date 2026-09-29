@@ -4,9 +4,11 @@
 //   prices come from the live Stripe Price objects at runtime (never hardcoded), sport pack names
 //   match the app labels. Do not edit wording here without a new Legal version string.
 // No em dashes. American spelling ("canceling"), per Legal update 2026-09-29 (sections 3b-2 / 3c-2 added).
+// v3: Jim decision (c) 2026-09-29, cancel ends access immediately, no refunds; Legal copy "Canceling ends your access
+// right away." (3b) and the "When you cancel:" bullet (3c / 3c-2).
 
-export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v2";
-export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v2";
+export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v3";
+export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
 export const BETA_TRIAL_END_UNIX = 1798822800;
@@ -34,22 +36,22 @@ export function formatUsd(unitAmountCents: number): string {
 
 /** 3b, Base only. */
 export function disclosureBase(basePrice: string): string {
-  return `Free through December 31, 2026. Then ${basePrice} per year, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Cancel before January 1, 2027 and you pay nothing.`;
+  return `Free through December 31, 2026. Then ${basePrice} per year, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Canceling ends your access right away. Cancel before January 1, 2027 and you pay nothing.`;
 }
 
 /** 3b, Base plus sport pack. */
 export function disclosureCombo(basePrice: string, sportPrice: string, sportPack: string): string {
-  return `Free through December 31, 2026. Then ${basePrice} per year for Base plus ${sportPrice} per year for ${sportPack}, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Cancel before January 1, 2027 and you pay nothing.`;
+  return `Free through December 31, 2026. Then ${basePrice} per year for Base plus ${sportPrice} per year for ${sportPack}, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Canceling ends your access right away. Cancel before January 1, 2027 and you pay nothing.`;
 }
 
 /** 3b-2, sport-only (existing Base user adds a pack), while the free period runs. */
 export function disclosureSport(sportPrice: string, sportPack: string): string {
-  return `Free through December 31, 2026. Then ${sportPrice} per year for ${sportPack}, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Cancel before January 1, 2027 and you pay nothing.`;
+  return `Free through December 31, 2026. Then ${sportPrice} per year for ${sportPack}, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Canceling ends your access right away. Cancel before January 1, 2027 and you pay nothing.`;
 }
 
 /** 3b-2, sport-only, from January 1, 2027 on (no free wording). */
 export function disclosureSportPaid(sportPrice: string, sportPack: string): string {
-  return `${sportPrice} per year for ${sportPack}, charged to your card today and every year after until you cancel. Cancel online anytime in Settings.`;
+  return `${sportPrice} per year for ${sportPack}, charged to your card today and every year after until you cancel. Cancel online anytime in Settings. Canceling ends your access right away.`;
 }
 
 /** 3c acknowledgment. sportPack/sportPrice are only set for Base plus sport pack. */
@@ -66,7 +68,7 @@ export function ackLines(basePrice: string, sportPack?: string | null, sportPric
     "Renewal: your plan renews automatically every year at the same price until you cancel. We will tell you before any price change.",
     `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
     "Cancel before January 1, 2027 and you will not be charged anything.",
-    "After a charge: canceling stops future renewals. Your access continues to the end of the paid year. All sales are final, except where the law requires a refund.",
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
     "Canceling Base also cancels any sport packs.",
     "Reminders: we will email you before your free period ends and before each yearly renewal.",
   ];
@@ -90,7 +92,7 @@ export function ackSportLines(sportPrice: string, sportPack: string, freePeriod:
     `Renewal: your ${sportPack} renews automatically every year at the same price until you cancel. We will tell you before any price change.`,
     `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
     ...(freePeriod ? ["Cancel before January 1, 2027 and you will not be charged anything."] : []),
-    "After a charge: canceling stops future renewals. Your access continues to the end of the paid year. All sales are final, except where the law requires a refund.",
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
     "Canceling Base also cancels any sport packs.",
     ...(packCancelsAlone ? [`Canceling ${sportPack} does not cancel your Base plan.`] : []),
     "Reminders: we will email you before your free period ends and before each yearly renewal.",

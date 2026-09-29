@@ -1,7 +1,8 @@
 // create-portal-session v13 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 section 4B, Jim GO via Grant 2026-09-29)
 //   - body { action: "cancel_status" }: DB-only state for Settings > Subscription: Base state
-//     (active | canceling | canceled | none) with the end date, each sport pack's state, and which subscriptions
-//     the signed-in user can cancel. Reads the cancel columns stripe-webhook v40 writes.
+//     (active | canceled | none), each sport pack's state, and which subscriptions the signed-in user can cancel.
+//     Jim 2026-09-29 (decision c): cancel ends access immediately, so a scheduled cancel also reads as "canceled"
+//     (stripe-webhook v40 converts it to an immediate cancel). There is no "active until {date}" state.
 //   - body { action: "cancel", target?: "base" | "bjj" | "bodybuilding" }: opens the Stripe Customer Portal straight
 //     to the cancel screen (flow_data.type = subscription_cancel) for the CALLER's own subscription only. The
 //     subscription id is never taken from the request: target only picks among the JWT user's own rows in
@@ -91,10 +92,8 @@ Deno.serve(async (req: Request) => {
     const baseScheduled = userRow?.base_cancel_at_period_end === true || !!userRow?.base_cancel_at;
     const baseLive = userRow?.base_status === "active" || userRow?.base_status === "past_due";
     const baseState = !baseSub ? "none"
-      : userRow?.base_status === "canceled" ? "canceled"
-      : baseLive && baseScheduled ? "canceling"
+      : userRow?.base_status === "canceled" || (baseLive && baseScheduled) ? "canceled"
       : baseLive ? "active" : "none";
-    const baseDate = baseState === "canceling" ? ((userRow?.base_cancel_at as string | null) ?? (userRow?.base_expiry as string | null) ?? null) : null;
 
     const candidates: Candidate[] = [];
     if (userRow?.stripe_customer_id && baseSub && baseState === "active") {
@@ -114,20 +113,20 @@ Deno.serve(async (req: Request) => {
     for (const e of ents ?? []) {
       const sid = e.stripe_subscription_id as string | null;
       const own = !!sid && sid !== baseSub; // own = separate Stripe subscription (sport unlock), not the combo item
-      // Combo packs ride on the Base subscription, so they inherit Base's canceling/canceled state.
-      const inherit = !own && (baseState === "canceling" || baseState === "canceled");
-      const scheduled = inherit ? baseState === "canceling" : (e.cancel_at_period_end === true || !!e.cancel_at);
-      const state = e.status === "canceled" || (inherit && baseState === "canceled") ? "canceled" : scheduled ? "canceling" : (e.status as string);
-      const cancelable = !!userRow?.stripe_customer_id && own && state !== "canceled" && state !== "canceling";
+      // Combo packs ride on the Base subscription, so they inherit Base's canceled state.
+      const inherit = !own && baseState === "canceled";
+      const scheduled = e.cancel_at_period_end === true || !!e.cancel_at;
+      const state = e.status === "canceled" || inherit || scheduled ? "canceled" : (e.status as string);
+      const cancelable = !!userRow?.stripe_customer_id && own && state !== "canceled";
       if (cancelable) candidates.push({ subscription_id: sid!, kind: "sport", sport: e.sport as string });
-      sports.push({ sport: e.sport as string, state, date: state !== "canceling" ? null : inherit ? baseDate : ((e.cancel_at as string | null) ?? (e.expires_at as string | null)), own_subscription: own, cancelable });
+      sports.push({ sport: e.sport as string, state, date: null, own_subscription: own, cancelable });
     }
 
     if (action === "cancel_status") {
       const first = candidates[0];
       return json({
         cancelable: !!first, kind: first?.kind ?? null,
-        base: { state: baseState, date: baseDate, cancelable: candidates.some((c) => c.kind === "base") },
+        base: { state: baseState, date: null, cancelable: candidates.some((c) => c.kind === "base") },
         sports,
       });
     }
