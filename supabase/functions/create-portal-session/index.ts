@@ -22,6 +22,9 @@ const SUPABASE_SVC  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY") ?? Deno.env.get("stripe_secret_key") ?? "";
 const STRIPE_TEST_SECRET = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim();
 
+// Release gate: until ARL_LIVE_ENABLED=true, live (non-fixture) callers get the v14 behavior (plain Manage billing
+// portal; cancel_status/cancel are ignored). Fixtures using the explicit test flag get the new actions.
+const ARL_LIVE = (Deno.env.get("ARL_LIVE_ENABLED") ?? "").toLowerCase() === "true";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -81,12 +84,13 @@ Deno.serve(async (req: Request) => {
 
   // Key choice: test key only for test fixtures (and only if a real sk_test_ key is configured).
   let stripeKey = STRIPE_SECRET;
+  let usingTest = false;
   if (testRequested && STRIPE_TEST_SECRET.startsWith("sk_test_") && user.email) {
     const { data: isTest } = await admin.rpc("is_test_account", { p_email: user.email });
-    if (isTest === true) stripeKey = STRIPE_TEST_SECRET;
+    if (isTest === true) { stripeKey = STRIPE_TEST_SECRET; usingTest = true; }
   }
 
-  if (action === "cancel_status" || action === "cancel") {
+  if ((action === "cancel_status" || action === "cancel") && (usingTest || ARL_LIVE)) {
     // Caller's own subscriptions only. Base first (canceling Base also cancels sport packs via stripe-webhook).
     const baseSub = (userRow?.base_stripe_subscription_id as string | null) ?? null;
     const baseScheduled = userRow?.base_cancel_at_period_end === true || !!userRow?.base_cancel_at;

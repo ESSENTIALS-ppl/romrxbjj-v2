@@ -1,3 +1,9 @@
+// DEPRECATED, not called anywhere (2026-09-29). compute-tiers persists protocols through the SQL RPC
+// public.persist_protocols_for_assessment, which ranks joints via public.protocol_joint_ranking().
+// That SQL is the source of truth: Base assessments use the My Protocol page ranking (top problem
+// areas, then asymmetry, then severity vs JOINT_SCORE_TARGETS); sport packs keep the legacy ranking
+// below. Do not wire this file back in without porting protocol_joint_ranking first, see
+// supabase/migrations/20260929040000_base_protocol_ranking_matches_my_protocol.sql.
 // Persist daily/full protocol rows to public.protocols so rombot_context.protocol
 // matches My Protocol (romrx-io-web): top-3 joints x (resistance, stretch, foam).
 // Mirrors app/src/pages/MyProtocol.tsx scoring + exercise grouping.

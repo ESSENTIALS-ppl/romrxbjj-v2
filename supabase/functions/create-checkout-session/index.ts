@@ -1,4 +1,4 @@
-// v32 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3b + 4D, Jim GO via Grant 2026-09-29):
+// v33 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3b + 4D, Jim GO via Grant 2026-09-29):
 //   - Base, Base + sport (combo) and sport unlock sessions now require an UNCHECKED terms consent box
 //     (consent_collection.terms_of_service = required) with Stacy's exact consent text in
 //     custom_text.terms_of_service_acceptance.
@@ -13,6 +13,9 @@
 //     test-mirror prices. Anything else (including the flag from a real customer) uses the live key exactly as before.
 //   - If Stripe rejects consent collection because the Terms URL is missing in Public details, the session is retried
 //     with the disclosure line but without the box (never worse than v31) and checkout_arl_consent_unavailable is logged.
+// v32 (already live, Grant GO 2026-09-29): NEW coach checkout sessions paused (launch is Base only; CA auto-renewal risk).
+// mode=coach returns 403 coach_checkout_paused unless env COACH_CHECKOUT_OPEN=true. Base, unlock, webhook,
+// portal and existing subscriptions unchanged.
 // v31 (Jim beta trial lock 2026-09-16): Base + sport unlock checkouts collect card always,
 // trial_end Unix 1798822800 (2027-01-01 12:00:00 America/New_York; noon ET Jan 1 display fix), then bill normally. Coach unchanged.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -36,6 +39,11 @@ const SPORT_PRICE_IDS: Record<string, string> = {
 };
 const COACH_PRICE_ID = "price_1TKKTgDou9Iktbw0YqnV3411";
 const COACH_ORIGIN = Deno.env.get("COACH_ORIGIN") ?? "https://romrxbjj.com";
+// Release gate (Jim: no real-user behavior change until release GO). While ARL_LIVE_ENABLED is not "true", LIVE
+// (non-fixture) requests take the exact v32 code path below (no disclosure, no consent box, v31 trial_end).
+// Only verified test-mode fixture requests get the new ARL behavior.
+const ARL_LIVE = (Deno.env.get("ARL_LIVE_ENABLED") ?? "").toLowerCase() === "true";
+const COACH_CHECKOUT_OPEN = (Deno.env.get("COACH_CHECKOUT_OPEN") ?? "").toLowerCase() === "true";
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-11-20.acacia" });
 // Fixture-only test mode (see header). Never used unless the key is a real sk_test_ key.
 const STRIPE_TEST_KEY = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim();
@@ -178,6 +186,34 @@ Deno.serve(async (req: Request) => {
     const caller = stripeTest && testRequested ? await getCallerUser(admin, req) : null;
     const testMode = !!caller && caller.id === body.user_id && await callerIsTestFixture(admin, caller.email, testRequested);
     const s = testMode ? stripeTest! : stripe;
+    if (!testMode && !ARL_LIVE) {
+      // v32 (live) behavior, unchanged.
+      const legacyItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: BASE_PRICE_ID, quantity: 1 }];
+      if (pendingSport) legacyItems.push({ price: SPORT_PRICE_IDS[pendingSport], quantity: 1 });
+      const legacyUrl = pendingSport
+        ? `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_success&add=${pendingSport}`
+        : `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_success`;
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          line_items: legacyItems,
+          allow_promotion_codes: true,
+          client_reference_id: body.user_id,
+          customer_email: body.email,
+          success_url: legacyUrl,
+          cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_cancel`,
+          metadata: meta,
+          subscription_data: { metadata: meta, trial_end: 1798822800 },
+          payment_method_collection: "always",
+        });
+        await logEvent("checkout_started", { userId: body.user_id, sport: pendingSport ?? "general", props: { mode: "base", pending_sport: pendingSport, lead_token: !!body.lead_token } });
+        return json(200, { url: session.url, pending_sport: pendingSport });
+      } catch (e) {
+        const err = e as { message?: string; type?: string; code?: string };
+        console.error("stripe base checkout failed", err);
+        return json(502, { error: "stripe_error", stripe_type: err.type ?? null, stripe_code: err.code ?? null, message: err.message ?? "Stripe checkout session creation failed" });
+      }
+    }
     let basePrice: YearlyPrice;
     let sportPriceR: YearlyPrice | null = null;
     try {
@@ -286,6 +322,28 @@ Deno.serve(async (req: Request) => {
     const unlockMeta = { purpose: "sport_unlock", user_id: userId, sport: token };
     const testMode = await callerIsTestFixture(admin, callerU?.email, testRequested);
     const s = testMode ? stripeTest! : stripe;
+    if (!testMode && !ARL_LIVE) {
+      // v32 (live) behavior, unchanged.
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          line_items: [{ price: priceId, quantity: 1 }],
+          allow_promotion_codes: true,
+          client_reference_id: userId,
+          metadata: unlockMeta,
+          subscription_data: { metadata: unlockMeta, trial_end: 1798822800 },
+          payment_method_collection: "always",
+          success_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_success`,
+          cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_cancel`,
+        });
+        await logEvent("checkout_started", { userId, sport: token, props: { mode: "unlock" } });
+        return json(200, { url: session.url });
+      } catch (e) {
+        const err = e as { message?: string; type?: string; code?: string };
+        console.error("stripe unlock checkout failed", err);
+        return json(502, { error: "stripe_error", stripe_type: err.type ?? null, stripe_code: err.code ?? null, message: err.message ?? "Stripe checkout session creation failed" });
+      }
+    }
     let unlockPrice: YearlyPrice;
     try {
       // Live: the caller-supplied price_id (v31 behavior) must still be an active USD yearly price.
@@ -359,6 +417,7 @@ Deno.serve(async (req: Request) => {
     }
   }
   if (mode === "coach") {
+    if (!COACH_CHECKOUT_OPEN) return json(403, { error: "coach_checkout_paused" });
     let userId = body.user_id ?? null;
     if (!userId) userId = await getCallerUserId(admin, req);
     if (!userId || !body.email) return json(400, { error: "user_id and email required" });

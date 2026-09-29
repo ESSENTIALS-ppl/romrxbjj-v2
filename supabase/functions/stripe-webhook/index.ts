@@ -1,3 +1,5 @@
+// v43: signature verification uses constructEventAsync (Deno/SubtleCrypto is async-only) + failure diagnostics (no secrets logged).
+// v42 = v40 ARL work + release gate (ARL_LIVE_ENABLED): live-signed events behave exactly like v41 until it is "true".
 // v40 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3c + 4A.4 + 4C, Jim GO via Grant 2026-09-29):
 //   - Base and Base + sport checkout.session.completed: the "You didn't buy a subscription" email is replaced by
 //     Stacy's 3c acknowledgment ("Your ROMRx subscription: terms and how to cancel"). Prices come from the
@@ -270,6 +272,10 @@ const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? Deno.env.
 // v40 fixture-only test mode. Both must be set for test events to be accepted.
 const STRIPE_TEST_WEBHOOK_SECRET = (Deno.env.get("STRIPE_TEST_WEBHOOK_SECRET") ?? "").trim();
 const STRIPE_TEST_SECRET = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim();
+// Release gate (Jim: no real-user behavior change until release GO). LIVE-signed events keep the exact v41 behavior
+// (old acknowledgment emails, no consent rows, no immediate-cancel conversion, no cancel-state writes) unless
+// ARL_LIVE_ENABLED=true. Test-signed fixture events always get the new ARL behavior.
+const ARL_LIVE = (Deno.env.get("ARL_LIVE_ENABLED") ?? "").toLowerCase() === "true";
 const TEST_MODE_READY = STRIPE_TEST_WEBHOOK_SECRET.startsWith("whsec_") && STRIPE_TEST_SECRET.startsWith("sk_test_");
 
 /** v40: user id an event refers to (metadata first, then customer id lookup). */
@@ -304,14 +310,25 @@ Deno.serve(async (req: Request) => {
   let event: Stripe.Event;
   let testEvent = false;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
-  } catch {
-    if (!TEST_MODE_READY) return new Response("Invalid signature", { status: 400 });
+    // constructEventAsync: same accept/reject result as constructEvent, but works with Deno's async SubtleCrypto.
+    event = await stripe.webhooks.constructEventAsync(body, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (liveErr) {
+    if (!TEST_MODE_READY) {
+      // Diagnostics only (no secret values): which prerequisite is missing.
+      console.error("webhook verify failed; test mode not ready", JSON.stringify({
+        whsec_set: STRIPE_TEST_WEBHOOK_SECRET.length > 0, whsec_prefix_ok: STRIPE_TEST_WEBHOOK_SECRET.startsWith("whsec_"),
+        sk_prefix_ok: STRIPE_TEST_SECRET.startsWith("sk_test_"), live_err: String((liveErr as Error)?.message ?? liveErr).slice(0, 80),
+      }));
+      return new Response("Invalid signature", { status: 400 });
+    }
     try {
-      event = stripe.webhooks.constructEvent(body, sig, STRIPE_TEST_WEBHOOK_SECRET);
+      event = await stripe.webhooks.constructEventAsync(body, sig, STRIPE_TEST_WEBHOOK_SECRET);
       if (event.livemode !== false) return new Response("Invalid signature", { status: 400 });
       testEvent = true;
-    } catch {
+    } catch (testErr) {
+      console.error("webhook verify failed (live and test)", JSON.stringify({
+        whsec_len: STRIPE_TEST_WEBHOOK_SECRET.length, test_err: String((testErr as Error)?.message ?? testErr).slice(0, 120),
+      }));
       return new Response("Invalid signature", { status: 400 });
     }
   }
@@ -332,6 +349,7 @@ Deno.serve(async (req: Request) => {
     CURRENT_CANCEL_KEY = STRIPE_TEST_SECRET;
   }
   const alertJim = !testEvent; // no internal PAID alerts for fixture test events
+  const arlOn = testEvent || ARL_LIVE;
 
   if (type === "checkout.session.completed") {
     const meta       = (obj.metadata ?? {}) as Record<string, string>;
@@ -356,21 +374,26 @@ Deno.serve(async (req: Request) => {
       const baseName = baseUser?.full_name ?? (email ? email.split("@")[0] : "there");
       const firstName = String(baseName).split(" ")[0] || "there";
 
-      void firstName; // v40: the 3c acknowledgment has no greeting line
       const pendingSport = (meta.pending_sport === "bjj" || meta.pending_sport === "bodybuilding")
         ? meta.pending_sport
         : null;
 
+      if (!arlOn) {
+        // v41 (live) behavior, unchanged.
+        if (email) {
+          await sendEmail(BRAND_HQ, email, `You didn't buy a subscription. You made an investment.`, `<p>Hey ${firstName}, your ROMRx Base is active. <a href="${BRAND_HQ.dashboard}">Dashboard</a></p>`);
+        }
+      }
       // v40: consent record + 3c acknowledgment (replaces "You didn't buy a subscription...").
-      const amounts = await arlAmounts(stripe, meta, subId);
-      await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
-      if (email && amounts.length) {
+      const amounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
+      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
+      if (arlOn && email && amounts.length) {
         const sportPack = pendingSport && amounts.length > 1 ? SPORT_PACK_NAMES[pendingSport] : null;
         const sportPrice = sportPack ? formatUsd(amounts[1]) : null;
         const resendId = await sendArlAck(email, obj.id as string, formatUsd(amounts[0]), sportPack, sportPrice);
         await logEvent("email_sent", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
           props: { email_id: "arl_ack", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
-      } else if (email) {
+      } else if (arlOn && email) {
         console.error("ARL ack not sent: no price amounts for session", obj.id);
       }
 
@@ -415,19 +438,23 @@ Deno.serve(async (req: Request) => {
       const firstName = String(sportName).split(" ")[0] || "there";
       const brand = brandFor(meta.sport);
 
+      if (!arlOn) {
+        // v41 (live) behavior, unchanged.
+        if (email) {
+          await sendEmail(brand, email, `Your ${meta.sport} pack is unlocked`, `<p>Hey ${firstName}, your ${meta.sport} pack is unlocked. <a href="${brand.dashboard}">Dashboard</a></p>`);
+        }
+      }
       // v40: consent record for sport unlock sessions too.
-      await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
-      void brand;
+      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
 
-      void firstName; // v40: 3c-2 has no greeting line
       // v40: 3c-2 acknowledgment replaces "Your {sport} pack is unlocked" (Legal: the old email alone does not comply).
-      const sportAmounts = await arlAmounts(stripe, meta, subId);
+      const sportAmounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
       const sportPack = SPORT_PACK_NAMES[meta.sport] ?? null;
-      if (email && sportAmounts.length && sportPack) {
+      if (arlOn && email && sportAmounts.length && sportPack) {
         const resendId = await sendArlSportAck(email, obj.id as string, formatUsd(sportAmounts[0]), sportPack, meta.arl_period !== "paid");
         await logEvent("email_sent", { userId: meta.user_id, sport: meta.sport, source: "stripe",
           props: { email_id: "arl_ack_sport", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
-      } else if (email) {
+      } else if (arlOn && email) {
         console.error("ARL sport ack not sent: missing amount or pack name", obj.id);
       }
 
@@ -533,8 +560,8 @@ Deno.serve(async (req: Request) => {
       // cancel (cancel_at_period_end / cancel_at, e.g. portal still in period-end mode) is converted to an immediate
       // Stripe cancel with no proration, and access is revoked now. Status canceled revokes too.
       const st = cancelState(obj, false);
-      const scheduled = stripeStatus !== "canceled" && (st.cancel_at_period_end || !!st.cancel_at);
-      const revoked = stripeStatus === "canceled" || scheduled;
+      const scheduled = arlOn && stripeStatus !== "canceled" && (st.cancel_at_period_end || !!st.cancel_at);
+      const revoked = arlOn && (stripeStatus === "canceled" || scheduled);
       const { error: baseUpdErr } = await supabase.from("users").update({
         base_status: revoked ? "canceled" : toBaseStatus(stripeStatus),
         base_expiry: expiry,
@@ -544,7 +571,7 @@ Deno.serve(async (req: Request) => {
       if (baseUpdErr) console.error("base_status update failed", stripeStatus, baseUpdErr.message);
 
       // v40: keep cancel_at / canceled_at for records.
-      await recordBaseCancelState(supabase, userId, { ...st, canceled_at: st.canceled_at ?? (revoked ? new Date().toISOString() : null) });
+      if (arlOn) await recordBaseCancelState(supabase, userId, { ...st, canceled_at: st.canceled_at ?? (revoked ? new Date().toISOString() : null) });
       if (revoked) {
         if (scheduled) {
           try { await cancelStripeSub(subId); } catch (e) { console.error("immediate cancel failed", subId, (e as Error)?.message); }
@@ -567,7 +594,7 @@ Deno.serve(async (req: Request) => {
           stripe_subscription_id: subId,
           expires_at: expiry,
         }, { onConflict: "user_id,sport" });
-        await recordSportCancelState(supabase, userId, pendingSport, st); // combo: same subscription as Base
+        if (arlOn) await recordSportCancelState(supabase, userId, pendingSport, st); // combo: same subscription as Base
         const sportGoodStanding = stripeStatus === "active" || stripeStatus === "trialing";
         if (sportGoodStanding) {
           await supabase.rpc("add_sport_access", { p_user_id: userId, p_sport: pendingSport });
@@ -596,7 +623,7 @@ Deno.serve(async (req: Request) => {
         expires_at: expiry,
       }, { onConflict: "user_id,sport" });
 
-      await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, false)); // v40
+      if (arlOn) await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, false)); // v40
       const sportGoodStanding = stripeStatus === "active" || stripeStatus === "trialing";
       const sportHardCancel = isBaseHardCancel(stripeStatus);
       if (sportGoodStanding) {
@@ -636,7 +663,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("users").update({
         base_status: "canceled",
       }).eq("id", userId);
-      if (type === "customer.subscription.deleted") await recordBaseCancelState(supabase, userId, cancelState(obj, true)); // v40
+      if (arlOn && type === "customer.subscription.deleted") await recordBaseCancelState(supabase, userId, cancelState(obj, true)); // v40
       await cancelAllSportPacksForUser(supabase, userId, {
         alsoCancelStripe: true,
         skipSubId: subId,
@@ -651,7 +678,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("sport_entitlements").update({
         status: "canceled",
       }).eq("user_id", userId).eq("sport", meta.sport);
-      if (type === "customer.subscription.deleted") await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, true)); // v40
+      if (arlOn && type === "customer.subscription.deleted") await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, true)); // v40
       await supabase.rpc("remove_sport_access", { p_user_id: userId, p_sport: meta.sport });
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }
