@@ -5,7 +5,15 @@
 //     Sent through Resend with an Idempotency-Key per Checkout Session; the Resend id is logged to product_events.
 //   - Every checkout.session.completed (base, combo, sport unlock) writes one public.billing_consents row with the
 //     Stripe consent result and the exact disclosure + consent text snapshot from the Session (no IP stored).
-//   - Sport unlock email unchanged (the plan has no sport-only 3c variant; flagged to Legal).
+//   - Sport unlock checkout.session.completed: the old "Your {sport} pack is unlocked" email is replaced by Stacy's
+//     3c-2 ("Your {Sport pack} is unlocked: terms and how to cancel"), incl. the [VERIFY] line
+//     "Canceling {Sport pack} does not cancel your Base plan." (sport unlock = its own Stripe subscription).
+//   - Canceled state: customer.subscription.updated/deleted store cancel_at_period_end, cancel_at (or
+//     current_period_end when canceling at period end) and canceled_at on users (base_*) and sport_entitlements.
+//     Written in a separate update so a missing column can never block the base_status update.
+//   - When Base is scheduled to cancel, separate sport-pack subscriptions are scheduled to cancel at their period end
+//     too (metadata romrx_cascade=base_cancel), and un-scheduled if Base is resumed, so "Canceling Base also cancels
+//     any sport packs" holds even though both free periods end at the same instant on Jan 1, 2027.
 //   - Fixture-only TEST mode: events signed with STRIPE_TEST_WEBHOOK_SECRET (livemode=false) are processed only for
 //     users where public.is_test_account(email) is true, use STRIPE_TEST_SECRET_KEY for Stripe calls, and skip Jim's
 //     internal PAID alerts. Live events are verified and handled exactly as before.
@@ -23,7 +31,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
 import { logEvent } from "../_shared/events.ts";
-import { ARL_ACK_VERSION, SPORT_PACK_NAMES, formatUsd, ackSubject, ackHtml, ackText } from "../_shared/arl_copy.ts";
+import {
+  ARL_ACK_VERSION, SPORT_PACK_NAMES, formatUsd, ackSubject, ackHtml, ackText,
+  ackSportSubject, ackSportHtml, ackSportText,
+} from "../_shared/arl_copy.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const STRIPE_SECRET_FOR_CANCEL = Deno.env.get("stripe_secret_key") ?? "";
@@ -82,25 +93,76 @@ async function cancelStripeSub(subId: string) {
   });
 }
 
-/** v40: 3c acknowledgment via Resend. Returns the Resend id (or null). Idempotent per Checkout Session. */
+/** v40: 3c / 3c-2 acknowledgment via Resend. Returns the Resend id (or null). Idempotent per Checkout Session. */
 async function sendArlAck(to: string, sessionId: string, basePrice: string, sportPack: string | null, sportPrice: string | null): Promise<string | null> {
+  return await sendArlMail(to, `arl_ack-${sessionId}`, ackSubject(), ackHtml(basePrice, sportPack, sportPrice), ackText(basePrice, sportPack, sportPrice), "arl_ack");
+}
+async function sendArlSportAck(to: string, sessionId: string, sportPrice: string, sportPack: string, freePeriod: boolean): Promise<string | null> {
+  // packCancelsAlone = true: a sport unlock is its own Stripe subscription and can be canceled without Base.
+  return await sendArlMail(to, `arl_ack_sport-${sessionId}`, ackSportSubject(sportPack),
+    ackSportHtml(sportPrice, sportPack, freePeriod, true), ackSportText(sportPrice, sportPack, freePeriod, true), "arl_ack_sport");
+}
+async function sendArlMail(to: string, key: string, subject: string, html: string, text: string, emailId: string): Promise<string | null> {
   if (!RESEND_KEY) return null;
-  const key = `arl_ack-${sessionId}`;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json", "Idempotency-Key": key },
     body: JSON.stringify({
       from: BRAND_HQ.from, to: [to], reply_to: BRAND_HQ.replyTo,
-      subject: ackSubject(),
-      html: ackHtml(basePrice, sportPack, sportPrice),
-      text: ackText(basePrice, sportPack, sportPrice),
+      subject, html, text,
       headers: { "X-Entity-Ref-ID": key },
-      tags: [{ name: "email_id", value: "arl_ack" }, { name: "type", value: "transactional" }],
+      tags: [{ name: "email_id", value: emailId }, { name: "type", value: "transactional" }],
     }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { console.error("ARL ack Resend error", res.status, JSON.stringify(data)); return null; }
   return (data as { id?: string }).id ?? null;
+}
+
+/** v40: cancel state from a Stripe Subscription object. */
+function cancelState(o: Record<string, unknown>, deleted: boolean) {
+  const iso = (v: unknown) => (typeof v === "number" && v > 0 ? new Date(v * 1000).toISOString() : null);
+  const cape = o.cancel_at_period_end === true;
+  const cancelAt = iso(o.cancel_at) ?? (cape ? iso(o.current_period_end) : null);
+  return {
+    cancel_at_period_end: deleted ? false : cape,
+    cancel_at: deleted ? (iso(o.ended_at) ?? iso(o.canceled_at)) : cancelAt,
+    canceled_at: iso(o.canceled_at) ?? (deleted ? new Date().toISOString() : null),
+  };
+}
+async function recordBaseCancelState(supabase: ReturnType<typeof createClient>, userId: string, st: ReturnType<typeof cancelState>) {
+  const { error } = await supabase.from("users").update({
+    base_cancel_at_period_end: st.cancel_at_period_end, base_cancel_at: st.cancel_at, base_canceled_at: st.canceled_at,
+  }).eq("id", userId);
+  if (error) console.error("base cancel state update failed", error.message);
+}
+async function recordSportCancelState(supabase: ReturnType<typeof createClient>, userId: string, sport: string, st: ReturnType<typeof cancelState>) {
+  const { error } = await supabase.from("sport_entitlements").update({
+    cancel_at_period_end: st.cancel_at_period_end, cancel_at: st.cancel_at, canceled_at: st.canceled_at,
+  }).eq("user_id", userId).eq("sport", sport);
+  if (error) console.error("sport cancel state update failed", error.message);
+}
+/** v40: Base scheduled to cancel (or resumed) -> schedule (or un-schedule) the user's SEPARATE sport-pack subscriptions. */
+async function cascadeBaseScheduledCancel(supabase: ReturnType<typeof createClient>, userId: string, baseSubId: string, scheduled: boolean) {
+  if (!CURRENT_CANCEL_KEY) return;
+  const { data: rows } = await supabase.from("sport_entitlements")
+    .select("sport, stripe_subscription_id, status").eq("user_id", userId);
+  for (const r of rows ?? []) {
+    const sid = r.stripe_subscription_id as string | null;
+    if (!sid || sid === baseSubId || r.status === "canceled") continue;
+    const auth = { Authorization: `Bearer ${CURRENT_CANCEL_KEY}` };
+    if (!scheduled) {
+      const cur = await fetch(`https://api.stripe.com/v1/subscriptions/${sid}`, { headers: auth }).then((x) => x.json()).catch(() => null);
+      if (cur?.metadata?.romrx_cascade !== "base_cancel") continue; // only undo what Base scheduled
+    }
+    const form = new URLSearchParams(scheduled
+      ? { cancel_at_period_end: "true", "metadata[romrx_cascade]": "base_cancel" }
+      : { cancel_at_period_end: "false", "metadata[romrx_cascade]": "" });
+    const res = await fetch(`https://api.stripe.com/v1/subscriptions/${sid}`, {
+      method: "POST", headers: { ...auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString(),
+    });
+    if (!res.ok) console.error("sport cascade schedule failed", sid, res.status);
+  }
 }
 
 /** v40: yearly unit amounts (cents) in line-item order: from arl_amounts metadata, else from the subscription items. */
@@ -265,6 +327,7 @@ Deno.serve(async (req: Request) => {
     if (!TEST_MODE_READY) return new Response("Invalid signature", { status: 400 });
     try {
       event = stripe.webhooks.constructEvent(body, sig, STRIPE_TEST_WEBHOOK_SECRET);
+      if (event.livemode !== false) return new Response("Invalid signature", { status: 400 });
       testEvent = true;
     } catch {
       return new Response("Invalid signature", { status: 400 });
@@ -372,9 +435,18 @@ Deno.serve(async (req: Request) => {
 
       // v40: consent record for sport unlock sessions too.
       await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
+      void brand;
 
-      if (email) {
-        await sendEmail(brand, email, `Your ${meta.sport} pack is unlocked`, `<p>Hey ${firstName}, your ${meta.sport} pack is unlocked. <a href="${brand.dashboard}">Dashboard</a></p>`);
+      void firstName; // v40: 3c-2 has no greeting line
+      // v40: 3c-2 acknowledgment replaces "Your {sport} pack is unlocked" (Legal: the old email alone does not comply).
+      const sportAmounts = await arlAmounts(stripe, meta, subId);
+      const sportPack = SPORT_PACK_NAMES[meta.sport] ?? null;
+      if (email && sportAmounts.length && sportPack) {
+        const resendId = await sendArlSportAck(email, obj.id as string, formatUsd(sportAmounts[0]), sportPack, meta.arl_period !== "paid");
+        await logEvent("email_sent", { userId: meta.user_id, sport: meta.sport, source: "stripe",
+          props: { email_id: "arl_ack_sport", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
+      } else if (email) {
+        console.error("ARL sport ack not sent: missing amount or pack name", obj.id);
       }
 
       if (alertJim) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
@@ -483,6 +555,14 @@ Deno.serve(async (req: Request) => {
       }).eq("id", userId);
       if (baseUpdErr) console.error("base_status update failed", stripeStatus, baseUpdErr.message);
 
+      // v40: canceled-but-not-ended state, and schedule/unschedule separate sport subs with Base.
+      const st = cancelState(obj, false);
+      await recordBaseCancelState(supabase, userId, st);
+      const prev = ((event.data as unknown as { previous_attributes?: Record<string, unknown> }).previous_attributes) ?? {};
+      if (type === "customer.subscription.updated" && ("cancel_at_period_end" in prev || "cancel_at" in prev)) {
+        await cascadeBaseScheduledCancel(supabase, userId, subId, st.cancel_at_period_end || !!st.cancel_at);
+      }
+
       // Dual-unlock pending_sport mirrors Base standing
       const pendingSport = (meta.pending_sport === "bjj" || meta.pending_sport === "bodybuilding")
         ? meta.pending_sport
@@ -495,6 +575,7 @@ Deno.serve(async (req: Request) => {
           stripe_subscription_id: subId,
           expires_at: expiry,
         }, { onConflict: "user_id,sport" });
+        await recordSportCancelState(supabase, userId, pendingSport, st); // combo: same subscription as Base
         const sportGoodStanding = stripeStatus === "active" || stripeStatus === "trialing";
         if (sportGoodStanding) {
           await supabase.rpc("add_sport_access", { p_user_id: userId, p_sport: pendingSport });
@@ -523,6 +604,7 @@ Deno.serve(async (req: Request) => {
         expires_at: expiry,
       }, { onConflict: "user_id,sport" });
 
+      await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, false)); // v40
       const sportGoodStanding = stripeStatus === "active" || stripeStatus === "trialing";
       const sportHardCancel = isBaseHardCancel(stripeStatus);
       if (sportGoodStanding) {
@@ -562,6 +644,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("users").update({
         base_status: "canceled",
       }).eq("id", userId);
+      if (type === "customer.subscription.deleted") await recordBaseCancelState(supabase, userId, cancelState(obj, true)); // v40
       await cancelAllSportPacksForUser(supabase, userId, {
         alsoCancelStripe: true,
         skipSubId: subId,
@@ -576,6 +659,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("sport_entitlements").update({
         status: "canceled",
       }).eq("user_id", userId).eq("sport", meta.sport);
+      if (type === "customer.subscription.deleted") await recordSportCancelState(supabase, userId, meta.sport, cancelState(obj, true)); // v40
       await supabase.rpc("remove_sport_access", { p_user_id: userId, p_sport: meta.sport });
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }

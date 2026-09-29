@@ -1,13 +1,15 @@
 // create-portal-session v13 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 section 4B, Jim GO via Grant 2026-09-29)
-//   - body { action: "cancel_status" }: tells the Settings page whether the signed-in user has an active
-//     Stripe subscription they can cancel (Base first, else a sport pack). DB-only, no Stripe call.
-//   - body { action: "cancel" }: opens the Stripe Customer Portal straight to the cancel screen
-//     (flow_data.type = subscription_cancel) for the CALLER's own subscription only. The subscription id is
-//     never taken from the request: it is read from public.users / public.sport_entitlements for the JWT user,
-//     then re-checked against Stripe (same customer, still active/trialing/past_due, not already canceling).
+//   - body { action: "cancel_status" }: DB-only state for Settings > Subscription: Base state
+//     (active | canceling | canceled | none) with the end date, each sport pack's state, and which subscriptions
+//     the signed-in user can cancel. Reads the cancel columns stripe-webhook v40 writes.
+//   - body { action: "cancel", target?: "base" | "bjj" | "bodybuilding" }: opens the Stripe Customer Portal straight
+//     to the cancel screen (flow_data.type = subscription_cancel) for the CALLER's own subscription only. The
+//     subscription id is never taken from the request: target only picks among the JWT user's own rows in
+//     public.users / public.sport_entitlements, then Stripe re-checks it (same customer, still active/trialing/
+//     past_due, not already canceling). No retention offer is ever requested.
 //   - Default (no action): unchanged v12 behavior, the general "Manage billing" portal.
-//   - Fixture-only TEST mode: STRIPE_TEST_SECRET_KEY (sk_test_) is used only when public.is_test_account(email)
-//     is true for the signed-in user. Everyone else uses the live key exactly as before.
+//   - Fixture-only TEST mode, all required: body stripe_test_mode === true, the JWT user's email passes
+//     public.is_test_account(email), and STRIPE_TEST_SECRET_KEY starts with sk_test_. Otherwise live key, as before.
 // create-portal-session v2
 // Fix: env var STRIPE_SECRET_KEY (was lowercase stripe_secret_key in v1)
 // Creates a Stripe Billing Portal session so athletes can manage/cancel their subscription
@@ -49,48 +51,92 @@ Deno.serve(async (req: Request) => {
   if (!STRIPE_SECRET) return json({ error: "Stripe not configured" }, 500);
 
   let action = "";
-  try { const b = await req.json(); action = String(b?.action ?? ""); } catch { /* empty body = manage billing */ }
+  let target = "";
+  let testRequested = false;
+  try {
+    const b = await req.json();
+    action = String(b?.action ?? "");
+    target = String(b?.target ?? "");
+    testRequested = b?.stripe_test_mode === true;
+  } catch { /* empty body = manage billing */ }
 
   // Get Stripe customer ID from users table
   const admin = createClient(SUPABASE_URL, SUPABASE_SVC);
-  const { data: userRow } = await admin.from("users")
-    .select("stripe_customer_id, base_status, base_stripe_subscription_id")
+  // Cancel-state columns come from migration 20260929060000; fall back so Manage billing never breaks without it.
+  type Row = Record<string, unknown>;
+  const first = await admin.from("users")
+    .select("stripe_customer_id, base_status, base_stripe_subscription_id, base_expiry, base_cancel_at_period_end, base_cancel_at")
     .eq("id", user.id)
     .maybeSingle();
+  let userRow = first.data as Row | null;
+  if (first.error) {
+    console.error("users select (cancel cols) failed, falling back", first.error.message);
+    const fb = await admin.from("users")
+      .select("stripe_customer_id, base_status, base_stripe_subscription_id, base_expiry")
+      .eq("id", user.id)
+      .maybeSingle();
+    userRow = fb.data as Row | null;
+  }
 
   // Key choice: test key only for test fixtures (and only if a real sk_test_ key is configured).
   let stripeKey = STRIPE_SECRET;
-  if (STRIPE_TEST_SECRET.startsWith("sk_test_") && user.email) {
+  if (testRequested && STRIPE_TEST_SECRET.startsWith("sk_test_") && user.email) {
     const { data: isTest } = await admin.rpc("is_test_account", { p_email: user.email });
     if (isTest === true) stripeKey = STRIPE_TEST_SECRET;
   }
 
   if (action === "cancel_status" || action === "cancel") {
-    // Caller's own subscriptions only. Base first (cancelling Base also cancels sport packs via stripe-webhook).
+    // Caller's own subscriptions only. Base first (canceling Base also cancels sport packs via stripe-webhook).
+    const baseSub = (userRow?.base_stripe_subscription_id as string | null) ?? null;
+    const baseScheduled = userRow?.base_cancel_at_period_end === true || !!userRow?.base_cancel_at;
+    const baseLive = userRow?.base_status === "active" || userRow?.base_status === "past_due";
+    const baseState = !baseSub ? "none"
+      : userRow?.base_status === "canceled" ? "canceled"
+      : baseLive && baseScheduled ? "canceling"
+      : baseLive ? "active" : "none";
+    const baseDate = baseState === "canceling" ? ((userRow?.base_cancel_at as string | null) ?? (userRow?.base_expiry as string | null) ?? null) : null;
+
     const candidates: Candidate[] = [];
-    if (userRow?.stripe_customer_id && userRow.base_stripe_subscription_id &&
-        (userRow.base_status === "active" || userRow.base_status === "past_due")) {
-      candidates.push({ subscription_id: userRow.base_stripe_subscription_id as string, kind: "base" });
+    if (userRow?.stripe_customer_id && baseSub && baseState === "active") {
+      candidates.push({ subscription_id: baseSub, kind: "base" });
     }
-    if (userRow?.stripe_customer_id) {
-      const { data: ents } = await admin.from("sport_entitlements")
-        .select("sport, status, stripe_subscription_id")
+    const sports: { sport: string; state: string; date: string | null; own_subscription: boolean; cancelable: boolean }[] = [];
+    const entFirst = await admin.from("sport_entitlements")
+      .select("sport, status, stripe_subscription_id, expires_at, cancel_at_period_end, cancel_at")
+      .eq("user_id", user.id);
+    let ents = entFirst.data as Row[] | null;
+    if (entFirst.error) {
+      const fb = await admin.from("sport_entitlements")
+        .select("sport, status, stripe_subscription_id, expires_at")
         .eq("user_id", user.id);
-      for (const e of ents ?? []) {
-        const sid = e.stripe_subscription_id as string | null;
-        if (!sid || e.status === "canceled") continue;
-        if (candidates.some((c) => c.subscription_id === sid)) continue; // combo: same subscription as Base
-        candidates.push({ subscription_id: sid, kind: "sport", sport: e.sport as string });
-      }
+      ents = fb.data as Row[] | null;
+    }
+    for (const e of ents ?? []) {
+      const sid = e.stripe_subscription_id as string | null;
+      const own = !!sid && sid !== baseSub; // own = separate Stripe subscription (sport unlock), not the combo item
+      // Combo packs ride on the Base subscription, so they inherit Base's canceling/canceled state.
+      const inherit = !own && (baseState === "canceling" || baseState === "canceled");
+      const scheduled = inherit ? baseState === "canceling" : (e.cancel_at_period_end === true || !!e.cancel_at);
+      const state = e.status === "canceled" || (inherit && baseState === "canceled") ? "canceled" : scheduled ? "canceling" : (e.status as string);
+      const cancelable = !!userRow?.stripe_customer_id && own && state !== "canceled" && state !== "canceling";
+      if (cancelable) candidates.push({ subscription_id: sid!, kind: "sport", sport: e.sport as string });
+      sports.push({ sport: e.sport as string, state, date: state !== "canceling" ? null : inherit ? baseDate : ((e.cancel_at as string | null) ?? (e.expires_at as string | null)), own_subscription: own, cancelable });
     }
 
     if (action === "cancel_status") {
       const first = candidates[0];
-      return json({ cancelable: !!first, kind: first?.kind ?? null });
+      return json({
+        cancelable: !!first, kind: first?.kind ?? null,
+        base: { state: baseState, date: baseDate, cancelable: candidates.some((c) => c.kind === "base") },
+        sports,
+      });
     }
 
-    // action === "cancel": verify with Stripe, then open the portal cancel flow.
-    for (const c of candidates) {
+    // action === "cancel": optional target narrows to the caller's own Base or one own pack.
+    const picked = target === "base" ? candidates.filter((c) => c.kind === "base")
+      : target ? candidates.filter((c) => c.kind === "sport" && c.sport === target)
+      : candidates;
+    for (const c of picked) {
       const { ok, body: sub } = await stripeGet(stripeKey, `subscriptions/${encodeURIComponent(c.subscription_id)}`);
       if (!ok) { console.error("subscription lookup failed", c.subscription_id, sub?.error?.message); continue; }
       if (sub.customer !== userRow?.stripe_customer_id) { console.error("subscription/customer mismatch", c.subscription_id); continue; }
@@ -129,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
   // Create Stripe Customer Portal session
   const params = new URLSearchParams({
-    customer: userRow.stripe_customer_id,
+    customer: userRow.stripe_customer_id as string,
     return_url: `${origin}/app/dashboard/settings`,
   });
 

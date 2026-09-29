@@ -4,11 +4,13 @@
 //     custom_text.terms_of_service_acceptance.
 //   - Base and combo sessions show Stacy's 3b disclosure line in bold directly above the pay button
 //     (custom_text.submit). Prices in the line are read from the Stripe Price objects at runtime.
-//   - Sport unlock (no Base line item) gets the consent box only: the plan has no sport-only 3b line (flagged to Legal).
+//   - Sport unlock (existing Base user adds a pack): Stacy's 3b-2 line (free-period version through Dec 31, 2026;
+//     "charged today" version from Jan 1, 2027, when no trial_end is sent because it would be in the past).
 //   - Session metadata carries arl_* fields so stripe-webhook can write public.billing_consents.
-//   - Fixture-only Stripe TEST mode: when STRIPE_TEST_SECRET_KEY (sk_test_) is set AND the signed-in caller passes
-//     public.is_test_account(email), the session is created in test mode with test-mirror prices. Everyone else
-//     always uses the live key exactly as before.
+//   - Fixture-only Stripe TEST mode, all four required: (1) request body stripe_test_mode === true, (2) a valid
+//     Supabase JWT whose email passes public.is_test_account(email) (base mode: JWT user id must equal body.user_id),
+//     (3) STRIPE_TEST_SECRET_KEY is set and starts with sk_test_. Then the session is created in test mode with
+//     test-mirror prices. Anything else (including the flag from a real customer) uses the live key exactly as before.
 //   - If Stripe rejects consent collection because the Terms URL is missing in Public details, the session is retried
 //     with the disclosure line but without the box (never worse than v31) and checkout_arl_consent_unavailable is logged.
 // v31 (Jim beta trial lock 2026-09-16): Base + sport unlock checkouts collect card always,
@@ -20,6 +22,7 @@ import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import {
   ARL_DISCLOSURE_VERSION, ARL_CONSENT_TEXT, SPORT_PACK_NAMES, formatUsd, disclosureBase, disclosureCombo,
+  disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
 } from "../_shared/arl_copy.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -70,8 +73,9 @@ async function resolveYearlyPrice(s: Stripe, testMode: boolean, key: string, liv
   if (!ok) throw new ArlPriceError(`price ${price.id} is not an active USD yearly price`);
   return { id: price.id, amount: price.unit_amount as number };
 }
-async function callerIsTestFixture(admin: ReturnType<typeof createClient>, email: string | null | undefined): Promise<boolean> {
-  if (!stripeTest || !email) return false;
+/** Test mode needs an explicit request flag AND a test-fixture email AND a real sk_test_ key. */
+async function callerIsTestFixture(admin: ReturnType<typeof createClient>, email: string | null | undefined, requested: boolean): Promise<boolean> {
+  if (!requested || !stripeTest || !email) return false;
   const { data, error } = await admin.rpc("is_test_account", { p_email: email });
   if (error) { console.error("is_test_account rpc failed", error.message); return false; }
   return data === true;
@@ -154,9 +158,11 @@ Deno.serve(async (req: Request) => {
     lead_token?: string;
     pending_sport?: string;
     add?: string;
+    stripe_test_mode?: boolean;
   };
   try { body = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+  const testRequested = body.stripe_test_mode === true;
   const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
   if (mode === "base") {
     if (!body.user_id || !body.email) return json(400, { error: "user_id and email required" });
@@ -169,8 +175,8 @@ Deno.serve(async (req: Request) => {
     if (pendingSport) meta.pending_sport = pendingSport;
     if (pendingSport && !SPORT_PRICE_IDS[pendingSport]) return json(400, { error: "invalid_pending_sport" });
     // Test mode only for a signed-in fixture checking out as themself.
-    const caller = stripeTest ? await getCallerUser(admin, req) : null;
-    const testMode = !!caller && caller.id === body.user_id && await callerIsTestFixture(admin, caller.email);
+    const caller = stripeTest && testRequested ? await getCallerUser(admin, req) : null;
+    const testMode = !!caller && caller.id === body.user_id && await callerIsTestFixture(admin, caller.email, testRequested);
     const s = testMode ? stripeTest! : stripe;
     let basePrice: YearlyPrice;
     let sportPriceR: YearlyPrice | null = null;
@@ -192,6 +198,7 @@ Deno.serve(async (req: Request) => {
       ...meta,
       arl_version: ARL_DISCLOSURE_VERSION,
       arl_offer: pendingSport ? "combo" : "base",
+      arl_period: "free",
       arl_price_ids: line_items.map((l) => l.price).join(","),
       arl_amounts: [basePrice.amount, ...(sportPriceR ? [sportPriceR.amount] : [])].join(","),
       arl_ua: (req.headers.get("user-agent") ?? "").slice(0, 255),
@@ -275,7 +282,7 @@ Deno.serve(async (req: Request) => {
     const priceId = body.price_id ?? SPORT_PRICE_IDS[token];
     if (!priceId) return json(404, { error: "invalid_token" });
     const unlockMeta = { purpose: "sport_unlock", user_id: userId, sport: token };
-    const testMode = await callerIsTestFixture(admin, callerU?.email);
+    const testMode = await callerIsTestFixture(admin, callerU?.email, testRequested);
     const s = testMode ? stripeTest! : stripe;
     let unlockPrice: YearlyPrice;
     try {
@@ -285,8 +292,14 @@ Deno.serve(async (req: Request) => {
       console.error("arl unlock price resolve failed", String(e));
       return json(502, { error: "stripe_error", stripe_type: null, stripe_code: null, message: "Could not load plan price" });
     }
+    const freePeriod = inFreePeriod();
+    const packName = SPORT_PACK_NAMES[token];
+    const sportDisclosure = freePeriod
+      ? disclosureSport(formatUsd(unlockPrice.amount), packName)
+      : disclosureSportPaid(formatUsd(unlockPrice.amount), packName);
     const unlockArlMeta: Record<string, string> = {
       ...unlockMeta,
+      arl_period: freePeriod ? "free" : "paid",
       arl_version: ARL_DISCLOSURE_VERSION,
       arl_offer: "sport",
       arl_price_ids: unlockPrice.id,
@@ -301,10 +314,9 @@ Deno.serve(async (req: Request) => {
         allow_promotion_codes: true,
         client_reference_id: userId,
         metadata: unlockArlMeta,
-        subscription_data: {
-          metadata: unlockMeta,
-          trial_end: 1798822800,
-        },
+        subscription_data: freePeriod
+          ? { metadata: unlockMeta, trial_end: BETA_TRIAL_END_UNIX }
+          : { metadata: unlockMeta },
         payment_method_collection: "always",
         success_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_success`,
         cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_cancel`,
@@ -315,14 +327,21 @@ Deno.serve(async (req: Request) => {
         session = await s.checkout.sessions.create({
           ...unlockParams,
           consent_collection: ARL_CONSENT,
-          custom_text: { terms_of_service_acceptance: { message: ARL_CONSENT_TEXT } },
+          custom_text: {
+            submit: { message: `**${sportDisclosure}**` },
+            terms_of_service_acceptance: { message: ARL_CONSENT_TEXT },
+          },
         });
       } catch (e) {
         if (!isMissingTermsUrlError(e)) throw e;
         console.error("ARL consent unavailable (Terms URL missing in Stripe Public details?)", String((e as Error)?.message));
         consentOn = false;
         await logEvent("checkout_arl_consent_unavailable", { userId, props: { mode: "unlock", testmode: testMode } });
-        session = await s.checkout.sessions.create({ ...unlockParams, metadata: { ...unlockArlMeta, arl_consent: "unavailable" } });
+        session = await s.checkout.sessions.create({
+          ...unlockParams,
+          metadata: { ...unlockArlMeta, arl_consent: "unavailable" },
+          custom_text: { submit: { message: `**${sportDisclosure}**` } },
+        });
       }
       await logEvent("checkout_started", { userId, sport: token, props: { mode: "unlock", arl_version: ARL_DISCLOSURE_VERSION, arl_consent: consentOn, testmode: testMode } });
       return json(200, { url: session.url });
