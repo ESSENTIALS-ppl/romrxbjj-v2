@@ -14,6 +14,8 @@
 // public.verify_webhook_secret (service_role only; returns boolean).
 // Logs never include the submitter's name, email or notes: only table, row id
 // and the Resend message id.
+// 2026-09-29 v2: partner email reads the live form fields (website,
+// product_category, offer_type); v1 read the old track/athletes names.
 // Requires: RESEND_API_KEY (+ auto-injected SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -85,17 +87,21 @@ Deno.serve(async (req: Request) => {
       String(r.notes ?? "").slice(0, 5000) || "(none)",
     ];
   } else {
-    subject = `Partner inquiry: ${oneLine(r.org, 80)} (${oneLine(r.track, 40) || "unspecified"})`;
+    // Live /partners form (#100): website, product_category, offer_type.
+    // track/athletes are legacy (old 3-track form); shown only if present.
+    const cat = oneLine(r.product_category, 60);
+    subject = `Partner inquiry: ${oneLine(r.org, 80)}${cat ? ` (${cat})` : ""}`;
     lines = [
-      `Name:     ${oneLine(r.name)}`,
-      `Email:    ${email}`,
-      `Org:      ${oneLine(r.org)}`,
-      `Track:    ${oneLine(r.track) || "(not provided)"}`,
-      `Athletes: ${oneLine(r.athletes) || "(not provided)"}`,
-      "",
-      "Notes:",
-      String(r.notes ?? "").slice(0, 5000) || "(none)",
+      `Name:             ${oneLine(r.name)}`,
+      `Email:            ${email}`,
+      `Brand/company:    ${oneLine(r.org)}`,
+      `Website:          ${oneLine(r.website, 500) || "(not provided)"}`,
+      `Product category: ${cat || "(not provided)"}`,
+      `How to partner:   ${oneLine(r.offer_type) || "(not provided)"}`,
     ];
+    if (r.track) lines.push(`Track (legacy):    ${oneLine(r.track)}`);
+    if (r.athletes) lines.push(`Athletes (legacy): ${oneLine(r.athletes)}`);
+    lines.push("", "Notes:", String(r.notes ?? "").slice(0, 5000) || "(none)");
   }
   lines.push("", `Source: ${oneLine(r.source) || "romrx.io"}`, `Row: ${table} ${r.id}`,
     "Reply to this email to answer the sender directly.");
