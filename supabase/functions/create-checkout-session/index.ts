@@ -1,3 +1,6 @@
+// v32 (Grant GO 2026-09-29): NEW coach checkout sessions paused (launch is Base only; CA auto-renewal risk).
+// mode=coach returns 403 coach_checkout_paused unless env COACH_CHECKOUT_OPEN=true. Base, unlock, webhook,
+// portal and existing subscriptions unchanged.
 // v31 (Jim beta trial lock 2026-09-16): Base + sport unlock checkouts collect card always,
 // trial_end Unix 1798822800 (2027-01-01 12:00:00 America/New_York; noon ET Jan 1 display fix), then bill normally. Coach unchanged.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -17,6 +20,7 @@ const SPORT_PRICE_IDS: Record<string, string> = {
 };
 const COACH_PRICE_ID = "price_1TKKTgDou9Iktbw0YqnV3411";
 const COACH_ORIGIN = Deno.env.get("COACH_ORIGIN") ?? "https://romrxbjj.com";
+const COACH_CHECKOUT_OPEN = (Deno.env.get("COACH_CHECKOUT_OPEN") ?? "").toLowerCase() === "true";
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: "2024-11-20.acacia" });
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -193,6 +197,7 @@ Deno.serve(async (req: Request) => {
     }
   }
   if (mode === "coach") {
+    if (!COACH_CHECKOUT_OPEN) return json(403, { error: "coach_checkout_paused" });
     let userId = body.user_id ?? null;
     if (!userId) userId = await getCallerUserId(admin, req);
     if (!userId || !body.email) return json(400, { error: "user_id and email required" });
