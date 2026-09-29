@@ -137,10 +137,12 @@ async function recordBaseCancelState(supabase: ReturnType<typeof createClient>, 
   if (error) console.error("base cancel state update failed", error.message);
 }
 async function recordSportCancelState(supabase: ReturnType<typeof createClient>, userId: string, sport: string, st: ReturnType<typeof cancelState>) {
-  const { error } = await supabase.from("sport_entitlements").update({
-    cancel_at_period_end: st.cancel_at_period_end, cancel_at: st.cancel_at, canceled_at: st.canceled_at,
-  }).eq("user_id", userId).eq("sport", sport);
-  if (error) console.error("sport cancel state update failed", error.message);
+  try {
+    const { error } = await supabase.from("sport_entitlements").update({
+      cancel_at_period_end: st.cancel_at_period_end, cancel_at: st.cancel_at, canceled_at: st.canceled_at,
+    }).eq("user_id", userId).eq("sport", sport);
+    if (error) console.error("sport cancel state update failed", error.message);
+  } catch (e) { console.error("sport cancel state error", (e as Error)?.message); }
 }
 /** v40: Base scheduled to cancel (or resumed) -> schedule (or un-schedule) the user's SEPARATE sport-pack subscriptions. */
 async function cascadeBaseScheduledCancel(supabase: ReturnType<typeof createClient>, userId: string, baseSubId: string, scheduled: boolean) {
@@ -560,7 +562,9 @@ Deno.serve(async (req: Request) => {
       await recordBaseCancelState(supabase, userId, st);
       const prev = ((event.data as unknown as { previous_attributes?: Record<string, unknown> }).previous_attributes) ?? {};
       if (type === "customer.subscription.updated" && ("cancel_at_period_end" in prev || "cancel_at" in prev)) {
-        await cascadeBaseScheduledCancel(supabase, userId, subId, st.cancel_at_period_end || !!st.cancel_at);
+        // Sport-pack side effect: never allowed to break or block the Base update above.
+        try { await cascadeBaseScheduledCancel(supabase, userId, subId, st.cancel_at_period_end || !!st.cancel_at); }
+        catch (e) { console.error("sport cascade error (Base unaffected)", (e as Error)?.message); }
       }
 
       // Dual-unlock pending_sport mirrors Base standing
