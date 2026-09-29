@@ -1,3 +1,4 @@
+// v33+ guard: mode=base returns 503 base_checkout_unavailable after Dec 30, 2026 12:00 ET (48h before trial_end); no change before then.
 // v33 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3b + 4D, Jim GO via Grant 2026-09-29):
 //   - Base, Base + sport (combo) and sport unlock sessions now require an UNCHECKED terms consent box
 //     (consent_collection.terms_of_service = required) with Stacy's exact consent text in
@@ -174,6 +175,11 @@ Deno.serve(async (req: Request) => {
   const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
   if (mode === "base") {
     if (!body.user_id || !body.email) return json(400, { error: "user_id and email required" });
+    // Fail closed once the free period is over (or under Stripe's 48h trial_end minimum): the Base path always sends the
+    // fixed trial_end (Jan 1, 2027) and Legal has not supplied post-Jan-1 Base copy yet. Applies to live and test paths.
+    if (Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000) {
+      return json(503, { error: "base_checkout_unavailable", message: "Base sign-up is temporarily unavailable. Please check back soon." });
+    }
     if (body.lead_token) {
       const claim = await claimLead(admin, body.lead_token, body.user_id, body.email);
       if (!claim.ok) return json(claim.status, { error: claim.error });
