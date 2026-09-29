@@ -1,9 +1,17 @@
-// v37 Base cancel cascades to sport packs (Jim GO 2026-09-08 — policy wins over Option 3)
+// v38 (ROMRx Base audit 2026-09-15)
+//   - Stripe statuses are mapped to the users.base_status enum (trialing->active, incomplete->inactive,
+//     unpaid/incomplete_expired->canceled, paused->past_due) instead of written raw, which violated the check
+//     constraint and silently left Base users in their old state.
+//   - invoice.payment_failed / invoice.payment_succeeded now also move base_status (past_due / active) when the
+//     invoice belongs to the Base subscription.
+//   - checkout.session.completed reads current_period_end from the Subscription (it is not on the Session).
+//   - product_events logged for checkout_completed, base_status_changed is captured by the DB trigger.
+// v37 Base cancel cascades to sport packs (Jim GO 2026-09-08, policy wins over Option 3)
 // v36 dual-unlock pending_sport grant — Stripe constructEvent with STRIPE_WEBHOOK_SECRET
-// Sprint 2: crypto verify via constructEvent (rebased onto main 2026-09-09)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
+import { logEvent } from "../_shared/events.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const STRIPE_SECRET_FOR_CANCEL = Deno.env.get("stripe_secret_key") ?? "";
@@ -92,6 +100,41 @@ function isBaseHardCancel(status: string): boolean {
   return status === "canceled" || status === "unpaid" || status === "incomplete_expired";
 }
 
+/** Stripe subscription status -> users.base_status enum (inactive|active|past_due|canceled). */
+function toBaseStatus(stripeStatus: string): "inactive" | "active" | "past_due" | "canceled" {
+  switch (stripeStatus) {
+    case "active":
+    case "trialing":
+      return "active";
+    case "past_due":
+    case "paused":
+      return "past_due";
+    case "canceled":
+    case "unpaid":
+    case "incomplete_expired":
+      return "canceled";
+    default: // incomplete and anything new
+      return "inactive";
+  }
+}
+
+/** Stripe subscription status -> sport_entitlements.status (free text today; keep Stripe vocabulary but never undefined). */
+function toEntitlementStatus(stripeStatus: string): string {
+  return stripeStatus === "trialing" ? "active" : (stripeStatus || "inactive");
+}
+
+async function periodEndFromSubscription(stripe: Stripe, subId: string | undefined | null): Promise<string | null> {
+  if (!subId) return null;
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    const end = (sub as unknown as { current_period_end?: number }).current_period_end;
+    return end ? new Date(end * 1000).toISOString() : null;
+  } catch (e) {
+    console.error("subscriptions.retrieve failed", subId, String(e));
+    return null;
+  }
+}
+
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SVC   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET  = Deno.env.get("stripe_secret_key") ?? "";
@@ -124,10 +167,9 @@ Deno.serve(async (req: Request) => {
     const customerId = obj.customer as string;
     const email      = ((obj.customer_details as Record<string, string>)?.email ?? "").toLowerCase();
     const subId      = obj.subscription as string | undefined;
-    const subEnd     = obj.current_period_end as number | undefined;
-    const expiry     = subEnd
-      ? new Date(subEnd * 1000).toISOString()
-      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    // v38: current_period_end lives on the Subscription, not the Checkout Session.
+    const expiry     = (await periodEndFromSubscription(stripe, subId))
+      ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
     const purpose = (meta.purpose ?? "").toLowerCase();
 
@@ -168,6 +210,9 @@ Deno.serve(async (req: Request) => {
         await supabase.rpc("add_sport_access", { p_user_id: meta.user_id, p_sport: pendingSport });
       }
 
+      await logEvent("checkout_completed", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
+        props: { purpose: "base", pending_sport: pendingSport, amount_total: obj.amount_total ?? null, currency: obj.currency ?? null, discount: !!(obj.total_details as Record<string, unknown> | undefined)?.amount_discount } });
+
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }
 
@@ -198,6 +243,9 @@ Deno.serve(async (req: Request) => {
          <strong>User ID:</strong> ${meta.user_id}<br>
          <strong>Sport:</strong> ${meta.sport}<br>
          <strong>Stripe customer:</strong> ${customerId}</p>`);
+
+      await logEvent("checkout_completed", { userId: meta.user_id, sport: meta.sport, source: "stripe",
+        props: { purpose: "sport_unlock", amount_total: obj.amount_total ?? null, currency: obj.currency ?? null } });
 
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }
@@ -287,12 +335,13 @@ Deno.serve(async (req: Request) => {
     const userId     = meta.user_id ?? meta.supabase_user_id ?? null;
 
     if (purpose === "base" && userId) {
-      await supabase.from("users").update({
-        base_status: stripeStatus,
+      const { error: baseUpdErr } = await supabase.from("users").update({
+        base_status: toBaseStatus(stripeStatus),
         base_expiry: expiry,
         base_stripe_subscription_id: subId,
         stripe_customer_id: customerId,
       }).eq("id", userId);
+      if (baseUpdErr) console.error("base_status update failed", stripeStatus, baseUpdErr.message);
 
       // Dual-unlock pending_sport mirrors Base standing
       const pendingSport = (meta.pending_sport === "bjj" || meta.pending_sport === "bodybuilding")
@@ -302,13 +351,15 @@ Deno.serve(async (req: Request) => {
         await supabase.from("sport_entitlements").upsert({
           user_id: userId,
           sport: pendingSport,
-          status: stripeStatus,
+          status: toEntitlementStatus(stripeStatus),
           stripe_subscription_id: subId,
           expires_at: expiry,
         }, { onConflict: "user_id,sport" });
         const sportGoodStanding = stripeStatus === "active" || stripeStatus === "trialing";
         if (sportGoodStanding) {
           await supabase.rpc("add_sport_access", { p_user_id: userId, p_sport: pendingSport });
+        } else if (stripeStatus === "past_due" || stripeStatus === "paused") {
+          // keep access during the grace window; hard cancel below removes it
         }
       }
 
@@ -327,7 +378,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from("sport_entitlements").upsert({
         user_id: userId,
         sport: meta.sport,
-        status: stripeStatus,
+        status: toEntitlementStatus(stripeStatus),
         stripe_subscription_id: subId,
         expires_at: expiry,
       }, { onConflict: "user_id,sport" });
@@ -399,6 +450,17 @@ Deno.serve(async (req: Request) => {
     const customerId = obj.customer as string;
     const subId      = obj.subscription as string | undefined;
 
+    // v38: Base subscription invoice failed -> base_status past_due (dashboard gate closes until cured).
+    if (subId) {
+      const { data: baseRows } = await supabase.from("users").select("id, email")
+        .eq("base_stripe_subscription_id", subId).neq("base_status", "canceled");
+      for (const b of baseRows ?? []) {
+        await supabase.from("users").update({ base_status: "past_due" }).eq("id", b.id);
+        await sendEmail(BRAND_HQ, JIM_EMAIL, `Base payment FAILED: ${b.email}`,
+          `<p>Base invoice payment failed. base_status set to past_due.</p><p><strong>User ID:</strong> ${b.id}<br><strong>Subscription:</strong> ${subId}<br><strong>Customer:</strong> ${customerId}</p>`);
+      }
+    }
+
     const { data: u } = await supabase
       .from("users")
       .select("id, email, full_name, paywall_frozen_until, active_sport")
@@ -433,7 +495,7 @@ Deno.serve(async (req: Request) => {
         const portalUrl = brand.login.replace("/login", "/dashboard/settings");
         if (!u.paywall_frozen_until) {
           await sendEmail(brand, u.email, `Action needed: your ${brand.name} payment failed`,
-            `<div style="font-family:Inter,sans-serif;padding:24px;color:#1a2e2e"><h2>Hey ${firstName},</h2><p>Your most recent ${brand.name} payment didn't go through. Update your card within 90 days.</p><p><a href="${portalUrl}">Update Payment</a></p><p>&mdash; Jim</p></div>`);
+            `<div style="font-family:Inter,sans-serif;padding:24px;color:#1a2e2e"><h2>Hey ${firstName},</h2><p>Your most recent ${brand.name} payment didn't go through. Update your card within 90 days.</p><p><a href="${portalUrl}">Update Payment</a></p><p>Jim</p></div>`);
         }
       }
     }
@@ -441,6 +503,23 @@ Deno.serve(async (req: Request) => {
 
   if (type === "invoice.payment_succeeded") {
     const customerId = obj.customer as string;
+    const subId      = obj.subscription as string | undefined;
+
+    // v38: Base renewal / cure -> base_status active and base_expiry refreshed from the subscription.
+    if (subId) {
+      const { data: baseRows } = await supabase.from("users").select("id, base_status")
+        .eq("base_stripe_subscription_id", subId);
+      if (baseRows && baseRows.length) {
+        const newExpiry = await periodEndFromSubscription(stripe, subId);
+        for (const b of baseRows) {
+          const patch: Record<string, unknown> = { base_status: "active" };
+          if (newExpiry) patch.base_expiry = newExpiry;
+          await supabase.from("users").update(patch).eq("id", b.id);
+        }
+        return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
+      }
+    }
+
     await supabase.from("users").update({
       subscription_status: "active",
       paywall_frozen_until: null,
