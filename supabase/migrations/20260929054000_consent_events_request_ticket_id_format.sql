@@ -1,7 +1,7 @@
 -- 2026-09-29 Legal (Stacy): request_ticket_id holds only an opaque internal ticket number,
 -- never a name, email or message text. Format: <PREFIX>-<YYYY>-<NNN+>, prefixes
 -- DEL (deletion), ACC (access/copy), COR (correction), OPT (opt-out). 0 non-null rows at apply time.
--- Applied to cqzvqzwwevnflinxgnpp 2026-09-29 00:02 ET (version 20260929040226).
+-- Applied to cqzvqzwwevnflinxgnpp 2026-09-29 00:02 ET (remote version 20260929040226; local name keeps branch order).
 -- Rollback-tested: DEL-2026-001, ACC-2026-042, COR-2026-1234, OPT-2027-000001 pass;
 -- 'john.smith', emails, 'DEL-2026-01', 'del-2026-001', 'XYZ-2026-001', 'DEL-26-001',
 -- 'DEL-2026-001 john', 'DEL-2026-001@x.io' rejected (check_violation).
