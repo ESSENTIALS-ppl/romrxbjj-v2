@@ -182,6 +182,8 @@ Deno.serve(async (req: Request) => {
     let sportPriceR: YearlyPrice | null = null;
     try {
       basePrice = await resolveYearlyPrice(s, testMode, "base", BASE_PRICE_ID);
+      // Locked Legal terms (spec 3b, signup page) say $60 per year. Refuse rather than show a different price.
+      if (basePrice.amount !== 6000) throw new ArlPriceError(`base price ${basePrice.id} is ${basePrice.amount}, expected 6000`);
       if (pendingSport) sportPriceR = await resolveYearlyPrice(s, testMode, pendingSport, SPORT_PRICE_IDS[pendingSport]);
     } catch (e) {
       console.error("arl price resolve failed", String(e));
