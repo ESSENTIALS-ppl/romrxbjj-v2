@@ -1,3 +1,14 @@
+// v40 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3c + 4A.4 + 4C, Jim GO via Grant 2026-09-29):
+//   - Base and Base + sport checkout.session.completed: the "You didn't buy a subscription" email is replaced by
+//     Stacy's 3c acknowledgment ("Your ROMRx subscription: terms and how to cancel"). Prices come from the
+//     session's arl_amounts metadata (read from Stripe at checkout) or, for older sessions, the subscription items.
+//     Sent through Resend with an Idempotency-Key per Checkout Session; the Resend id is logged to product_events.
+//   - Every checkout.session.completed (base, combo, sport unlock) writes one public.billing_consents row with the
+//     Stripe consent result and the exact disclosure + consent text snapshot from the Session (no IP stored).
+//   - Sport unlock email unchanged (the plan has no sport-only 3c variant; flagged to Legal).
+//   - Fixture-only TEST mode: events signed with STRIPE_TEST_WEBHOOK_SECRET (livemode=false) are processed only for
+//     users where public.is_test_account(email) is true, use STRIPE_TEST_SECRET_KEY for Stripe calls, and skip Jim's
+//     internal PAID alerts. Live events are verified and handled exactly as before.
 // v38 (ROMRx Base audit 2026-09-15)
 //   - Stripe statuses are mapped to the users.base_status enum (trialing->active, incomplete->inactive,
 //     unpaid/incomplete_expired->canceled, paused->past_due) instead of written raw, which violated the check
@@ -12,6 +23,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
 import { logEvent } from "../_shared/events.ts";
+import { ARL_ACK_VERSION, SPORT_PACK_NAMES, formatUsd, ackSubject, ackHtml, ackText } from "../_shared/arl_copy.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const STRIPE_SECRET_FOR_CANCEL = Deno.env.get("stripe_secret_key") ?? "";
@@ -59,12 +71,84 @@ async function sendEmail(brand: Brand, to: string, subject: string, html: string
   });
 }
 
+// v40: which Stripe key to use for API calls for the event being handled (live unless a verified test event).
+let CURRENT_CANCEL_KEY = STRIPE_SECRET_FOR_CANCEL;
+
 async function cancelStripeSub(subId: string) {
-  if (!STRIPE_SECRET_FOR_CANCEL || !subId) return;
+  if (!CURRENT_CANCEL_KEY || !subId) return;
   await fetch(`https://api.stripe.com/v1/subscriptions/${subId}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${STRIPE_SECRET_FOR_CANCEL}` },
+    headers: { Authorization: `Bearer ${CURRENT_CANCEL_KEY}` },
   });
+}
+
+/** v40: 3c acknowledgment via Resend. Returns the Resend id (or null). Idempotent per Checkout Session. */
+async function sendArlAck(to: string, sessionId: string, basePrice: string, sportPack: string | null, sportPrice: string | null): Promise<string | null> {
+  if (!RESEND_KEY) return null;
+  const key = `arl_ack-${sessionId}`;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json", "Idempotency-Key": key },
+    body: JSON.stringify({
+      from: BRAND_HQ.from, to: [to], reply_to: BRAND_HQ.replyTo,
+      subject: ackSubject(),
+      html: ackHtml(basePrice, sportPack, sportPrice),
+      text: ackText(basePrice, sportPack, sportPrice),
+      headers: { "X-Entity-Ref-ID": key },
+      tags: [{ name: "email_id", value: "arl_ack" }, { name: "type", value: "transactional" }],
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { console.error("ARL ack Resend error", res.status, JSON.stringify(data)); return null; }
+  return (data as { id?: string }).id ?? null;
+}
+
+/** v40: yearly unit amounts (cents) in line-item order: from arl_amounts metadata, else from the subscription items. */
+async function arlAmounts(stripe: Stripe, meta: Record<string, string>, subId: string | undefined): Promise<number[]> {
+  const fromMeta = (meta.arl_amounts ?? "").split(",").map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n));
+  if (fromMeta.length) return fromMeta;
+  if (!subId) return [];
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    return sub.items.data.map((i: Stripe.SubscriptionItem) => i.price.unit_amount ?? 0);
+  } catch (e) {
+    console.error("arlAmounts: subscriptions.retrieve failed", String(e));
+    return [];
+  }
+}
+
+/** v40: one consent record per Checkout Session (spec 4C). Service role only; never stores IP. */
+async function writeBillingConsent(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>, meta: Record<string, string>, userId: string, livemode: boolean, amounts: number[]) {
+  const customText = (obj.custom_text ?? {}) as Record<string, { message?: string } | null>;
+  const consent = (obj.consent ?? {}) as Record<string, string | null>;
+  const consentCollection = (obj.consent_collection ?? {}) as Record<string, string | null>;
+  const tos = consent.terms_of_service ?? null;
+  const offer = meta.arl_offer || ((meta.purpose ?? "") === "sport_unlock" ? "sport" : (meta.pending_sport ? "combo" : "base"));
+  const created = typeof obj.created === "number" ? obj.created as number : null;
+  const row = {
+    user_id: userId,
+    stripe_checkout_session_id: obj.id as string,
+    stripe_subscription_id: (obj.subscription as string | undefined) ?? null,
+    stripe_customer_id: (obj.customer as string | undefined) ?? null,
+    offer,
+    price_ids: (meta.arl_price_ids ?? "").split(",").filter(Boolean),
+    amounts,
+    currency: (obj.currency as string | undefined) ?? "usd",
+    interval: "year",
+    trial_end: new Date(1798822800 * 1000).toISOString(),
+    disclosure_text_version: meta.arl_version ?? "none (pre-ARL session)",
+    disclosure_text: customText.submit?.message ?? null,
+    consent_text: customText.terms_of_service_acceptance?.message ?? null,
+    consent_method: consentCollection.terms_of_service === "required" ? "stripe_terms_of_service" : "none",
+    stripe_consent_terms_of_service: tos,
+    consented_at: tos === "accepted" ? new Date().toISOString() : null,
+    checkout_created_at: created ? new Date(created * 1000).toISOString() : null,
+    user_agent: meta.arl_ua || null,
+    region_state: null,
+    livemode,
+  };
+  const { error } = await supabase.from("billing_consents").upsert(row, { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true });
+  if (error) console.error("billing_consents insert failed", error.message);
 }
 
 type Sb = ReturnType<typeof createClient>;
@@ -139,6 +223,27 @@ const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SVC   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET  = Deno.env.get("stripe_secret_key") ?? "";
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? Deno.env.get("stripe_webhook_secret") ?? "";
+// v40 fixture-only test mode. Both must be set for test events to be accepted.
+const STRIPE_TEST_WEBHOOK_SECRET = (Deno.env.get("STRIPE_TEST_WEBHOOK_SECRET") ?? "").trim();
+const STRIPE_TEST_SECRET = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim();
+const TEST_MODE_READY = STRIPE_TEST_WEBHOOK_SECRET.startsWith("whsec_") && STRIPE_TEST_SECRET.startsWith("sk_test_");
+
+/** v40: user id an event refers to (metadata first, then customer id lookup). */
+async function eventUserEmail(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>): Promise<string | null> {
+  const meta = (obj.metadata ?? {}) as Record<string, string>;
+  const uid = meta.user_id ?? meta.supabase_user_id ?? null;
+  if (uid) {
+    const { data } = await supabase.from("users").select("email").eq("id", uid).maybeSingle();
+    if (data?.email) return data.email as string;
+  }
+  const cust = typeof obj.customer === "string" ? obj.customer : null;
+  if (cust) {
+    const { data } = await supabase.from("users").select("email").eq("stripe_customer_id", cust).maybeSingle();
+    if (data?.email) return data.email as string;
+  }
+  const details = obj.customer_details as Record<string, string> | undefined;
+  return details?.email ?? null;
+}
 
 Deno.serve(async (req: Request) => {
   if (!STRIPE_WEBHOOK_SECRET) {
@@ -149,18 +254,39 @@ Deno.serve(async (req: Request) => {
   if (!sig) return new Response("Missing signature", { status: 400 });
 
   const body = await req.text();
-  const stripe = new Stripe(STRIPE_SECRET || "sk_unused", { apiVersion: "2024-11-20.acacia" });
+  let stripe = new Stripe(STRIPE_SECRET || "sk_unused", { apiVersion: "2024-11-20.acacia" });
+  CURRENT_CANCEL_KEY = STRIPE_SECRET_FOR_CANCEL;
 
   let event: Stripe.Event;
+  let testEvent = false;
   try {
     event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
   } catch {
-    return new Response("Invalid signature", { status: 400 });
+    if (!TEST_MODE_READY) return new Response("Invalid signature", { status: 400 });
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, STRIPE_TEST_WEBHOOK_SECRET);
+      testEvent = true;
+    } catch {
+      return new Response("Invalid signature", { status: 400 });
+    }
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SVC);
   const type = event.type as string;
   const obj  = event.data.object as Record<string, unknown>;
+
+  // v40: test-mode events only ever touch test fixtures, and use the test key for Stripe calls.
+  if (testEvent) {
+    const who = await eventUserEmail(supabase, obj);
+    const { data: isTest } = who ? await supabase.rpc("is_test_account", { p_email: who }) : { data: false };
+    if (isTest !== true) {
+      console.warn("test-mode event ignored: not a test fixture", type);
+      return new Response(JSON.stringify({ received: true, ignored: "not_test_fixture" }), { headers: { "Content-Type": "application/json" } });
+    }
+    stripe = new Stripe(STRIPE_TEST_SECRET, { apiVersion: "2024-11-20.acacia" });
+    CURRENT_CANCEL_KEY = STRIPE_TEST_SECRET;
+  }
+  const alertJim = !testEvent; // no internal PAID alerts for fixture test events
 
   if (type === "checkout.session.completed") {
     const meta       = (obj.metadata ?? {}) as Record<string, string>;
@@ -185,14 +311,25 @@ Deno.serve(async (req: Request) => {
       const baseName = baseUser?.full_name ?? (email ? email.split("@")[0] : "there");
       const firstName = String(baseName).split(" ")[0] || "there";
 
-      if (email) {
-        await sendEmail(BRAND_HQ, email, `You didn't buy a subscription. You made an investment.`, `<p>Hey ${firstName}, your ROMRx Base is active. <a href="${BRAND_HQ.dashboard}">Dashboard</a></p>`);
-      }
-
+      void firstName; // v40: the 3c acknowledgment has no greeting line
       const pendingSport = (meta.pending_sport === "bjj" || meta.pending_sport === "bodybuilding")
         ? meta.pending_sport
         : null;
-      await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
+
+      // v40: consent record + 3c acknowledgment (replaces "You didn't buy a subscription...").
+      const amounts = await arlAmounts(stripe, meta, subId);
+      await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
+      if (email && amounts.length) {
+        const sportPack = pendingSport && amounts.length > 1 ? SPORT_PACK_NAMES[pendingSport] : null;
+        const sportPrice = sportPack ? formatUsd(amounts[1]) : null;
+        const resendId = await sendArlAck(email, obj.id as string, formatUsd(amounts[0]), sportPack, sportPrice);
+        await logEvent("email_sent", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
+          props: { email_id: "arl_ack", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
+      } else if (email) {
+        console.error("ARL ack not sent: no price amounts for session", obj.id);
+      }
+
+      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
         `<p>New ROMRx Base membership activated.</p>
          <p><strong>Email:</strong> ${email}<br>
          <strong>User ID:</strong> ${meta.user_id}<br>
@@ -233,11 +370,14 @@ Deno.serve(async (req: Request) => {
       const firstName = String(sportName).split(" ")[0] || "there";
       const brand = brandFor(meta.sport);
 
+      // v40: consent record for sport unlock sessions too.
+      await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
+
       if (email) {
         await sendEmail(brand, email, `Your ${meta.sport} pack is unlocked`, `<p>Hey ${firstName}, your ${meta.sport} pack is unlocked. <a href="${brand.dashboard}">Dashboard</a></p>`);
       }
 
-      await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
+      if (alertJim) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
         `<p>New Sport pack purchase activated.</p>
          <p><strong>Email:</strong> ${email}<br>
          <strong>User ID:</strong> ${meta.user_id}<br>
@@ -426,7 +566,7 @@ Deno.serve(async (req: Request) => {
         alsoCancelStripe: true,
         skipSubId: subId,
       });
-      await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled — sport packs cascaded: ${userId}`,
+      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled — sport packs cascaded: ${userId}`,
         `<p>Base subscription deleted/paused. Sport entitlements canceled and separate sport Stripe subs canceled when present.</p>
          <p><strong>User ID:</strong> ${userId}<br><strong>Customer:</strong> ${customerId}</p>`);
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
