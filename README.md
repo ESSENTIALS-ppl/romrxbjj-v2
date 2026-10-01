@@ -28,7 +28,7 @@ supabase functions deploy stripe-webhook
 | Table | Purpose |
 |-------|---------|
 | users | Athletes + coaches + admins, belt, platforms[], stripe_customer_id |
-| assessments | ROM measurement log, all 14 joints bilateral |
+| assessments | ROM measurement log, all 12 joints bilateral |
 | joint_scores | Per-joint GREEN/YELLOW/RED with asymmetry |
 | technique_eligibility | Computed GREEN/YELLOW/RED per technique |
 | techniques | 124 BJJ techniques with ROM thresholds |
