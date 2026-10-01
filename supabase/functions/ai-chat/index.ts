@@ -1,6 +1,8 @@
 // ROMRx AI Chat — Sprint 8 rate-limit scaffold wrapper
 // Delegates to handler.js (esbuild-minified main ai-chat logic). Limits TBD/tunable.
-// v77 (2026-10-01 security audit): guest mode removed; only role=authenticated JWTs pass (anon key -> 401).
+// v77 (2026-10-01 security audit): guest mode removed. verify_jwt accepts the public anon key, which let anyone
+// call the LLM with a caller-chosen system context on ROMRx's OpenAI/Anthropic keys. No client uses guest mode
+// (ROMBot.tsx and Chat.tsx always send the session token). Only role=authenticated passes.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   DEFAULT_LIMITS,
