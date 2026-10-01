@@ -72,7 +72,7 @@ const STAGES: Stage[] = [
     subject: () => "You found the gaps. Here's how to close them.",
     body: (b, n, email) => {
       const game = b.sport === "bodybuilding" ? "lifts" : "game";
-      const li = b.sport === "bodybuilding" ? "The lifts you can load heavier, safely" : "The techniques your body can unlock next";
+      const li = b.sport === "bodybuilding" ? "The lifts your body is ready to load" : "The techniques your body can unlock next";
       const inner = `
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Hey ${n},</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Your assessment showed you something most athletes never see: exactly where your body is holding your ${game} back.</p>
