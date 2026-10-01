@@ -1,5 +1,6 @@
 // ROMRx AI Chat — Sprint 8 rate-limit scaffold wrapper
 // Delegates to handler.js (esbuild-minified main ai-chat logic). Limits TBD/tunable.
+// v77 (2026-10-01 security audit): guest mode removed; only role=authenticated JWTs pass (anon key -> 401).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   DEFAULT_LIMITS,
@@ -28,6 +29,15 @@ function jwtRole(jwt: string): string {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
+  }
+
+  const authHeader0 = req.headers.get("Authorization") ?? "";
+  const token0 = authHeader0.replace("Bearer ", "").trim();
+  if (!token0 || jwtRole(token0) !== "authenticated") {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...CORS, "Content-Type": "application/json" },
+    });
   }
 
   // Hourly IP burst guard
