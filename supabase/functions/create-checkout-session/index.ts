@@ -175,6 +175,12 @@ Deno.serve(async (req: Request) => {
   const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
   if (mode === "base") {
     if (!body.user_id || !body.email) return json(400, { error: "user_id and email required" });
+    // v39 (2026-10-01 security audit): the JWT must belong to body.user_id. verify_jwt alone accepts the public anon key,
+    // which let anyone start Base checkout / claim leads for an arbitrary user_id. All clients send the signed-in session token.
+    {
+      const baseCaller = await getCallerUser(admin, req);
+      if (!baseCaller || baseCaller.id !== body.user_id) return json(401, { error: "auth_required" });
+    }
     // Fail closed once the free period is over (or under Stripe's 48h trial_end minimum): the Base path always sends the
     // fixed trial_end (Jan 1, 2027) and Legal has not supplied post-Jan-1 Base copy yet. Applies to live and test paths.
     if (Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000) {
@@ -323,7 +329,8 @@ Deno.serve(async (req: Request) => {
     if (baseStatus !== "active") {
       return json(409, { error: "base_required", checkout_url: null });
     }
-    const priceId = body.price_id ?? SPORT_PRICE_IDS[token];
+    // v39: price is always server-side; a client-supplied price_id is ignored.
+    const priceId = SPORT_PRICE_IDS[token];
     if (!priceId) return json(404, { error: "invalid_token" });
     const unlockMeta = { purpose: "sport_unlock", user_id: userId, sport: token };
     const testMode = await callerIsTestFixture(admin, callerU?.email, testRequested);
