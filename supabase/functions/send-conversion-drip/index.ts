@@ -1,3 +1,5 @@
+// send-conversion-drip v12 (2026-10-02) — fail-closed x-cron-secret gate
+// (pg_cron via public.cron_call_edge already sends the header; was open to anonymous callers).
 // send-conversion-drip v11 (issue #16 — 2026-09-21)
 // - v2/v10: SPORT USERS ONLY. Skips active_sport not in (bjj, bodybuilding), skips active entitlement,
 //          reads marketing_opt_out from users (profiles table was historically missing). jsr supabase-js.
@@ -18,6 +20,24 @@ const serve = (h: (req: Request) => Promise<Response>) => Deno.serve(h);
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// 2026-10-02 caller auth: only pg_cron (public.cron_call_edge) may trigger sends.
+// x-cron-secret checked against Vault cron_webhook_secret via RPC verify_webhook_secret.
+async function cronCallerOk(req: Request): Promise<boolean> {
+  const got = (req.headers.get("x-cron-secret") ?? "").trim();
+  if (got.length < 32) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_webhook_secret`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
+    });
+    return r.ok && (await r.json()) === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 
 /** Sep 8 Field plus-alias fixtures land in jim@romrx.io — never drip them. */
 function isAuditFixtureEmail(email: string): boolean {
@@ -125,6 +145,7 @@ const STAGES: Stage[] = [
 ];
 
 serve(async (_req) => {
+  if (!(await cronCallerOk(_req))) return new Response("forbidden", { status: 403 });
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const now = Date.now();
   const results: Record<string, number> = {};
