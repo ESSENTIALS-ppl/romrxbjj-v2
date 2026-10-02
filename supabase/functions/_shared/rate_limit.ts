@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { serviceRoleKey } from "./admin_key.ts";
 export type RateLimitConfig = { limit: number; windowMs: number };
 export type RateLimitResult = { allowed: boolean; limit: number; remaining: number; resetAt: number; key: string };
 export const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
@@ -16,7 +17,7 @@ let _admin: SupabaseClient | null = null;
 function serviceClient(): SupabaseClient | null {
   if (_admin) return _admin;
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const key = serviceRoleKey();
   if (!url || !key) { console.error("[rate_limit] missing env"); return null; }
   _admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   return _admin;

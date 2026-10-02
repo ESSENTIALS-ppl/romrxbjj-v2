@@ -1,12 +1,13 @@
 // _shared/events.ts - server-side product event logging (ROMRx Base audit 2026-09-15)
 // Writes to public.product_events with the service role. Never throws.
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { serviceRoleKey } from "./admin_key.ts";
 
 let _admin: SupabaseClient | null = null;
 function admin(): SupabaseClient | null {
   if (_admin) return _admin;
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const key = serviceRoleKey();
   if (!url || !key) return null;
   _admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   return _admin;
