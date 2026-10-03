@@ -167,7 +167,7 @@ import { buildRequirements, classifyMove } from "../rule.ts";
   const cm = { ankle_df_l: 11, ankle_df_r: 11 };
   for (const deg of [10, 15, 20]) {
     const r = classifyMove(cm, buildRequirements([{ joint: "Ankle DF", required_value: deg, laterality_rule: "BOTH" }]));
-    assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"], `matrix ${deg}`);
+    assert.deepEqual([r.tier, r.grey_reason], ["GREY", "no_reference_range"], `matrix ${deg}`);
     assert.equal(r.joint_status[0].status, "GREY");
   }
 }

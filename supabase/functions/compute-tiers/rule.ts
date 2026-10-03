@@ -10,7 +10,9 @@
 // value for a (move, joint) the legacy techniques.<joint>_min value is kept (flagged as undocumented in the PR).
 
 export type Status = "GREEN" | "YELLOW" | "RED" | "GREY";
-export type GreyReason = "no_rule" | "incomplete";
+// no_reference_range = the move's number for that joint is far above any published healthy average (Legal, STACY-CLEARANCES
+// section 10: "no reference range yet" until Quinn answers Q4 / Q5). Shown as GREY, never RED or GREEN.
+export type GreyReason = "no_rule" | "incomplete" | "no_reference_range";
 
 // F-17 (ankle unit mix). Base measures ankle ONE way: knee-to-wall, in CENTIMETERS (Jim closed this 2026-10-03). The
 // ankle numbers already in rom_thresholds (10/15/20, matrix) and techniques.ankle_df_min (10-20 BJJ, 12-20 BB) were
@@ -28,6 +30,21 @@ export const YELLOW_TOLERANCE_DEG = 10;
 export const YELLOW_TOLERANCE_ANKLE_CM = 2;
 export function yellowTolerance(joint: string): number {
   return joint === "ankle_df" ? YELLOW_TOLERANCE_ANKLE_CM : YELLOW_TOLERANCE_DEG;
+}
+
+// LEGAL RULING (Stacy): a matrix bar far above the healthy average must stay GREY with the reason "no reference range yet"
+// until Quinn answers Q4 (ankle cm values with a source) and Q5 (hip rotation). Hip external rotation: healthy seated average
+// is about 36 degrees, the matrix asks 40-70 (57 BJJ techniques ask 50 or more).
+//   NO_REFERENCE_RANGE_SWITCH = true  (DEFAULT, Legal): a hip_er requirement of HIP_ER_NO_REFERENCE_MIN or more is GREY
+//                               (no_reference_range). It never produces RED or GREEN for that joint; a real RED on another
+//                               joint still wins. The ankle legacy degree path (ANKLE_LEGACY_REQUIREMENTS_ARE_CM = false) uses
+//                               the same reason label.
+//   NO_REFERENCE_RANGE_SWITCH = false: hip_er bars are graded against the number as before (RED for a healthy 36 degrees).
+// SQL mirror: c_no_reference_range / c_hip_er_no_ref_min in recompute_user_eligibility. Change them together.
+export const NO_REFERENCE_RANGE_SWITCH = true;
+export const HIP_ER_NO_REFERENCE_MIN = 50;
+export function isNoReferenceBar(joint: string, required: number): boolean {
+  return NO_REFERENCE_RANGE_SWITCH && joint === "hip_er" && required >= HIP_ER_NO_REFERENCE_MIN;
 }
 
 const BILATERAL: Record<string, [string, string]> = {
@@ -160,6 +177,7 @@ export type Requirement = {
   required: number;
   laterality?: string | null;
   unit_pending?: boolean; // ankle only: requirement has no cm number yet, so it cannot be compared to a cm reading
+  no_reference?: boolean; // hip_er only: bar is far above the healthy average, no reference range yet (NO_REFERENCE_RANGE_SWITCH)
 };
 
 // Build the requirement list for one move. matrixRows come from rom_thresholds (documented). techniqueRow is the
@@ -201,6 +219,8 @@ export function buildRequirements(
   // F-17: a unit-less ankle requirement is never compared to a cm reading.
   const ankle = byJoint.get("ankle_df");
   if (ankle && !ankleCm.has("ankle_df") && !ANKLE_LEGACY_REQUIREMENTS_ARE_CM) ankle.unit_pending = true;
+  // Legal: a hip rotation bar far above the healthy average has no reference range yet (stricter-row rule already applied).
+  for (const q of byJoint.values()) if (isNoReferenceBar(q.joint, q.required)) q.no_reference = true;
   return [...byJoint.values()];
 }
 
@@ -228,6 +248,7 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], do
   if (reqs.length === 0) return { tier: "GREY", grey_reason: "no_rule", joint_status: [], limiting: [] };
   const joint_status: JointStatus[] = [];
   const limiting: string[] = [];
+  let noRef = false; // some required joint has no reference range yet (hip rotation bar, ankle degree-style bar)
   for (const r of reqs) {
     const ov = overrides?.[r.joint];
     if (ov) {
@@ -240,6 +261,13 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], do
     if (r.unit_pending) {
       joint_status.push({ joint: r.joint, status: "GREY" });
       limiting.push(`${r.joint}:cm_requirement_pending`);
+      noRef = true;
+      continue;
+    }
+    if (r.no_reference) {
+      joint_status.push({ joint: r.joint, status: "GREY" });
+      limiting.push(`${r.joint}:no_reference_range`);
+      noRef = true;
       continue;
     }
     const v = EVALUABLE.has(r.joint) ? athleteValue(a, r.joint, r.laterality, dominant) : null;
@@ -252,8 +280,10 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], do
   if (has("RED")) return { tier: "RED", grey_reason: null, joint_status, limiting };
   // Only a RED is conclusive when a joint is unmeasured (a YELLOW could still end up RED once measured, and a move that
   // cannot be fully judged is "Not rated"). GREY_BEATS_YELLOW = Quinn's reference and Jim's "missing joint = GREY".
-  if (GREY_BEATS_YELLOW && has("GREY")) return { tier: "GREY", grey_reason: "incomplete", joint_status, limiting };
+  // no_reference_range wins over incomplete: such a move cannot be rated even after every joint is measured.
+  const greyReason: GreyReason = noRef ? "no_reference_range" : "incomplete";
+  if (GREY_BEATS_YELLOW && has("GREY")) return { tier: "GREY", grey_reason: greyReason, joint_status, limiting };
   if (has("YELLOW")) return { tier: "YELLOW", grey_reason: null, joint_status, limiting };
-  if (has("GREY")) return { tier: "GREY", grey_reason: "incomplete", joint_status, limiting };
+  if (has("GREY")) return { tier: "GREY", grey_reason: greyReason, joint_status, limiting };
   return { tier: "GREEN", grey_reason: null, joint_status, limiting: [] };
 }
