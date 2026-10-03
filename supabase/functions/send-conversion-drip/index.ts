@@ -15,6 +15,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/events.ts";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 const serve = (h: (req: Request) => Promise<Response>) => Deno.serve(h);
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
@@ -72,7 +73,7 @@ function shell(b: Brand, email: string, inner: string): string {
         <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;"><strong>Jim Scott</strong><br/>Founder, ROMRx LLC<br/><a href="mailto:${b.replyTo}" style="color:${b.accent};">${b.replyTo}</a></p>
       </td></tr>
       <tr><td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
-        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${b.name} &bull; Dublin, Ohio<br/>You completed a ${b.name} assessment but haven&rsquo;t started your membership yet.<br/><a href="${b.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
+        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${POSTAL_LINE}<br/>You completed a ${b.name} assessment but haven&rsquo;t started your membership yet.<br/><a href="${b.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
       </td></tr>
     </table>
   </td></tr></table>
