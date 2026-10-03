@@ -1,0 +1,19 @@
+-- ROLLBACK for 20261003040000_yoga_poses.sql (DRAFT, not applied). Kept as .txt so `supabase db push` never runs it.
+-- Refuses to run if anyone already holds a 'yoga' entitlement or a teacher has signed a range (that data would be lost).
+BEGIN;
+DO $$ BEGIN
+  IF to_regclass('public.sport_entitlements') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.sport_entitlements WHERE sport = 'yoga') THEN
+    RAISE EXCEPTION 'yoga entitlements exist; cancel and remove them first';
+  END IF;
+  IF to_regclass('public.yoga_pose_joints') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.yoga_pose_joints WHERE required_value IS NOT NULL) THEN
+    RAISE EXCEPTION 'signed yoga ranges exist; export them before rolling back';
+  END IF;
+END $$;
+DROP TABLE IF EXISTS public.yoga_pose_evidence;
+DROP TABLE IF EXISTS public.yoga_pose_joints;
+DROP TABLE IF EXISTS public.yoga_poses;
+DROP FUNCTION IF EXISTS public.yoga_pack_visible();
+DELETE FROM public.sport_config WHERE slug = 'yoga';
+COMMIT;
