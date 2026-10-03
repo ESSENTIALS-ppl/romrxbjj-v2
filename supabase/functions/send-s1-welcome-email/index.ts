@@ -1,4 +1,12 @@
-// send-s1-welcome-email v24 (2026-09-24): Base/general duration "about 15 minutes" (locked claim; BJJ/BB already 15).
+// send-s1-welcome-email v26 (2026-10-03, DRAFT, not deployed): footer shows the full postal address (_shared/email_footer.ts)
+//   and an unsubscribe link (same {base}/unsubscribe?email= pattern as the drip emails).
+// - v25 (2026-09-29): trigger auth moved off the inline service_role bearer.
+//   The auth.users trigger on_new_user_send_s1_welcome -> public.tg_webhook_send_s1_welcome()
+//   reads a dedicated secret from Supabase Vault (welcome_email_webhook_secret) and sends it as
+//   x-webhook-secret; verified here via RPC public.verify_webhook_secret (service_role only,
+//   boolean result). The legacy service-role bearer paths remain accepted until the legacy
+//   service_role key is disabled (see KEYS-DELETIONDOC-NOTES 2026-09-29).
+// - v24 (2026-09-24): Base/general duration "about 15 minutes" (locked claim; BJJ/BB already 15).
 // - v23 (2026-09-24): Base/general copy says "top three problem areas" (Jim LOCK via Grant).
 //   BJJ / Bodybuilding brands untouched (sport packs keep their own copy).
 // - v22 (2026-09-21): restore full branded HTML from PR #28 + keep email_sends (redeploy after v21 stub).
@@ -14,13 +22,41 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/events.ts";
+import { POSTAL_LINE, unsubscribeUrl } from "../_shared/email_footer.ts";
 const serve = (h: (req: Request) => Promise<Response>) => Deno.serve(h);
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const EMAIL_ID = "s1_1_welcome";
 
+const VAULT_SECRET_NAME = "welcome_email_webhook_secret";
+
+async function webhookSecretOk(got: string): Promise<boolean> {
+  if (!got || !SUPABASE_URL || !SERVICE_ROLE_KEY) return false;
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await admin.rpc("verify_webhook_secret", {
+      p_name: VAULT_SECRET_NAME,
+      p_candidate: got,
+    });
+    if (error) {
+      console.error("verify_webhook_secret error:", error.message);
+      return false;
+    }
+    return data === true;
+  } catch (e) {
+    console.error("verify_webhook_secret threw:", String(e));
+    return false;
+  }
+}
+
 async function callerIsTrusted(req: Request): Promise<boolean> {
+  // Preferred (v25+): Vault-backed webhook secret from the DB trigger.
+  const hook = (req.headers.get("x-webhook-secret") ?? "").trim();
+  if (hook) return await webhookSecretOk(hook);
+  // Legacy: service-role bearer (kept until the legacy service_role key is disabled).
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth.startsWith("Bearer ")) return false;
   const token = auth.slice(7).trim();
@@ -54,7 +90,6 @@ interface Brand {
   fromName: string;
   fromEmail: string;
   domain: string;
-  city: string;
   accent: string;
   protocol: string;
   markerCount: string;
@@ -76,7 +111,6 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrxbjj.com",
     domain: "https://romrxbjj.com",
-    city: "Dublin, Ohio",
     accent: "#c8102e",
     protocol: "Position Readiness Protocol&trade;",
     markerCount: "8 key ROM markers",
@@ -96,13 +130,12 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrxbodybuilding.com",
     domain: "https://romrxbodybuilding.com",
-    city: "Dublin, Ohio",
     accent: "#1e6fd9",
     protocol: "Range of Motion Readiness Protocol&trade;",
     markerCount: "key ROM markers",
-    contextLine: "which lifts your body is ready to load (and which ranges may be limiting your lifts)",
+    contextLine: "which lifts your body is ready to load (and which ranges are leaking strength and risking injury)",
     introLine: "Most people who get real results with ROMRxBodybuilding do one thing first: complete the <strong>Range of Motion Readiness Protocol&trade; assessment</strong>.",
-    durationLine: "It takes about 15 minutes. You'll measure key ROM markers, and immediately see which lifts your body is ready to load (and which ranges may be limiting your lifts).",
+    durationLine: "It takes about 15 minutes. You'll measure key ROM markers, and immediately see which lifts your body is ready to load (and which ranges are leaking strength and risking injury).",
     baseNote: "This is the diagnostic that changes how you train.",
     ctaLabel: "&rarr; Start My ROM Assessment",
     subject: "Your ROMRx account is ready. Here's your first move.",
@@ -116,7 +149,6 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrx.io",
     domain: "https://romrx.io",
-    city: "Dublin, Ohio",
     accent: "#1e6fd9",
     protocol: "Personalized Readiness Profile&trade;",
     markerCount: "key ROM markers",
@@ -260,9 +292,10 @@ serve(async (req) => {
           <tr>
             <td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
               <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">
-                ${b.brandName} &bull; ${b.city}<br />
+                ${POSTAL_LINE}<br />
                 You're receiving this because you created a ${b.brandName} account.<br />
-                <a href="mailto:${b.fromEmail}" style="color:#999999;">${b.fromEmail}</a>
+                <a href="mailto:${b.fromEmail}" style="color:#999999;">${b.fromEmail}</a><br />
+                <a href="${unsubscribeUrl(sport === "general" ? `${b.domain}/app` : b.domain, email)}" style="color:#999999;">unsubscribe</a>
               </p>
             </td>
           </tr>

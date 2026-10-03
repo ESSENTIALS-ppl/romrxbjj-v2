@@ -7,6 +7,8 @@
 // v3: Jim decision (c) 2026-09-29, cancel ends access immediately, no refunds; Legal copy "Canceling ends your access
 // right away." (3b) and the "When you cancel:" bullet (3c / 3c-2).
 
+import { POSTAL_LINE } from "./email_footer.ts";
+
 export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v3";
 export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 
@@ -101,7 +103,7 @@ export function ackSportLines(sportPrice: string, sportPack: string, freePeriod:
 }
 
 export function ackFooter(): string {
-  return `ROMRx LLC, Dublin, Ohio. ${SUPPORT_EMAIL}. Full terms: ${LEGAL_URL}`;
+  return `${POSTAL_LINE}. ${SUPPORT_EMAIL}. Full terms: ${LEGAL_URL}`;
 }
 
 const escHtml = (v: string): string =>
