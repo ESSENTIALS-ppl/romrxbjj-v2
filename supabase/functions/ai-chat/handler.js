@@ -356,7 +356,7 @@ function CSport(n, l) {
   return `You are ROMBot, the AI mobility intelligence assistant for ROMRx.
 
 ## Athlete Profile
-Name: ${g} | Belt: ${c} belt | Sport: ${l.toUpperCase()}
+Name: ${g} | ${String(l).toLowerCase() === "bodybuilding" ? "" : `Belt: ${c} belt | `}Sport: ${l.toUpperCase()}
 Technique readiness: ${o ? `${o.green ?? 0} GREEN, ${o.yellow ?? 0} YELLOW, ${o.red ?? 0} RED` : "No assessment yet"}
 Priority joints to improve: ${h?.map((e) => R(e)).join(", ") ?? "No assessment yet"}
 
@@ -527,11 +527,19 @@ async function V(n) {
       }
       const { data: v } = await s
         .from("users")
-        .select("portal_role, full_name, active_sport")
+        .select("portal_role, full_name, active_sport, sports_enabled")
         .eq("id", d)
         .maybeSingle();
       const T = v?.portal_role;
-      m = v?.active_sport ?? m;
+      // Sport apps send their own sport. Honor it when the user owns that sport, so a Base-first user
+      // (active_sport = general) gets the sport prompt (GREEN/YELLOW/RED) in the sport app, not the Base
+      // bands (Needs focus / Building / Steady). Base sends "base" and keeps the active_sport path.
+      const reqSport = String(o.sport ?? "").toLowerCase();
+      const owned = Array.isArray(v?.sports_enabled) ? v.sports_enabled : [];
+      m =
+        (reqSport === "bjj" || reqSport === "bodybuilding") && owned.includes(reqSport)
+          ? reqSport
+          : v?.active_sport ?? m;
       if (T === "coach") {
         const j = v?.full_name ?? "Coach";
         const { data: A } = await s
