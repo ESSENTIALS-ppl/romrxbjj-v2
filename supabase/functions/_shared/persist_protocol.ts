@@ -18,7 +18,11 @@ type JointDef = {
   riskBelow: number;
 };
 
-const JOINTS: JointDef[] = [
+// HIP_FLEX_UNSCORED (Jim closed this, Oct 3 2026): hip flexion is never judged against 100 or 120, so it is never ranked as a
+// weak spot. Mirrors the SQL protocol_joint_ranking() switch (cfg.hip_flex_unscored). This file is deprecated and not called.
+export const HIP_FLEX_UNSCORED = true;
+
+const ALL_JOINTS: JointDef[] = [
   { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 40, riskBelow: 40 },
   { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 30, riskBelow: 30 },
   { key: "hip_abd", leftKey: "hip_abd_l", rightKey: "hip_abd_r", normalMin: 40, riskBelow: 30 },
@@ -30,6 +34,7 @@ const JOINTS: JointDef[] = [
   { key: "lumbar_ext", singleKey: "lumbar_ext", normalMin: 20, riskBelow: 15 },
   { key: "cervical_rot", leftKey: "cervical_rot_l", rightKey: "cervical_rot_r", normalMin: 70, riskBelow: 60 },
 ];
+const JOINTS: JointDef[] = ALL_JOINTS.filter(j => !(HIP_FLEX_UNSCORED && j.key === "hip_flex"));
 
 const JOINT_KEY_ALIASES: Record<string, string[]> = {
   hip_er: ["hip_er"],
