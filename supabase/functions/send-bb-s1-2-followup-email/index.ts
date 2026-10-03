@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -148,7 +149,7 @@ serve(async (_req) => {
           <tr>
             <td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
               <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">
-                ${BRAND} &bull; Dublin, Ohio<br />
+                ${POSTAL_LINE}<br />
                 You&rsquo;re receiving this because you created a ${BRAND} account.<br />
                 <a href="mailto:jim@romrxbodybuilding.com" style="color:#999999;">jim@romrxbodybuilding.com</a>
               </p>
