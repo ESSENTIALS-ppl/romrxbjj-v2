@@ -1,0 +1,7 @@
+-- ROLLBACK (run only after deploying compute-tiers v42 again, and after removing GREY rows):
+DELETE FROM public.technique_eligibility WHERE tier = 'GREY';
+ALTER TABLE public.technique_eligibility DROP CONSTRAINT IF EXISTS technique_eligibility_tier_check;
+ALTER TABLE public.technique_eligibility
+  ADD CONSTRAINT technique_eligibility_tier_check CHECK (tier = ANY (ARRAY['GREEN','YELLOW','RED']));
+ALTER TABLE public.technique_eligibility DROP COLUMN IF EXISTS joint_status, DROP COLUMN IF EXISTS status_reason;
+-- then POST the latest assessment to compute-tiers (v42) to rewrite rows.

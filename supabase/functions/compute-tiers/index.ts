@@ -1,3 +1,6 @@
+// v43 (DRAFT, not deployed): per-joint rule in ./rule.ts. Worst measured required joint wins; no rule or an
+//   unmeasured required joint is tier GREY (never GREEN). Thresholds come from rom_thresholds (documented matrix),
+//   legacy techniques.*_min only fills gaps. Needs migration 20261003010000 (GREY tier, joint_status, status_reason).
 // compute-tiers v38 - readiness engine + Phase A1 protocol persist
 // v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)
 // v36: also emits per-joint scores into public.joint_scores via the SQL fn
@@ -11,6 +14,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildRequirements, classifyMove, toNum } from "./rule.ts";
 
 const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 45, hip_er_r: 45,
@@ -28,83 +32,6 @@ const JOINT_TARGETS: Record<string, number> = {
   lumbar_flex: 60, lumbar_ext: 25,
   balance_l: 30, balance_r: 30,
 };
-
-const YELLOW_BAND = 0.90;
-
-const BILATERAL: Record<string, [string, string]> = {
-  hip_er:        ["hip_er_l", "hip_er_r"],
-  hip_ir:        ["hip_ir_l", "hip_ir_r"],
-  hip_abd:       ["hip_abd_l", "hip_abd_r"],
-  hip_flex:      ["hip_flex_l", "hip_flex_r"],
-  shoulder_er:   ["shoulder_er_l", "shoulder_er_r"],
-  shoulder_flex: ["shoulder_flex_l", "shoulder_flex_r"],
-  ankle_df:      ["ankle_df_l", "ankle_df_r"],
-  cervical_rot:  ["cervical_rot_l", "cervical_rot_r"],
-  cervical_lat:  ["cervical_lat_l", "cervical_lat_r"],
-};
-const SINGLE: Record<string, string> = {
-  lumbar_flex:   "lumbar_flex",
-  lumbar_ext:    "lumbar_ext",
-  cervical_flex: "cervical_flex",
-  cervical_ext:  "cervical_ext",
-};
-const EVALUABLE = new Set([...Object.keys(BILATERAL), ...Object.keys(SINGLE)]);
-
-function toNum(v: unknown): number | null {
-  if (v == null) return null;
-  const n = typeof v === "number" ? v : Number(v);
-  return isFinite(n) ? n : null;
-}
-
-function athleteValue(a: Record<string, unknown>, joint: string): number | null {
-  if (joint in BILATERAL) {
-    const [l, r] = BILATERAL[joint];
-    const vs = [toNum(a[l]), toNum(a[r])].filter((x): x is number => x != null);
-    return vs.length ? Math.min(...vs) : null;
-  }
-  if (joint in SINGLE) return toNum(a[SINGLE[joint]]);
-  return null;
-}
-
-type LimitingJoint = { joint: string; value: number | null; min: number; ratio?: number; reason?: string };
-type TierResult = { tier: "GREEN" | "YELLOW" | "RED"; limiting: LimitingJoint[] };
-
-function classify(a: Record<string, unknown>, technique: Record<string, unknown>): TierResult {
-  const required: { joint: string; thresh: number }[] = [];
-  for (const [col, val] of Object.entries(technique)) {
-    if (!col.endsWith("_min")) continue;
-    const thresh = toNum(val);
-    if (thresh == null || thresh === 0) continue;
-    const joint = col.slice(0, -4);
-    if (!EVALUABLE.has(joint)) continue;
-    required.push({ joint, thresh });
-  }
-  if (required.length === 0) return { tier: "GREEN", limiting: [] };
-
-  const limiting: LimitingJoint[] = [];
-  const missing: LimitingJoint[] = [];
-  let worstRatio: number | null = null;
-
-  for (const { joint, thresh } of required) {
-    const av = athleteValue(a, joint);
-    if (av == null) {
-      missing.push({ joint, value: null, min: thresh, reason: "not_measured" });
-      continue;
-    }
-    const ratio = thresh ? av / thresh : 1.0;
-    if (worstRatio == null || ratio < worstRatio) worstRatio = ratio;
-    if (ratio < 1.0) limiting.push({ joint, value: av, min: thresh, ratio: Math.round(ratio * 1000) / 1000 });
-  }
-
-  if (worstRatio != null && worstRatio < YELLOW_BAND) {
-    return { tier: "RED", limiting: limiting.filter(x => (x.ratio ?? 1) < YELLOW_BAND) };
-  }
-  const band = limiting.filter(x => (x.ratio ?? 1) >= YELLOW_BAND && (x.ratio ?? 1) < 1.0);
-  if (band.length || missing.length) {
-    return { tier: "YELLOW", limiting: [...band, ...missing] };
-  }
-  return { tier: "GREEN", limiting: [] };
-}
 
 function computeWorstJointKeys(a: Record<string, unknown>, limit = 5): string[] {
   const rows: { key: string; pct: number }[] = [];
@@ -220,12 +147,30 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: "techniques_fetch_failed", detail: techErr?.message }, 500);
     }
 
+    // Documented thresholds (Jim's matrix + White doc) live in rom_thresholds; legacy techniques.*_min fills gaps only.
+    const { data: matrix, error: matErr } = await supa
+      .from("rom_thresholds")
+      .select("technique_code,joint,required_value,laterality_rule")
+      .eq("sport", sport)
+      .range(0, 4999);
+    if (matErr) {
+      return json({ success: false, error: "rom_thresholds_fetch_failed", detail: matErr.message }, 500);
+    }
+    const matrixByCode = new Map<string, { joint: string; required_value: unknown; laterality_rule?: string | null }[]>();
+    for (const m of (matrix ?? []) as Record<string, unknown>[]) {
+      const code = String(m.technique_code ?? "");
+      if (!code) continue;
+      const list = matrixByCode.get(code) ?? [];
+      list.push({ joint: String(m.joint), required_value: m.required_value, laterality_rule: (m.laterality_rule as string | null) ?? null });
+      matrixByCode.set(code, list);
+    }
+
     const now = new Date().toISOString();
     const rows: Record<string, unknown>[] = [];
-    const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0 };
+    const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0, GREY: 0 };
 
     for (const t of techniques as Record<string, unknown>[]) {
-      const res = classify(assessment, t);
+      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t));
       counts[res.tier]++;
       rows.push({
         user_id: userId,
@@ -235,11 +180,9 @@ Deno.serve(async (req: Request) => {
         technique_code: t.code,
         sport,
         tier: res.tier,
-        limiting_joints: res.limiting.map(l =>
-          l.reason === "not_measured"
-            ? `${l.joint}:not_measured(min ${l.min})`
-            : `${l.joint}:${l.value} vs min ${l.min}`
-        ),
+        limiting_joints: res.limiting,
+        joint_status: res.joint_status,
+        status_reason: res.grey_reason,
         computed_at: now,
       });
     }
