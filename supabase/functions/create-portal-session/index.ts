@@ -1,3 +1,4 @@
+// v17 (draft): cancel flow accepts a subscription whose customer differs from users.stripe_customer_id when sub.metadata.user_id is the caller; portal opens for the sub's own customer. Fixes Base cancel 404 after a later sport unlock.
 // create-portal-session v13 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 section 4B, Jim GO via Grant 2026-09-29)
 //   - body { action: "cancel_status" }: DB-only state for Settings > Subscription: Base state
 //     (active | canceled | none), each sport pack's state, and which subscriptions the signed-in user can cancel.
@@ -142,13 +143,21 @@ Deno.serve(async (req: Request) => {
     for (const c of picked) {
       const { ok, body: sub } = await stripeGet(stripeKey, `subscriptions/${encodeURIComponent(c.subscription_id)}`);
       if (!ok) { console.error("subscription lookup failed", c.subscription_id, sub?.error?.message); continue; }
-      if (sub.customer !== userRow?.stripe_customer_id) { console.error("subscription/customer mismatch", c.subscription_id); continue; }
+      // A pack bought later through sport unlock can live on a different Stripe customer than Base (the unlock
+      // checkout creates its own customer and the webhook used to overwrite users.stripe_customer_id with it).
+      // Ownership is therefore: same customer as on file, OR the subscription's own metadata.user_id is the caller
+      // (set by create-checkout-session on every subscription). The caller's id comes from the verified JWT, never the request.
+      const subCustomer = typeof sub.customer === "string" ? sub.customer : (sub.customer?.id as string | undefined);
+      const ownedByMeta = sub.metadata?.user_id === user.id;
+      if (!subCustomer || (subCustomer !== userRow?.stripe_customer_id && !ownedByMeta)) {
+        console.error("subscription/customer mismatch", c.subscription_id); continue;
+      }
       if (!CANCELABLE.has(sub.status) || sub.cancel_at_period_end || sub.cancel_at) continue;
 
       const origin = req.headers.get("origin") ?? "https://romrx.io";
       const returnUrl = `${origin}/app/dashboard/settings`;
       const params = new URLSearchParams({
-        customer: userRow!.stripe_customer_id as string,
+        customer: subCustomer, // the subscription's own customer (portal flow needs the owning customer)
         return_url: returnUrl,
         "flow_data[type]": "subscription_cancel",
         "flow_data[subscription_cancel][subscription]": c.subscription_id,
