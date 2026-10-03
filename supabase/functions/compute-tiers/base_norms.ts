@@ -31,7 +31,7 @@ export type NormSource = "PUBLISHED_MEAN_SD" | "REASONING" | "PROPOSED" | "EXIST
 // Hip flexion, straight-leg raise, degrees, graded PER LEG, SEX-SPECIFIC
 // ---------------------------------------------------------------------------------------------------------------
 export type HipFlexNormRow = {
-  sex: "male" | "female";
+  sex: "male" | "female" | "pooled";
   mean: number;
   sd: number;
   green_min: number;        // mean - 1 SD (both modes)
@@ -63,6 +63,26 @@ export const HIP_FLEX_SLR_NORMS: Record<"male" | "female", HipFlexNormRow> = {
     source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, women n=108, mean 76.3 +/- 9.5 (avg of sides); cut = mean-1SD green; yellow flat10 or mean-2SD (Quinn REASONING); mean/SD abstract-verified only",
   },
 };
+
+// POOLED (men + women) row, used when sex is empty / other / prefer_not_to_say and HIP_FLEX_MISSING_SEX_POLICY = "pooled".
+// STATUS: PROPOSED / DERIVED, NOT a published norm. Needs Quinn to confirm. Youdas 2005 printed no combined row, so it is derived
+// transparently from the two published sex rows (n 106 men, 108 women) with the law of total variance:
+//   N = 106 + 108 = 214
+//   mean_pooled = (106 * 68.5 + 108 * 76.3) / 214 = 72.44            -> 72.4
+//   var_pooled  = [ (106-1)*6.8^2 + (108-1)*9.5^2 + 106*(68.5-72.44)^2 + 108*(76.3-72.44)^2 ] / (214-1)
+//   sd_pooled   = sqrt(var_pooled) = 9.13                            -> 9.1   (includes the between-sex spread, as a mixed group must)
+//   GREEN edge  = mean - 1 SD = 63.3   (same rule as the sex rows)
+//   YELLOW edge = flat10: 63.3 - 10 = 53.3 | published_sd: mean - 2 SD = 54.2
+// Cross-check: pooling Quinn's 12 age cells (n 214) gives mean 72.43, SD 9.16 -> GREEN edge 63.3 (same to 0.1).
+// Caveat: this assumes an even men/women mix. The pooled GREEN edge (63.3) sits between the men edge (61.7) and the women edge
+// (66.8): a man at 62 reads YELLOW here, a woman at 65 reads GREEN here (she would be YELLOW on the women's table). Sex-neutral
+// by design (Grant for Jim, Oct 3). Simple fallback if Quinn prefers: midpoint of the two GREEN edges = 64.25.
+export const HIP_FLEX_SLR_POOLED_NORM: HipFlexNormRow = {
+  sex: "pooled", mean: 72.4, sd: 9.1, green_min: 63.3, yellow_min: 54.2, yellow_flat10_min: 53.3,
+  source: "PROPOSED (derived, needs Quinn): n-weighted mean and total SD pooled from Youdas 2005 men (n=106, 68.5 +/- 6.8) and women (n=108, 76.3 +/- 9.5), PMID 15901126; GREEN = mean-1SD; not a published combined norm",
+};
+export const HIP_FLEX_POOLED_SOURCE: NormSource = "PROPOSED";
+export const HIP_FLEX_POOLED_LABEL = "adult norm, men and women combined"; // sex-neutral wording for any text built from a pooled grade
 
 // Age bands from Youdas (mean, SD, n); ABSTRACT-VERIFIED ONLY (paywalled full text, PARTIAL). Quinn: ANOVA found no age effect from 20 to 79, so ONE adult cut-off per sex is
 // used and these are kept as reference only. The 70-79 cells are a little lower and small (10 men, 14 women).
@@ -98,23 +118,23 @@ export const HIP_FLEX_ASYMMETRY_SOURCE: NormSource = "REASONING";
 export const HIP_FLEX_REVIEW_ABOVE_DEG = 90;
 export const HIP_FLEX_ABOVE_REVIEW_HANDLING: "grade_normally" | "grey" = "grade_normally"; // PENDING JIM
 
-// SEX-MISSING POLICY (PENDING JIM). Fact (Oct 3): users.gender is empty for 31 of 35 users, so this is the COMMON case.
-//   "grey"             = leg is GREY, reason sex_missing, "Not rated" (never GREEN, no guessed edge). DEFAULT, because
-//                        Quinn's norm table has NO combined-sex row (only men and women), so a combined edge would be our own invention.
-//   "combined_lenient" = use the more lenient (lower) of the men and women edges for each line: GREEN from 61.7,
-//                        YELLOW from 51.7 (flat10) or 54.9 (published_sd). DERIVED, not published (labelled
-//                        "combined_lenient" in the result, never presented as a norm). A woman at 63 reads GREEN
-//                        here although she is YELLOW on the women's table: that is the cost of this option.
+// MISSING-SEX POLICY. Fact (Oct 3): users.gender is empty for 31 of 35 users, so this is the COMMON case.
+// DECIDED (Grant, for Jim, Oct 3): "pooled" = ONE sex-neutral norm (HIP_FLEX_SLR_POOLED_NORM) when sex is empty, other or
+// prefer_not_to_say. Not grey, not a stricter edge, avoids a false "low". Sex-specific norms are used ONLY when sex is on file.
+// The pooled row is PROPOSED (derived from the published men and women rows), needs Quinn to confirm.
+//   "pooled"  = DEFAULT. GREEN from 63.3; YELLOW from 53.3 (flat10) or 54.2 (published_sd). Wording: "adult norm, men and women combined".
+//   "grey"    = leg is GREY, reason sex_missing, "Not rated" (no guessed edge). The previous default.
+//   "lenient" = the more lenient (lower) of the men and women edges: GREEN from 61.7, YELLOW from 51.7 (flat10) or 54.9
+//               (published_sd). DERIVED, not published. A woman at 63 reads GREEN here although she is YELLOW on the women's table.
 // Change ONLY this constant. The result always says which policy produced the color (sex_policy).
-export type HipFlexSexMissingPolicy = "grey" | "combined_lenient";
-export const HIP_FLEX_SEX_MISSING_POLICY: HipFlexSexMissingPolicy = "grey"; // PENDING JIM
+export type HipFlexMissingSexPolicy = "pooled" | "grey" | "lenient";
+export const HIP_FLEX_MISSING_SEX_POLICY: HipFlexMissingSexPolicy = "pooled"; // DECIDED by Grant for Jim; pooled row needs Quinn
 
 // users.gender values written by Base CompleteProfile: male, female, other, prefer_not_to_say, or null (optional).
 // Anything that is not clearly male or female is "unknown".
-// Missing/unknown sex fallback (stated plainly): the leg is GREY with reason sex_missing. We do NOT guess an edge,
-// because the male and female edges differ by about 2 to 5 degrees at the edges and a guess could print
-// GREEN for a reading that is YELLOW on the correct table. The raw value, the asymmetry flag and the
-// above-limit flag are still reported (they do not need sex).
+// Missing/unknown sex fallback: per HIP_FLEX_MISSING_SEX_POLICY (default "pooled" = one sex-neutral norm). Under "grey" the leg
+// is GREY with reason sex_missing and no edge is guessed. The raw value, the asymmetry flag and the above-limit flag are
+// reported either way (they do not need sex).
 export function normalizeSex(raw: unknown): Sex {
   const s = String(raw ?? "").trim().toLowerCase();
   if (s === "male" || s === "m" || s === "man") return "male";
@@ -134,8 +154,16 @@ export type LegGrade = {
   above_review_limit: boolean;
 };
 
-export function hipFlexCombinedEdges(mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): { green_min: number; yellow_min: number } {
-  const m = hipFlexEdges("male", mode), f = hipFlexEdges("female", mode);
+// Edges used when sex is missing, per policy. null = no edge (policy "grey").
+export function hipFlexMissingSexEdges(
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+): { green_min: number; yellow_min: number } | null {
+  if (policy === "grey") return null;
+  if (policy === "pooled") {
+    const r = HIP_FLEX_SLR_POOLED_NORM;
+    return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: (mode === "published_sd" ? r.yellow_min : r.yellow_flat10_min) - HIP_FLEX_YELLOW_WIDEN_DEG };
+  }
+  const m = hipFlexEdges("male", mode), f = hipFlexEdges("female", mode); // "lenient"
   return { green_min: Math.min(m.green_min, f.green_min), yellow_min: Math.min(m.yellow_min, f.yellow_min) };
 }
 
@@ -147,17 +175,18 @@ export function hipFlexEdges(sex: "male" | "female", mode: HipFlexGradingMode = 
 
 export function gradeHipFlexLeg(
   sexRaw: unknown, value: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
-  policy: HipFlexSexMissingPolicy = HIP_FLEX_SEX_MISSING_POLICY,
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY,
 ): LegGrade {
   const v = num(value);
   if (v == null) return { status: "GREY", reason: "not_measured", above_review_limit: false };
   const above = v > HIP_FLEX_REVIEW_ABOVE_DEG;
   const sex = normalizeSex(sexRaw);
-  if (sex === "unknown" && policy === "grey") return { status: "GREY", reason: "sex_missing", above_review_limit: above };
+  const missing = sex === "unknown" ? hipFlexMissingSexEdges(policy, mode) : null;
+  if (sex === "unknown" && !missing) return { status: "GREY", reason: "sex_missing", above_review_limit: above };
   if (above && HIP_FLEX_ABOVE_REVIEW_HANDLING === "grey") {
     return { status: "GREY", reason: "above_review_limit", above_review_limit: true };
   }
-  const e = sex === "unknown" ? hipFlexCombinedEdges(mode) : hipFlexEdges(sex, mode);
+  const e = sex === "unknown" ? missing! : hipFlexEdges(sex, mode);
   const status: Status = v >= e.green_min ? "GREEN" : v >= e.yellow_min ? "YELLOW" : "RED";
   return { status, reason: null, above_review_limit: above };
 }
@@ -196,12 +225,13 @@ export type HipFlexGrade = {
   asymmetry: Asymmetry;
   above_review_limit_handling: "grade_normally" | "grey"; // PENDING JIM
   grading_mode: HipFlexGradingMode; // PENDING JIM
-  sex_policy: HipFlexSexMissingPolicy | "sex_on_file"; // which rule produced the color
+  sex_policy: HipFlexMissingSexPolicy | "sex_on_file"; // which rule produced the color
+  norm_label: string | null; // sex-neutral wording when the pooled norm graded (null otherwise)
 };
 
 export function gradeHipFlexion(
   sexRaw: unknown, left: unknown, right: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
-  policy: HipFlexSexMissingPolicy = HIP_FLEX_SEX_MISSING_POLICY,
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY,
 ): HipFlexGrade {
   const l = gradeHipFlexLeg(sexRaw, left, mode, policy);
   const r = gradeHipFlexLeg(sexRaw, right, mode, policy);
@@ -217,6 +247,7 @@ export function gradeHipFlexion(
     above_review_limit_handling: HIP_FLEX_ABOVE_REVIEW_HANDLING,
     grading_mode: mode,
     sex_policy: normalizeSex(sexRaw) === "unknown" ? policy : "sex_on_file",
+    norm_label: normalizeSex(sexRaw) === "unknown" && policy === "pooled" ? HIP_FLEX_POOLED_LABEL : null,
   };
 }
 
