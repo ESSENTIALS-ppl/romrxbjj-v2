@@ -431,7 +431,8 @@ Deno.serve(async (req: Request) => {
       }, { onConflict: "user_id,sport" });
 
       await supabase.rpc("add_sport_access", { p_user_id: meta.user_id, p_sport: meta.sport });
-      await supabase.from("users").update({ stripe_customer_id: customerId }).eq("id", meta.user_id);
+      // Keep the customer of record (Base). The unlock checkout creates its own Stripe customer; overwriting made Base cancel 404.
+      await supabase.from("users").update({ stripe_customer_id: customerId }).eq("id", meta.user_id).is("stripe_customer_id", null);
 
       const { data: sportUser } = await supabase.from("users").select("full_name").eq("id", meta.user_id).maybeSingle();
       const sportName = sportUser?.full_name ?? (email ? email.split("@")[0] : "there");
