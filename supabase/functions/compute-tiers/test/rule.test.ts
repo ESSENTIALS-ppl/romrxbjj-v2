@@ -44,7 +44,7 @@ assert.equal(normalizeJoint("shoulder_external_rotation"), "shoulder_er");
 assert.equal(ANKLE_LEGACY_REQUIREMENTS_ARE_CM, false);
 const AK = { ankle_df_l: 12, ankle_df_r: 11, hip_abd_l: 60, hip_abd_r: 60 };
 r = classifyMove(AK, M([["Ankle DF", 15]]));                                   // 12 cm vs "15" would have been RED
-assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"]);
+assert.deepEqual([r.tier, r.grey_reason], ["GREY", "no_reference_range"]);   // Legal: "no reference range yet"
 assert.deepEqual(r.limiting, ["ankle_df:cm_requirement_pending"]);
 r = classifyMove(AK, buildRequirements([], { ankle_df_min: 20, hip_abd_min: 50 })); // legacy techniques column: same
 assert.equal(r.joint_status.find(j => j.joint === "ankle_df")!.status, "GREY");

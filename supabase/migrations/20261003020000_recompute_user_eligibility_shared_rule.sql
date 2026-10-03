@@ -134,6 +134,11 @@ DECLARE
   c_hip_flex_moves_use_slr constant boolean := true;   -- PENDING JIM (mirrors HIP_FLEX_MOVES_USE_SLR_COLOR)
   c_grey_beats_yellow constant boolean := true;        -- PENDING JIM (mirrors GREY_BEATS_YELLOW; RED always wins)
   c_one_side constant text := 'grey';                  -- PENDING JIM (mirrors ONE_SIDE_MISSING_POLICY: 'grey' | 'use_measured_side')
+  -- LEGAL (Stacy, STACY-CLEARANCES section 10; mirrors NO_REFERENCE_RANGE_SWITCH / HIP_ER_NO_REFERENCE_MIN in rule.ts): a hip external
+  -- rotation bar of c_hip_er_no_ref_min or more is far above the healthy average (about 36 degrees), so it stays GREY with reason
+  -- no_reference_range until Quinn answers Q4 / Q5. The ankle degree-style path (unit_pending) uses the same reason.
+  c_no_reference_range constant boolean := true;
+  c_hip_er_no_ref_min constant numeric := 50;
   v_assessment   assessments%ROWTYPE;
   v_sports       text[];
   v_sport        text;
@@ -243,10 +248,12 @@ BEGIN
                WHEN r.joint = 'hip_flex' AND c_hip_flex_moves_use_slr
                  THEN public.rom_pick_leg_status(public.rom_slr_leg(v_gender, jv.l), public.rom_slr_leg(v_gender, jv.r), r.lat, v_dom)
                WHEN r.joint = 'ankle_df' AND NOT r.is_cm THEN 'GREY'          -- F-17: cm reading never vs a unit-less requirement
+               WHEN r.joint = 'hip_er' AND c_no_reference_range AND r.req >= c_hip_er_no_ref_min THEN 'GREY'   -- Legal: no reference range yet
                ELSE public.rom_classify_joint(v.val, r.req, r.joint)
              END AS status,
              (r.joint = 'hip_flex' AND c_hip_flex_moves_use_slr) AS slr_basis,
-             (r.joint = 'ankle_df' AND NOT r.is_cm) AS unit_pending
+             (r.joint = 'ankle_df' AND NOT r.is_cm) AS unit_pending,
+             (r.joint = 'hip_er' AND c_no_reference_range AND r.req >= c_hip_er_no_ref_min) AS no_ref
         FROM reqs r
         LEFT JOIN jv ON jv.joint = r.joint
         CROSS JOIN LATERAL (SELECT CASE
@@ -265,6 +272,7 @@ BEGIN
              BOOL_OR(g.status = 'RED') AS any_red,
              BOOL_OR(g.status = 'YELLOW') AS any_yellow,
              BOOL_OR(g.status = 'GREY') AS any_grey,
+             COALESCE(BOOL_OR(g.unit_pending OR g.no_ref), false) AS any_no_ref,
              COALESCE(jsonb_agg(
                CASE WHEN g.joint IS NOT NULL THEN
                  jsonb_build_object('joint', g.joint, 'status', g.status)
@@ -272,6 +280,7 @@ BEGIN
                END) FILTER (WHERE g.joint IS NOT NULL), '[]'::jsonb) AS joint_status,
              COALESCE(ARRAY_REMOVE(ARRAY_AGG(
                CASE WHEN g.status = 'GREY' AND g.unit_pending THEN g.joint || ':cm_requirement_pending'
+                    WHEN g.status = 'GREY' AND g.no_ref THEN g.joint || ':no_reference_range'
                     WHEN g.status = 'GREY' AND g.slr_basis THEN g.joint || ':slr_not_rated'
                     WHEN g.status = 'GREY' THEN g.joint || ':not_measured(min ' || fmt_num(g.req) || ')'
                     WHEN g.slr_basis AND g.status <> 'GREEN' THEN g.joint || ':slr_norm'
@@ -292,7 +301,7 @@ BEGIN
                   ELSE 'GREEN' END AS tier,
              CASE WHEN req_count = 0 THEN 'no_rule'
                   WHEN any_red THEN NULL
-                  WHEN any_grey AND (c_grey_beats_yellow OR NOT any_yellow) THEN 'incomplete'
+                  WHEN any_grey AND (c_grey_beats_yellow OR NOT any_yellow) THEN CASE WHEN any_no_ref THEN 'no_reference_range' ELSE 'incomplete' END
                   ELSE NULL END AS status_reason,
              CASE WHEN req_count = 0 OR NOT (any_red OR any_yellow OR any_grey) THEN ARRAY[]::text[]
                   ELSE limiting END AS limiting_joints
