@@ -1,11 +1,31 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// 2026-09-29 caller auth: only pg_cron (public.cron_call_edge) may trigger sends.
+// x-cron-secret is checked against Vault cron_webhook_secret via RPC
+// public.verify_webhook_secret (service_role only, returns boolean). Fails closed.
+async function cronCallerOk(req: Request): Promise<boolean> {
+  const got = (req.headers.get("x-cron-secret") ?? "").trim();
+  if (got.length < 32) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_webhook_secret`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
+    });
+    return r.ok && (await r.json()) === true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 serve(async (_req) => {
+  if (!(await cronCallerOk(_req))) return new Response("forbidden", { status: 403 });
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -16,7 +36,8 @@ serve(async (_req) => {
 
     const { data: users, error: usersError } = await supabase
       .from("users")
-      .select("id, email, full_name, created_at")
+      .select("id, email, full_name, created_at, active_sport")
+      .eq("active_sport", "bjj")
       .gte("created_at", windowStart)
       .lte("created_at", windowEnd);
 
@@ -133,7 +154,7 @@ serve(async (_req) => {
           <tr>
             <td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
               <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">
-                ROMRxBJJ &bull; Dublin, Ohio<br />
+                ${POSTAL_LINE}<br />
                 You&rsquo;re receiving this because you created a ROMRxBJJ account.<br />
                 <a href="mailto:jim@romrxbjj.com" style="color:#999999;">jim@romrxbjj.com</a>
               </p>

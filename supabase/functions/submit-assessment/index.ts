@@ -97,8 +97,8 @@ function greatJobConfig(sport: string) {
     betaLine: "ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.",
   };
 }
-/** Assessment-complete ("great job") email HTML. Pure function so tests and previews can render it. */
-export function renderGreatJobHtml(sport: string, email: string, firstName: string): string {
+async function sendGreatJob(sport: string, email: string, firstName: string) {
+  if (!RESEND_API_KEY) return;
   const c = greatJobConfig(sport);
   const profileUrl = `${c.domain}${c.ctaPath}`;
   const html = `
@@ -132,12 +132,6 @@ export function renderGreatJobHtml(sport: string, email: string, firstName: stri
     </table>
   </td></tr></table>
 </body></html>`;
-  return html;
-}
-async function sendGreatJob(sport: string, email: string, firstName: string) {
-  if (!RESEND_API_KEY) return;
-  const c = greatJobConfig(sport);
-  const html = renderGreatJobHtml(sport, email, firstName);
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },

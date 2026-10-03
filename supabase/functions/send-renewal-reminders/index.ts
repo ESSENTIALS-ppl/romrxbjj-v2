@@ -4,6 +4,7 @@
 // so replies land in the unified inbox).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -79,7 +80,7 @@ function buildEmail(brand: Brand, name: string, plan: string, price: string, day
     <a href="${dashboardUrl}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;">Manage Subscription</a>
     <p style="font-size:11px;color:#5a7070;margin-top:24px;line-height:1.6;">To cancel, go to Settings and click Manage Subscription before your renewal date. All sales are final per our <a href="${brand.domain}/legal" style="color:#008080;">Refund Policy</a>.</p>
   </div>
-  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">ROMRx LLC &mdash; Dublin, Ohio &mdash; <a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
+  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${POSTAL_LINE}<br /><a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
 <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}. If you don't want to receive these emails from ${brand.name} in the future, please <a href="${brand.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#5a7070;">unsubscribe</a>.</p></div></body></html>`;
 }
 

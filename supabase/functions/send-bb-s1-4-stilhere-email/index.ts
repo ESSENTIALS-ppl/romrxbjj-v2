@@ -6,6 +6,11 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+const ACCENT = "#1e6fd9";
+const DOMAIN = "https://romrxbodybuilding.com";
+const FROM = "Jim Scott <jim@romrxbodybuilding.com>";
+const BRAND = "ROMRxBodybuilding";
+
 // 2026-09-29 caller auth: only pg_cron (public.cron_call_edge) may trigger sends.
 // x-cron-secret is checked against Vault cron_webhook_secret via RPC
 // public.verify_webhook_secret (service_role only, returns boolean). Fails closed.
@@ -29,7 +34,6 @@ serve(async (_req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Day 5 window: 119-121 hours after signup
     const now = new Date();
     const windowStart = new Date(now.getTime() - 121 * 60 * 60 * 1000).toISOString();
     const windowEnd = new Date(now.getTime() - 119 * 60 * 60 * 1000).toISOString();
@@ -37,7 +41,7 @@ serve(async (_req) => {
     const { data: users, error: usersError } = await supabase
       .from("users")
       .select("id, email, full_name, created_at, active_sport")
-      .eq("active_sport", "bjj")
+      .eq("active_sport", "bodybuilding")
       .gte("created_at", windowStart)
       .lte("created_at", windowEnd);
 
@@ -47,7 +51,7 @@ serve(async (_req) => {
     }
 
     if (!users || users.length === 0) {
-      console.log("No users in Day 5 window");
+      console.log("No bodybuilding users in Day 5 window");
       return new Response(JSON.stringify({ sent: 0 }), { status: 200 });
     }
 
@@ -64,7 +68,7 @@ serve(async (_req) => {
     const assessedIds = new Set((assessed ?? []).map((a: any) => a.user_id));
     const eligibleUsers = users.filter((u: any) => !assessedIds.has(u.id));
 
-    console.log(`Day 5 window — Total: ${users.length}, Assessed: ${assessedIds.size}, Eligible: ${eligibleUsers.length}`);
+    console.log(`BB S1-4 Day 5 — Total: ${users.length}, Assessed: ${assessedIds.size}, Eligible: ${eligibleUsers.length}`);
 
     let sent = 0;
     const errors: any[] = [];
@@ -72,14 +76,14 @@ serve(async (_req) => {
     for (const user of eligibleUsers) {
       const firstName = (user.full_name ?? "").split(" ")[0] || "there";
       const email = user.email;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('marketing_opt_out')
-          .eq('email', user.email)
-          .single()
-        if (profile?.marketing_opt_out) {
-          continue
-        }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("marketing_opt_out")
+        .eq("email", user.email)
+        .single();
+      if (profile?.marketing_opt_out) {
+        continue;
+      }
 
       const htmlBody = `
 <!DOCTYPE html>
@@ -95,30 +99,27 @@ serve(async (_req) => {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;">
 
-          <!-- Header -->
           <tr>
             <td style="background-color:#1a1a1a;padding:32px 40px;text-align:center;">
-              <h1 style="color:#ffffff;font-size:24px;margin:0;letter-spacing:2px;font-weight:700;">ROMRxBJJ</h1>
-              <p style="color:#888888;font-size:12px;margin:6px 0 0 0;letter-spacing:1px;text-transform:uppercase;">Position Readiness Protocol&trade;</p>
+              <h1 style="color:#ffffff;font-size:24px;margin:0;letter-spacing:2px;font-weight:700;">${BRAND}</h1>
+              <p style="color:#888888;font-size:12px;margin:6px 0 0 0;letter-spacing:1px;text-transform:uppercase;">Range of Motion Readiness Protocol&trade;</p>
             </td>
           </tr>
 
-          <!-- Body -->
           <tr>
             <td style="padding:40px 40px 32px 40px;">
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Hey ${firstName},</p>
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 28px 0;">No sales pitch today.</p>
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">I just want to make sure you know what you have access to &mdash; right now, for free:</p>
 
-              <!-- Checklist -->
-              <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;background-color:#f8fffe;border:1px solid #d4edda;border-radius:8px;padding:24px;">
+              <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;background-color:#f8fffe;border:1px solid #d4edda;border-radius:8px;">
                 <tr>
-                  <td style="padding:0 24px 0 24px;">
+                  <td style="padding:24px;">
                     <table cellpadding="0" cellspacing="0" width="100%">
-                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Full 8-marker ROM assessment</td></tr>
-                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Your Position Readiness Score</td></tr>
-                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Which BJJ techniques your body is currently ready for</td></tr>
-                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Where your biggest mobility gaps are</td></tr>
+                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Full ROM assessment across every key lifting joint</td></tr>
+                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Your Range of Motion Readiness Score</td></tr>
+                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Which lifts your body is currently ready to load</td></tr>
+                      <tr><td style="padding:8px 0;font-size:15px;color:#222222;line-height:1.6;"><span style="color:#28a745;font-weight:700;margin-right:10px;">&#10003;</span> Where your biggest mobility gaps are costing you size and strength</td></tr>
                     </table>
                   </td>
                 </tr>
@@ -126,7 +127,6 @@ serve(async (_req) => {
 
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 28px 0;">This is the foundation everything else is built on.</p>
 
-              <!-- Personal note -->
               <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;">
                 <tr>
                   <td style="background-color:#fff9f0;border-left:4px solid #f0ad4e;padding:18px 22px;border-radius:0 6px 6px 0;">
@@ -137,12 +137,11 @@ serve(async (_req) => {
 
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 8px 0;">Otherwise:</p>
 
-              <!-- CTA Button -->
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td align="center" style="padding-bottom:36px;">
-                    <a href="https://romrxbjj.com/onboarding/assessment"
-                       style="display:inline-block;background-color:#c8102e;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 36px;border-radius:6px;letter-spacing:0.5px;">
+                    <a href="${DOMAIN}/onboarding/assessment"
+                       style="display:inline-block;background-color:${ACCENT};color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 36px;border-radius:6px;letter-spacing:0.5px;">
                       &rarr; Run My Assessment
                     </a>
                   </td>
@@ -153,26 +152,27 @@ serve(async (_req) => {
             </td>
           </tr>
 
-          <!-- Footer -->
           <tr>
             <td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
               <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">
                 ${POSTAL_LINE}<br />
-                You&rsquo;re receiving this because you created a ROMRxBJJ account.<br />
-                <a href="mailto:jim@romrxbjj.com" style="color:#999999;">jim@romrxbjj.com</a>
+                You&rsquo;re receiving this because you created a ${BRAND} account.<br />
+                <a href="mailto:jim@romrxbodybuilding.com" style="color:#999999;">jim@romrxbodybuilding.com</a>
               </p>
             </td>
           </tr>
 
         </table>
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+          <tr>
+            <td align="center" style="padding:20px 40px 10px;">
+              <p style="font-size:11px;color:#999999;text-align:center;margin:0;line-height:1.6;">This message was sent to ${email}. If you don't want to receive these emails from ${BRAND} in the future, please <a href="${DOMAIN}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a>.</p>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
-          <tr>
-            <td align="center" style="padding:20px 40px 10px;">
-              <p style="font-size:11px;color:#999999;text-align:center;margin:0;line-height:1.6;">This message was sent to ${email}. If you don't want to receive these emails from ROMRxBJJ in the future, please <a href="https://romrxbjj.com/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a>.</p>
-            </td>
-          </tr>
 </body>
 </html>`;
 
@@ -183,23 +183,22 @@ serve(async (_req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Jim Scott <jim@romrxbjj.com>",
+          from: FROM,
           to: [email],
           subject: `Still here for you, ${firstName}`,
           html: htmlBody,
-          headers: {
-            "X-Entity-Ref-ID": `s1-4-stillhere-${user.id}-${Date.now()}`,
-          },
+          headers: { "X-Entity-Ref-ID": `bb-s1-4-stillhere-${user.id}-${Date.now()}` },
           tags: [
             { name: "stage", value: "s1_registered" },
-            { name: "email_id", value: "s1_4_stillhere" },
+            { name: "email_id", value: "bb_s1_4_stillhere" },
+            { name: "sport", value: "bodybuilding" },
           ],
         }),
       });
 
       if (res.ok) {
         sent++;
-        console.log(`S1-4 sent to ${email}`);
+        console.log(`BB S1-4 sent to ${email}`);
       } else {
         const errData = await res.json();
         console.error(`Failed for ${email}:`, errData);

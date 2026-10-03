@@ -74,25 +74,55 @@ Deno.test("welcome email: full address + unsubscribe link for general, bjj, body
   }
 });
 
-// ---- 2. assessment done (submit-assessment great_job) ----
+// ---- 2. assessment done (submit-assessment great_job): drive the real handler with stubs, capture the Resend payload ----
 Deno.test("assessment-done email: full address + existing unsubscribe link", async () => {
   Deno.env.set("SUPABASE_URL", "http://stub.local");
   Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "stub-service-key");
+  Deno.env.set("SUPABASE_ANON_KEY", "stub-anon-key");
   Deno.env.set("RESEND_API_KEY", "stub-resend-key");
+  const box: { handler?: (req: Request) => Promise<Response> } = {};
   // deno-lint-ignore no-explicit-any
-  (Deno as any).serve = () => ({});
-  const { renderGreatJobHtml } = await import("../submit-assessment/index.ts");
-  const email = "fixture-general@example.com";
+  (Deno as any).serve = (h: (req: Request) => Promise<Response>) => { box.handler = h; return {}; };
+  const sent: { to: string; subject: string; html: string }[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).includes("api.resend.com")) {
+      const body = JSON.parse(String(init?.body));
+      sent.push({ to: body.to[0], subject: body.subject, html: body.html });
+      return new Response(JSON.stringify({ id: "re_stub" }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  }) as typeof fetch;
   const expect: Record<string, string> = {
     general: "https://romrx.io/app/unsubscribe?email=",
     bjj: "https://romrxbjj.com/unsubscribe?email=",
     bodybuilding: "https://romrxbodybuilding.com/unsubscribe?email=",
   };
-  for (const sport of Object.keys(expect)) {
-    const html = renderGreatJobHtml(sport, email, "Test");
-    footerChecks(html);
-    assertStringIncludes(html, `href="${expect[sport]}${encodeURIComponent(email)}"`);
-    await preview(`2-assessment-done-${sport}`, html);
+  try {
+    await import("../submit-assessment/index.ts");
+    assert(box.handler, "handler registered");
+    for (const sport of Object.keys(expect)) {
+      sent.length = 0;
+      const email = `fixture-${sport}@example.com`;
+      // deno-lint-ignore no-explicit-any
+      (globalThis as any).__stub = {
+        user: { id: "u1", email, user_metadata: { full_name: "Test User" } },
+        row: { id: "a1", active_sport: sport, marketing_opt_out: false, full_name: "Test User", assessed_at: "2026-10-03T00:00:00Z", sport },
+      };
+      const res = await box.handler!(new Request("http://x", {
+        method: "POST",
+        headers: { Authorization: "Bearer stub", "content-type": "application/json" },
+        body: JSON.stringify({ hip_flex_l: 100 }),
+      }));
+      assertEquals(res.status, 200);
+      const m = sent.find((x) => x.to === email);
+      assert(m, "assessment-done email sent to stub");
+      footerChecks(m!.html);
+      assertStringIncludes(m!.html, `href="${expect[sport]}${encodeURIComponent(email)}"`);
+      await preview(`2-assessment-done-${sport}`, m!.html);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 

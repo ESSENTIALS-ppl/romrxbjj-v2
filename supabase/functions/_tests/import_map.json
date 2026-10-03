@@ -1,6 +1,8 @@
 {
   "imports": {
     "jsr:@supabase/supabase-js@2": "./stub_supabase.ts",
-    "jsr:@supabase/functions-js/edge-runtime.d.ts": "./stub_edge_runtime.ts"
+    "jsr:@supabase/functions-js/edge-runtime.d.ts": "./stub_edge_runtime.ts",
+    "https://esm.sh/@supabase/supabase-js@2": "./stub_supabase.ts",
+    "https://deno.land/std@0.168.0/http/server.ts": "./stub_std_server.ts"
   }
 }
