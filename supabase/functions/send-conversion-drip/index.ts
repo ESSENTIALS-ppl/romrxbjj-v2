@@ -38,7 +38,6 @@ async function cronCallerOk(req: Request): Promise<boolean> {
   }
 }
 
-
 /** Sep 8 Field plus-alias fixtures land in jim@romrx.io — never drip them. */
 function isAuditFixtureEmail(email: string): boolean {
   const e = email.toLowerCase();
@@ -167,7 +166,7 @@ serve(async (_req) => {
     const { data: users, error: uErr } = await supabase
       .from("users").select("id, email, full_name, active_sport, subscription_status, marketing_opt_out, platforms")
       .in("id", userIds)
-      .in("active_sport", ["bjj", "bodybuilding"]);   // v2/v10: Base (general) users are never in this drip
+      .in("active_sport", ["bjj", "bodybuilding"]);
     if (uErr) { errors.push({ stage: stage.id, uErr }); continue; }
 
     const { data: ents } = await supabase
@@ -187,13 +186,11 @@ serve(async (_req) => {
       if (activeEnt.has(`${u.id}:${sport}`)) { skipped.paid++; continue; }
       if ((u.platforms as string[] | null)?.includes(sport)) { skipped.paid++; continue; }
 
-      // Send-once claim BEFORE Resend — blocks hour-apart duplicates across the 2h window.
       const { error: claimErr } = await supabase.from("email_sends").insert({
         user_id: u.id,
         email_id: stage.id,
       });
       if (claimErr) {
-        // unique_violation (23505) or race = already claimed/sent
         skipped.already_sent++;
         continue;
       }
@@ -220,7 +217,6 @@ serve(async (_req) => {
         sent++;
         await logEvent("email_sent", { userId: u.id as string, sport, props: { email_id: stage.id, stage: "conversion_drip" } });
       } else {
-        // Release claim so a later cron can retry a transient Resend failure.
         await supabase.from("email_sends").delete().eq("user_id", u.id as string).eq("email_id", stage.id);
         errors.push({ stage: stage.id, email, err: await res.text() });
       }
