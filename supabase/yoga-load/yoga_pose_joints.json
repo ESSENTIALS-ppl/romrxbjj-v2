@@ -1,0 +1,3359 @@
+{
+ "SUN02": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "cervical_ext",
+   "base_key": "cervical_ext",
+   "measure_status": "base",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SUN03": [
+  {
+   "joint_key": "x:ankle:dorsiflexion, knee straight",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SUN04": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUN05": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN06": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN07": [
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:plantarflexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUN08": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:ankle:dorsiflexion, knee straight",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN09": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUN10": [
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "cervical_ext",
+   "base_key": "cervical_ext",
+   "measure_status": "base",
+   "bilateral": false
+  }
+ ],
+ "SUN11": [
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN12": [
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN13": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SUN14": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN15": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD01": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD02": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:abduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD03": [
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD04": [
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:abduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:extension past zero",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:dorsiflexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD05": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD06": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD07": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD08": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD09": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD10": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD11": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD12": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:adduction across body",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:adduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD13": [
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD14": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD15": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD16": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD17": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD18": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD19": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD20": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "STD21": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD22": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "STD23": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "STD24": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP01": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP02": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "HIP03": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "HIP04": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP05": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:dorsiflexion, knee straight",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "HIP06": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP07": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP08": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "HIP09": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP10": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP11": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP12": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP13": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:ankle:plantarflexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "HIP14": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "FWD01": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD02": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD03": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:lateral flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "FWD04": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD05": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "FWD06": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "FWD07": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:plantarflexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "FWD08": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD09": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD10": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD11": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "FWD12": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "BCK01": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK02": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK03": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK04": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK05": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK06": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK07": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK08": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK09": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "cervical_ext",
+   "base_key": "cervical_ext",
+   "measure_status": "base",
+   "bilateral": false
+  }
+ ],
+ "BCK10": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK11": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK12": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK13": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK14": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "BCK15": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK16": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "BCK17": [
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "BCK18": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "TWS01": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS02": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS03": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS04": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:adduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS05": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS06": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS07": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS08": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS09": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS10": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS11": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS12": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS13": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS14": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "TWS15": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "ARM01": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "ARM02": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM03": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM04": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM05": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM06": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM07": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM08": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "ARM09": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "ARM10": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "ARM11": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "ARM12": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "ARM13": [
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV01": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV02": [
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "INV03": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "cervical_flex",
+   "base_key": "cervical_flex",
+   "measure_status": "base",
+   "bilateral": false
+  }
+ ],
+ "INV04": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "cervical_flex",
+   "base_key": "cervical_flex",
+   "measure_status": "base",
+   "bilateral": false
+  }
+ ],
+ "INV05": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV06": [
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV07": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV08": [
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV09": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "INV10": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "INV11": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "COR01": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "COR02": [
+  {
+   "joint_key": "x:shoulder:abduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "COR03": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "COR04": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "COR05": [
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "COR06": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:abduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "COR07": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SIT01": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT02": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT03": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "ankle_df",
+   "base_key": "ankle_df",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SIT04": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT05": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:plantarflexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT06": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SIT07": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:dorsiflexion, knee straight",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT08": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT09": [
+  {
+   "joint_key": "x:hip:adduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_ir",
+   "base_key": "hip_ir",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "shoulder_er",
+   "base_key": "shoulder_er",
+   "measure_status": "proxy",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:internal rotation / extension behind the back",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT10": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SIT11": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP01": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SUP02": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP03": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP04": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP05": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP06": [
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUP07": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUP08": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "SUP09": [
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUP10": [
+  {
+   "joint_key": "x:hip:adduction",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "PRN01": [
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "PRN02": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "PRN04": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "PRN05": [
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "PRN06": [
+  {
+   "joint_key": "shoulder_er",
+   "base_key": "shoulder_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:shoulder:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "RST03": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "RST04": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:hip:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "RST05": [
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "RST06": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:extension",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "RST07": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:hip:flexion, knee bent",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "hip_abd",
+   "base_key": "hip_abd",
+   "measure_status": "base",
+   "bilateral": true
+  }
+ ],
+ "RST08": [
+  {
+   "joint_key": "lumbar_ext",
+   "base_key": "lumbar_ext",
+   "measure_status": "proxy",
+   "bilateral": false
+  },
+  {
+   "joint_key": "cervical_ext",
+   "base_key": "cervical_ext",
+   "measure_status": "base",
+   "bilateral": false
+  }
+ ],
+ "RST09": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "RST10": [
+  {
+   "joint_key": "x:spine:rotation",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "RST12": [
+  {
+   "joint_key": "hip_er",
+   "base_key": "hip_er",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "lumbar_flex",
+   "base_key": "lumbar_flex",
+   "measure_status": "proxy",
+   "bilateral": false
+  }
+ ],
+ "SUN08-W": [
+  {
+   "joint_key": "hip_flex",
+   "base_key": "hip_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:knee:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:ankle:",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "shoulder_flex",
+   "base_key": "shoulder_flex",
+   "measure_status": "base",
+   "bilateral": true
+  },
+  {
+   "joint_key": "x:elbow:flexion",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  },
+  {
+   "joint_key": "x:wrist:",
+   "base_key": null,
+   "measure_status": "not_measured",
+   "bilateral": false
+  }
+ ],
+ "SUN01": [],
+ "PRN03": [],
+ "RST01": [],
+ "RST02": [],
+ "RST11": []
+}

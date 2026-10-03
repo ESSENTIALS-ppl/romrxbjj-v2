@@ -1,0 +1,124 @@
+{
+ "csv_rows": 515,
+ "pose_codes": 169,
+ "main_poses": 159,
+ "prop_variants": 10,
+ "rows_blank_degrees": 475,
+ "rows_with_degrees": 40,
+ "rows_by_label": {
+  "EVIDENCE": 54,
+  "UNVERIFIED": 461
+ },
+ "unverified_blank_degrees": 461,
+ "evidence_blank_degrees": 14,
+ "ankle_rows_base_cm_vs_degrees": 16,
+ "poses_no_joint": [
+  "PRN03",
+  "RST01",
+  "RST02",
+  "RST11",
+  "SUN01"
+ ],
+ "coverage_main": {
+  "partial": 145,
+  "proxy": 5,
+  "full": 5,
+  "no_joint": 4
+ },
+ "coverage_all": {
+  "partial": 152,
+  "proxy": 7,
+  "full": 5,
+  "no_joint": 5
+ },
+ "poses_missing_level": [],
+ "joints_total": 504,
+ "joints_by_status": {
+  "proxy": 63,
+  "not_measured": 292,
+  "base": 149
+ },
+ "signed_requirements": 0,
+ "not_measured_joint_poses_main": [
+  [
+   "Knee flexion",
+   68
+  ],
+  [
+   "Hip flexion, knee bent",
+   53
+  ],
+  [
+   "Hip extension",
+   39
+  ],
+  [
+   "Wrist extension",
+   24
+  ],
+  [
+   "Spine rotation",
+   22
+  ],
+  [
+   "Knee extension",
+   15
+  ],
+  [
+   "Elbow flexion",
+   9
+  ],
+  [
+   "Shoulder extension",
+   8
+  ],
+  [
+   "Hip flexion",
+   7
+  ],
+  [
+   "Shoulder internal rotation / extension behind the back",
+   7
+  ],
+  [
+   "Spine lateral flexion",
+   6
+  ],
+  [
+   "Ankle dorsiflexion, knee straight",
+   4
+  ],
+  [
+   "Ankle plantarflexion",
+   4
+  ],
+  [
+   "Hip adduction",
+   4
+  ],
+  [
+   "Shoulder abduction",
+   4
+  ],
+  [
+   "Ankle dorsiflexion",
+   1
+  ],
+  [
+   "Ankle motion",
+   1
+  ],
+  [
+   "Knee extension past zero",
+   1
+  ],
+  [
+   "Shoulder adduction across body",
+   1
+  ],
+  [
+   "Wrist flexion",
+   1
+  ]
+ ]
+}
