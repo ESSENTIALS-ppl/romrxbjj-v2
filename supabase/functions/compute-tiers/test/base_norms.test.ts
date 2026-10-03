@@ -143,18 +143,18 @@ import { buildRequirements, classifyMove } from "../rule.ts";
   // raw compare of a straight-leg reading to the matrix 110 would be RED (the old, wrong comparison)
   assert.equal(classifyMove(A, reqs).tier, "RED");
   const hf = gradeBaseJoints("male", A).hip_flex;
-  const r = classifyMove(A, reqs, null, { hip_flex: { status: hf.status, basis: "slr_norm" } });
+  const r = classifyMove(A, reqs, null, { hip_flex: { basis: "slr_norm", left: hf.left.status, right: hf.right.status } });
   assert.equal(r.tier, "GREEN");
   assert.equal(r.joint_status.find(j => j.joint === "hip_flex")!.basis, "slr_norm");
   // sex missing: hip flexion GREY -> move GREY (incomplete), never GREEN
   const g2 = gradeBaseJoints(null, A).hip_flex;
-  const r2 = classifyMove(A, reqs, null, { hip_flex: { status: g2.status, basis: "slr_norm" } });
+  const r2 = classifyMove(A, reqs, null, { hip_flex: { basis: "slr_norm", left: g2.left.status, right: g2.right.status } });
   assert.deepEqual([r2.tier, r2.grey_reason], ["GREY", "incomplete"]);
   // a real RED elsewhere still wins over an SLR GREEN
-  const r3 = classifyMove({ ...A, hip_er_l: 10 }, reqs, null, { hip_flex: { status: "GREEN", basis: "slr_norm" } });
+  const r3 = classifyMove({ ...A, hip_er_l: 10 }, reqs, null, { hip_flex: { basis: "slr_norm", left: "GREEN", right: "GREEN" } });
   assert.equal(r3.tier, "RED");
   // SLR RED colors the move RED
-  const r4 = classifyMove(A, reqs, null, { hip_flex: { status: "RED", basis: "slr_norm" } });
+  const r4 = classifyMove(A, reqs, null, { hip_flex: { basis: "slr_norm", left: "RED", right: "RED" } });
   assert.equal(r4.tier, "RED");
 }
 

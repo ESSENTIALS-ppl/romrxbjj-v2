@@ -91,6 +91,35 @@ LANGUAGE sql IMMUTABLE AS $$
   END
 $$;
 
+-- Pick the leg status for a joint already colored per leg (straight-leg raise), honoring the sheet's side rule
+-- (mirrors pickLegStatus in rule.ts). One side missing = GREY unless the rule needs only the logged side
+-- (ONE_SIDE_MISSING_POLICY = 'grey', PENDING JIM; 'use_measured_side' would fall back to the logged leg).
+CREATE OR REPLACE FUNCTION public.rom_pick_leg_status(p_left text, p_right text, p_lat text, p_dom text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+  c_one_side constant text := 'grey';                 -- PENDING JIM: 'grey' | 'use_measured_side'
+  v_rank constant text[] := ARRAY['GREEN', 'YELLOW', 'RED'];
+  v_wanted text;
+  v_graded text[] := ARRAY(SELECT x FROM unnest(ARRAY[p_left, p_right]) AS x WHERE x <> 'GREY');
+BEGIN
+  IF coalesce(array_length(v_graded, 1), 0) = 0 THEN RETURN 'GREY'; END IF;
+  IF p_lat IN ('LEAD', 'HOOK', 'TRAIL') AND p_dom IN ('left', 'right') THEN
+    v_wanted := CASE WHEN (p_dom = 'left') = (p_lat = 'LEAD') THEN p_left ELSE p_right END;
+    IF v_wanted <> 'GREY' THEN RETURN v_wanted; END IF;
+    IF c_one_side = 'grey' THEN RETURN 'GREY'; END IF;
+  ELSIF c_one_side = 'grey' AND array_length(v_graded, 1) < 2 THEN
+    RETURN 'GREY';
+  END IF;
+  IF p_lat = 'ANY' THEN
+    RETURN (SELECT x FROM unnest(v_graded) x ORDER BY array_position(v_rank, x) ASC LIMIT 1);
+  END IF;
+  RETURN (SELECT x FROM unnest(v_graded) x ORDER BY array_position(v_rank, x) DESC LIMIT 1);
+END $$;
+
+-- A negative reading is an invalid entry = not measured (mirrors toNum). Zero is a real value.
+CREATE OR REPLACE FUNCTION public.rom_valid_reading(p_value numeric) RETURNS numeric
+LANGUAGE sql IMMUTABLE AS $$ SELECT CASE WHEN p_value >= 0 THEN p_value ELSE NULL END $$;
+
 CREATE OR REPLACE FUNCTION public.recompute_user_eligibility(p_user_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -99,6 +128,8 @@ CREATE OR REPLACE FUNCTION public.recompute_user_eligibility(p_user_id uuid)
 AS $function$
 DECLARE
   c_hip_flex_moves_use_slr constant boolean := true;   -- PENDING JIM (mirrors HIP_FLEX_MOVES_USE_SLR_COLOR)
+  c_grey_beats_yellow constant boolean := true;        -- PENDING JIM (mirrors GREY_BEATS_YELLOW; RED always wins)
+  c_one_side constant text := 'grey';                  -- PENDING JIM (mirrors ONE_SIDE_MISSING_POLICY: 'grey' | 'use_measured_side')
   v_assessment   assessments%ROWTYPE;
   v_sports       text[];
   v_sport        text;
@@ -150,19 +181,19 @@ BEGIN
     -- athlete values per joint, left / right (single-value joints use the same value twice)
     jv(joint, l, r) AS (
       VALUES
-        ('hip_er',        v_assessment.hip_er_l::numeric,        v_assessment.hip_er_r::numeric),
-        ('hip_ir',        v_assessment.hip_ir_l::numeric,        v_assessment.hip_ir_r::numeric),
-        ('hip_abd',       v_assessment.hip_abd_l::numeric,       v_assessment.hip_abd_r::numeric),
-        ('hip_flex',      v_assessment.hip_flex_l::numeric,      v_assessment.hip_flex_r::numeric),
-        ('shoulder_er',   v_assessment.shoulder_er_l::numeric,   v_assessment.shoulder_er_r::numeric),
-        ('shoulder_flex', v_assessment.shoulder_flex_l::numeric, v_assessment.shoulder_flex_r::numeric),
-        ('ankle_df',      v_assessment.ankle_df_l::numeric,      v_assessment.ankle_df_r::numeric),
-        ('cervical_rot',  v_assessment.cervical_rot_l::numeric,  v_assessment.cervical_rot_r::numeric),
-        ('cervical_lat',  v_assessment.cervical_lat_l::numeric,  v_assessment.cervical_lat_r::numeric),
-        ('lumbar_flex',   v_assessment.lumbar_flex::numeric,     v_assessment.lumbar_flex::numeric),
-        ('lumbar_ext',    v_assessment.lumbar_ext::numeric,      v_assessment.lumbar_ext::numeric),
-        ('cervical_flex', v_assessment.cervical_flex::numeric,   v_assessment.cervical_flex::numeric),
-        ('cervical_ext',  v_assessment.cervical_ext::numeric,    v_assessment.cervical_ext::numeric)
+        ('hip_er',        public.rom_valid_reading(v_assessment.hip_er_l::numeric),        public.rom_valid_reading(v_assessment.hip_er_r::numeric)),
+        ('hip_ir',        public.rom_valid_reading(v_assessment.hip_ir_l::numeric),        public.rom_valid_reading(v_assessment.hip_ir_r::numeric)),
+        ('hip_abd',       public.rom_valid_reading(v_assessment.hip_abd_l::numeric),       public.rom_valid_reading(v_assessment.hip_abd_r::numeric)),
+        ('hip_flex',      public.rom_valid_reading(v_assessment.hip_flex_l::numeric),      public.rom_valid_reading(v_assessment.hip_flex_r::numeric)),
+        ('shoulder_er',   public.rom_valid_reading(v_assessment.shoulder_er_l::numeric),   public.rom_valid_reading(v_assessment.shoulder_er_r::numeric)),
+        ('shoulder_flex', public.rom_valid_reading(v_assessment.shoulder_flex_l::numeric), public.rom_valid_reading(v_assessment.shoulder_flex_r::numeric)),
+        ('ankle_df',      public.rom_valid_reading(v_assessment.ankle_df_l::numeric),      public.rom_valid_reading(v_assessment.ankle_df_r::numeric)),
+        ('cervical_rot',  public.rom_valid_reading(v_assessment.cervical_rot_l::numeric),  public.rom_valid_reading(v_assessment.cervical_rot_r::numeric)),
+        ('cervical_lat',  public.rom_valid_reading(v_assessment.cervical_lat_l::numeric),  public.rom_valid_reading(v_assessment.cervical_lat_r::numeric)),
+        ('lumbar_flex',   public.rom_valid_reading(v_assessment.lumbar_flex::numeric),     public.rom_valid_reading(v_assessment.lumbar_flex::numeric)),
+        ('lumbar_ext',    public.rom_valid_reading(v_assessment.lumbar_ext::numeric),      public.rom_valid_reading(v_assessment.lumbar_ext::numeric)),
+        ('cervical_flex', public.rom_valid_reading(v_assessment.cervical_flex::numeric),   public.rom_valid_reading(v_assessment.cervical_flex::numeric)),
+        ('cervical_ext',  public.rom_valid_reading(v_assessment.cervical_ext::numeric),    public.rom_valid_reading(v_assessment.cervical_ext::numeric))
     ),
     -- documented requirements (rom_thresholds). An explicit cm ankle row replaces a unit-less ankle row.
     mat0 AS (
@@ -206,7 +237,7 @@ BEGIN
              v.val,
              CASE
                WHEN r.joint = 'hip_flex' AND c_hip_flex_moves_use_slr
-                 THEN public.rom_slr_status(v_gender, jv.l, jv.r)
+                 THEN public.rom_pick_leg_status(public.rom_slr_leg(v_gender, jv.l), public.rom_slr_leg(v_gender, jv.r), r.lat, v_dom)
                WHEN r.joint = 'ankle_df' AND NOT r.is_cm THEN 'GREY'          -- F-17: cm reading never vs a unit-less requirement
                ELSE public.rom_classify_joint(v.val, r.req, r.joint)
              END AS status,
@@ -216,9 +247,11 @@ BEGIN
         LEFT JOIN jv ON jv.joint = r.joint
         CROSS JOIN LATERAL (SELECT CASE
             WHEN jv.joint IS NULL OR (jv.l IS NULL AND jv.r IS NULL) THEN NULL
+            WHEN r.lat IN ('LEAD', 'HOOK', 'TRAIL') AND v_dom IS NOT NULL THEN
+              CASE WHEN c_one_side = 'grey' THEN CASE WHEN (v_dom = 'left') = (r.lat = 'LEAD') THEN jv.l ELSE jv.r END
+                   ELSE COALESCE(CASE WHEN (v_dom = 'left') = (r.lat = 'LEAD') THEN jv.l ELSE jv.r END, LEAST(jv.l, jv.r)) END
+            WHEN c_one_side = 'grey' AND (jv.l IS NULL OR jv.r IS NULL) THEN NULL
             WHEN r.lat = 'ANY' THEN GREATEST(jv.l, jv.r)
-            WHEN r.lat IN ('LEAD', 'HOOK', 'TRAIL') AND v_dom IS NOT NULL
-              THEN COALESCE(CASE WHEN (v_dom = 'left') = (r.lat = 'LEAD') THEN jv.l ELSE jv.r END, LEAST(jv.l, jv.r))
             ELSE LEAST(jv.l, jv.r)
           END AS val) v
     ),
@@ -249,12 +282,13 @@ BEGIN
       SELECT technique_id, technique_code, joint_status,
              CASE WHEN req_count = 0 THEN 'GREY'
                   WHEN any_red THEN 'RED'
+                  WHEN any_grey AND c_grey_beats_yellow THEN 'GREY'
                   WHEN any_yellow THEN 'YELLOW'
                   WHEN any_grey THEN 'GREY'
                   ELSE 'GREEN' END AS tier,
              CASE WHEN req_count = 0 THEN 'no_rule'
-                  WHEN any_red OR any_yellow THEN NULL
-                  WHEN any_grey THEN 'incomplete'
+                  WHEN any_red THEN NULL
+                  WHEN any_grey AND (c_grey_beats_yellow OR NOT any_yellow) THEN 'incomplete'
                   ELSE NULL END AS status_reason,
              CASE WHEN req_count = 0 OR NOT (any_red OR any_yellow OR any_grey) THEN ARRAY[]::text[]
                   ELSE limiting END AS limiting_joints

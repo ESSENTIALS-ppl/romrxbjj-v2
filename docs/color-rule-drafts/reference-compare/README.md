@@ -1,0 +1,3 @@
+Harness (DRAFT, read-only) that runs compute-tiers v43 (rule.ts, base_norms.ts, pack_rating.ts) against Quinn's reference outputs in /workspace/quinn-research (color-rules-expected-moves / -packs / -test-cases). Bundle with esbuild and run with node; diff.py and diffpacks.py compare /tmp/engine_*.csv with the expected CSVs.
+Result (default config: flat10, sex-missing GREY): 7164/7164 move colors match (18 sample users x 124 BJJ + 274 BB), 36/36 pack summaries match, 69/69 runnable test cases match.
+Not run: value/rule cases (21), E05-E13 whole-pack lookups (covered by the pack CSV compare), yoga (no signed rules), alt configs (SD scale in packs CSV, red-incomplete-counted), C11/C17 (adapter and missing_dominant=grey option).

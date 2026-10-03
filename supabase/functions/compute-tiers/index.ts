@@ -202,8 +202,10 @@ Deno.serve(async (req: Request) => {
     const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0, GREY: 0 };
 
     // Hip flexion on a move takes the Base straight-leg color (PENDING JIM, flag in base_norms.ts). GREY when sex is missing.
-    const hipFlexStatus = (baseGrades as { hip_flex?: { status: "GREEN" | "YELLOW" | "RED" | "GREY" } } | null)?.hip_flex?.status ?? "GREY";
-    const overrides = HIP_FLEX_MOVES_USE_SLR_COLOR ? { hip_flex: { status: hipFlexStatus, basis: "slr_norm" as const } } : undefined;
+    const hf = (baseGrades as { hip_flex?: { left: { status: "GREEN" | "YELLOW" | "RED" | "GREY" }; right: { status: "GREEN" | "YELLOW" | "RED" | "GREY" } } } | null)?.hip_flex;
+    const overrides = HIP_FLEX_MOVES_USE_SLR_COLOR
+      ? { hip_flex: { basis: "slr_norm" as const, left: hf?.left.status ?? "GREY", right: hf?.right.status ?? "GREY" } }
+      : undefined;
 
     for (const t of techniques as Record<string, unknown>[]) {
       const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t), dominant as "left" | "right" | null, overrides);
