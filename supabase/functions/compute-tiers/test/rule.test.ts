@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildRequirements, classifyMove, classifyJoint, normalizeJoint } from "../rule.ts";
+import { buildRequirements, classifyMove, classifyJoint, normalizeJoint, ANKLE_LEGACY_REQUIREMENTS_ARE_CM } from "../rule.ts";
 
 const A = { hip_flex_l: 120, hip_flex_r: 100, hip_abd_l: 60, hip_abd_r: 60, lumbar_flex: 50, shoulder_flex_l: 170, shoulder_flex_r: 170 };
 const M = (rows: [string, number, string?][]) => buildRequirements(rows.map(([joint, v, l]) => ({ joint, required_value: v, laterality_rule: l ?? "BOTH" })));
@@ -37,4 +37,29 @@ assert.deepEqual(reqs.map(q => [q.joint, q.required]), [["hip_flex", 100], ["lum
 // unmeasured on both sides
 assert.equal(classifyJoint(null, 50), "GREY");
 assert.equal(normalizeJoint("shoulder_external_rotation"), "shoulder_er");
+
+// F-17: a cm ankle reading is never compared to a unit-less (degrees-style) requirement
+assert.equal(ANKLE_LEGACY_REQUIREMENTS_ARE_CM, false);
+const AK = { ankle_df_l: 12, ankle_df_r: 11, hip_abd_l: 60, hip_abd_r: 60 };
+r = classifyMove(AK, M([["Ankle DF", 15]]));                                   // 12 cm vs "15" would have been RED
+assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"]);
+assert.deepEqual(r.limiting, ["ankle_df:cm_requirement_pending"]);
+r = classifyMove(AK, buildRequirements([], { ankle_df_min: 20, hip_abd_min: 50 })); // legacy techniques column: same
+assert.equal(r.joint_status.find(j => j.joint === "ankle_df")!.status, "GREY");
+assert.equal(r.joint_status.find(j => j.joint === "hip_abd")!.status, "GREEN");
+assert.equal(r.tier, "GREY");
+// pending ankle never hides a real RED on another joint, and never produces GREEN
+r = classifyMove(AK, M([["Ankle DF", 15], ["Hip Abduction", 90]]));
+assert.equal(r.tier, "RED");
+// explicit cm requirement is compared in cm and replaces the legacy ankle row
+r = classifyMove(AK, M([["Ankle DF", 20], ["Ankle DF (cm)", 10]]));
+assert.equal(r.tier, "GREEN");
+r = classifyMove(AK, M([["Ankle DF (cm)", 13]]));                               // 11/13 = 0.846 -> RED
+assert.equal(r.tier, "RED");
+r = classifyMove(AK, M([["ankle_df_cm", 12]]));                                 // 11/12 = 0.917 -> YELLOW
+assert.equal(r.tier, "YELLOW");
+r = classifyMove(AK, buildRequirements([], { ankle_df_min: 20, ankle_df_cm_min: 10 })); // cm column beats legacy
+assert.equal(r.tier, "GREEN");
+assert.equal(classifyMove({}, M([["Ankle DF (cm)", 10]])).tier, "GREY");        // unmeasured stays GREY
+assert.equal(normalizeJoint("Ankle DF (cm)"), "ankle_df_cm");
 console.log("compute-tiers rule tests: ok");

@@ -1,3 +1,7 @@
+// v43 (DRAFT, not deployed) additions: ./base_norms.ts = Base hip flexion (straight-leg raise, per leg, sex-specific,
+//   Youdas 2005, asymmetry flag) and ankle (knee-to-wall, cm) grades, returned as base_grades (response only, nothing
+//   persisted, no schema change). F-17: ankle cm is never compared to unit-less 10/15/20 requirements (GREY until cm
+//   requirements exist) and the old literal ankle target 20 is now ANKLE_DF_CM_TARGET.
 // v43 (DRAFT, not deployed): per-joint rule in ./rule.ts. Worst measured required joint wins; no rule or an
 //   unmeasured required joint is tier GREY (never GREEN). Thresholds come from rom_thresholds (documented matrix),
 //   legacy techniques.*_min only fills gaps. Needs migration 20261003010000 (GREY tier, joint_status, status_reason).
@@ -15,6 +19,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildRequirements, classifyMove, toNum } from "./rule.ts";
+import { ANKLE_DF_CM_TARGET, gradeBaseJoints } from "./base_norms.ts";
 
 const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 45, hip_er_r: 45,
@@ -24,7 +29,7 @@ const JOINT_TARGETS: Record<string, number> = {
   hip_ext_l: 30, hip_ext_r: 30,
   shoulder_er_l: 90, shoulder_er_r: 90,
   shoulder_flex_l: 180, shoulder_flex_r: 180,
-  ankle_df_l: 20, ankle_df_r: 20,
+  ankle_df_l: ANKLE_DF_CM_TARGET, ankle_df_r: ANKLE_DF_CM_TARGET, // F-17: cm target, was the literal 20 (PROPOSED value, see base_norms.ts)
   cervical_rot_l: 80, cervical_rot_r: 80,
   cervical_lat_l: 45, cervical_lat_r: 45,
   cervical_flex: 50, cervical_ext: 60,
@@ -93,6 +98,19 @@ Deno.serve(async (req: Request) => {
     const userId = assessment.user_id as string | undefined;
     const athleteId = (assessment.athlete_id as string | undefined) ?? null;
 
+    // Base grades (hip flexion per leg by sex, ankle cm). Read-only lookup of users.gender; never blocks the run.
+    let baseGrades: Record<string, unknown> | null = null;
+    try {
+      let gender: unknown = null;
+      if (userId) {
+        const { data: u } = await supa.from("users").select("gender").eq("id", userId).maybeSingle();
+        gender = (u as Record<string, unknown> | null)?.gender ?? null;
+      }
+      baseGrades = gradeBaseJoints(gender, assessment);
+    } catch (e) {
+      console.error("base grades failed:", String(e));
+    }
+
     const worstJoints = computeWorstJointKeys(assessment, 5);
     const romTotal = computeRomTotal(assessment);
     const { error: updErr } = await supa
@@ -134,6 +152,7 @@ Deno.serve(async (req: Request) => {
       return json({
         success: true, assessment_id: assessmentId, sport,
         worst_joints: worstJoints, rom_total: romTotal,
+        base_grades: baseGrades,
         protocol: protocolPersist,
         eligibility: "skipped_no_technique_catalog_for_sport",
       });
@@ -202,6 +221,7 @@ Deno.serve(async (req: Request) => {
       sport,
       worst_joints: worstJoints,
       rom_total: romTotal,
+      base_grades: baseGrades,
       protocol: protocolPersist,
       eligibility: { written: rows.length, ...counts },
     });

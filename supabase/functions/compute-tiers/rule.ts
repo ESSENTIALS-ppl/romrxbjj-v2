@@ -12,6 +12,15 @@
 export type Status = "GREEN" | "YELLOW" | "RED" | "GREY";
 export type GreyReason = "no_rule" | "incomplete";
 
+// F-17 (ankle unit mix). Base measures ankle ONE way: knee-to-wall, in CENTIMETERS (Jim closed this 2026-10-03). The
+// ankle numbers already in rom_thresholds (10/15/20, matrix) and techniques.ankle_df_min (10-20 BJJ, 12-20 BB) were
+// authored as degrees-style numbers with no unit and were being compared straight against cm. A cm value is never
+// compared to those numbers any more: such a requirement is GREY (never GREEN, never a false RED) until a cm
+// requirement exists. cm requirements are rom_thresholds rows whose joint is "Ankle DF (cm)" / "ankle_df_cm", or a
+// techniques.ankle_df_cm_min column. PENDING JIM / Quinn: set this to true ONLY if the legacy numbers are confirmed to
+// be centimeters (then they are used as cm exactly as before).
+export const ANKLE_LEGACY_REQUIREMENTS_ARE_CM = false;
+
 export const YELLOW_BAND = 0.90; // OPEN QUESTION Q1: Jim's sheet says "within 10 degrees"; kept at the current 90% ratio until he decides.
 
 const BILATERAL: Record<string, [string, string]> = {
@@ -44,6 +53,7 @@ const JOINT_ALIAS: Record<string, string> = {
   "shoulder er": "shoulder_er", "shoulder_external_rotation": "shoulder_er",
   "shoulder flexion": "shoulder_flex", "shoulder_flexion": "shoulder_flex",
   "ankle df": "ankle_df", "ankle_dorsiflexion": "ankle_df", "ankle_df": "ankle_df",
+  "ankle df (cm)": "ankle_df_cm", "ankle_df_cm": "ankle_df_cm", "ankle dorsiflexion (cm)": "ankle_df_cm",
   "cervical rotation": "cervical_rot", "cervical_rotation": "cervical_rot",
   "cervical lateral flexion": "cervical_lat", "cervical_lateral_flexion": "cervical_lat",
   "cervical flexion": "cervical_flex", "cervical_flexion": "cervical_flex",
@@ -76,7 +86,12 @@ export function athleteValue(a: Record<string, unknown>, joint: string, laterali
   return null;
 }
 
-export type Requirement = { joint: string; required: number; laterality?: string | null };
+export type Requirement = {
+  joint: string;
+  required: number;
+  laterality?: string | null;
+  unit_pending?: boolean; // ankle only: requirement has no cm number yet, so it cannot be compared to a cm reading
+};
 
 // Build the requirement list for one move. matrixRows come from rom_thresholds (documented). techniqueRow is the
 // legacy techniques row, used only for joints the matrix has no number for (kept, not invented).
@@ -85,15 +100,26 @@ export function buildRequirements(
   techniqueRow?: Record<string, unknown> | null,
 ): Requirement[] {
   const byJoint = new Map<string, Requirement>();
+  const ankleCm = new Set<string>(); // joints (only "ankle_df") whose requirement is an explicit cm number
   for (const r of matrixRows) {
     const req = toNum(r.required_value);
     if (req == null || req <= 0) continue;
-    const joint = normalizeJoint(r.joint);
-    const prev = byJoint.get(joint);
+    let joint = normalizeJoint(r.joint);
+    const isCm = joint === "ankle_df_cm";
+    if (isCm) joint = "ankle_df";
+    // an explicit cm row always replaces a legacy unit-less ankle row (no stricter-number rule across units)
+    if (isCm && !ankleCm.has(joint)) { byJoint.delete(joint); ankleCm.add(joint); }
+    else if (!isCm && ankleCm.has(joint)) continue;
+    const cur = byJoint.get(joint);
     // two documented rows for one joint (for example LEAD and TRAIL): the stricter number applies (flagged Q7).
-    if (!prev || req > prev.required) byJoint.set(joint, { joint, required: req, laterality: r.laterality_rule ?? null });
+    if (!cur || req > cur.required) byJoint.set(joint, { joint, required: req, laterality: r.laterality_rule ?? null });
   }
   if (techniqueRow) {
+    const cmMin = toNum(techniqueRow["ankle_df_cm_min"]);
+    if (cmMin != null && cmMin > 0 && !ankleCm.has("ankle_df")) {
+      byJoint.set("ankle_df", { joint: "ankle_df", required: cmMin, laterality: null });
+      ankleCm.add("ankle_df");
+    }
     for (const [col, val] of Object.entries(techniqueRow)) {
       if (!col.endsWith("_min")) continue;
       const req = toNum(val);
@@ -103,6 +129,9 @@ export function buildRequirements(
       byJoint.set(joint, { joint, required: req, laterality: null });
     }
   }
+  // F-17: a unit-less ankle requirement is never compared to a cm reading.
+  const ankle = byJoint.get("ankle_df");
+  if (ankle && !ankleCm.has("ankle_df") && !ANKLE_LEGACY_REQUIREMENTS_ARE_CM) ankle.unit_pending = true;
   return [...byJoint.values()];
 }
 
@@ -127,6 +156,11 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[]): M
   const joint_status: JointStatus[] = [];
   const limiting: string[] = [];
   for (const r of reqs) {
+    if (r.unit_pending) {
+      joint_status.push({ joint: r.joint, status: "GREY" });
+      limiting.push(`${r.joint}:cm_requirement_pending`);
+      continue;
+    }
     const v = EVALUABLE.has(r.joint) ? athleteValue(a, r.joint, r.laterality) : null;
     const status = classifyJoint(v, r.required);
     joint_status.push({ joint: r.joint, status });
