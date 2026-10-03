@@ -1,3 +1,5 @@
+// v45 DRAFT (2026-10-03, not deployed): customer.subscription.trial_will_end sends our own Base pre-renewal reminder
+//   (price, charge date, cancel link and steps) via Resend; off for live events unless PREREMINDER_ENABLED=true.
 // v43: signature verification uses constructEventAsync (Deno/SubtleCrypto is async-only) + failure diagnostics (no secrets logged).
 // v42 = v40 ARL work + release gate (ARL_LIVE_ENABLED): live-signed events behave exactly like v41 until it is "true".
 // v40 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3c + 4A.4 + 4C, Jim GO via Grant 2026-09-29):
@@ -37,6 +39,9 @@ import {
   ARL_ACK_VERSION, SPORT_PACK_NAMES, formatUsd, ackSubject, ackHtml, ackText,
   ackSportSubject, ackSportHtml, ackSportText,
 } from "../_shared/arl_copy.ts";
+import {
+  PREREMINDER_COPY_VERSION, PREREMINDER_EMAIL_ID, decideReminder, reminderSubject, reminderHtml, reminderText,
+} from "../_shared/prerenewal_copy.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const STRIPE_SECRET_FOR_CANCEL = Deno.env.get("stripe_secret_key") ?? "";
@@ -276,6 +281,10 @@ const STRIPE_TEST_SECRET = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim()
 // (old acknowledgment emails, no consent rows, no immediate-cancel conversion, no cancel-state writes) unless
 // ARL_LIVE_ENABLED=true. Test-signed fixture events always get the new ARL behavior.
 const ARL_LIVE = (Deno.env.get("ARL_LIVE_ENABLED") ?? "").toLowerCase() === "true";
+// DRAFT (v45, not deployed): own Base pre-renewal reminder on customer.subscription.trial_will_end. OFF for live events
+// unless PREREMINDER_ENABLED=true (set only after Stacy approves the copy and Grant says go). Test-mode events are
+// already limited to fixtures by the guard below, so they are processed (and mailed to the fixture inbox) regardless.
+const PREREMINDER_ENABLED = (Deno.env.get("PREREMINDER_ENABLED") ?? "").toLowerCase() === "true";
 const TEST_MODE_READY = STRIPE_TEST_WEBHOOK_SECRET.startsWith("whsec_") && STRIPE_TEST_SECRET.startsWith("sk_test_");
 
 /** v40: user id an event refers to (metadata first, then customer id lookup). */
@@ -293,6 +302,46 @@ async function eventUserEmail(supabase: ReturnType<typeof createClient>, obj: Re
   }
   const details = obj.customer_details as Record<string, string> | undefined;
   return details?.email ?? null;
+}
+
+/** v45 DRAFT: pre-renewal reminder for Base free trials. Idempotent per user (email_sends claim) and per event (Resend key). */
+async function handleTrialWillEnd(
+  // deno-lint-ignore no-explicit-any
+  supabase: any, event: Stripe.Event, obj: Record<string, unknown>, testEvent: boolean,
+): Promise<{ sent: boolean; reason: string }> {
+  if (!testEvent && !PREREMINDER_ENABLED) return { sent: false, reason: "disabled" };
+  const d = decideReminder(obj);
+  if (!d.send) return { sent: false, reason: d.reason };
+  const email = await eventUserEmail(supabase, obj);
+  if (!email) return { sent: false, reason: "no_email" };
+  if (!testEvent) {
+    const { data: isTest } = await supabase.rpc("is_test_account", { p_email: email });
+    if (isTest === true) return { sent: false, reason: "test_fixture_on_live_event" };
+  }
+  const { error: claimErr } = await supabase.from("email_sends").insert({ user_id: d.userId, email_id: PREREMINDER_EMAIL_ID });
+  if (claimErr) return { sent: false, reason: "already_claimed" };
+  const key = `trial_will_end-${event.id}`;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json", "Idempotency-Key": key },
+    body: JSON.stringify({
+      from: BRAND_HQ.from, to: [email], reply_to: BRAND_HQ.replyTo,
+      subject: reminderSubject(d.trialEnd),
+      html: reminderHtml(d.trialEnd, d.basePrice, d.sportPack, d.sportPrice),
+      text: reminderText(d.trialEnd, d.basePrice, d.sportPack, d.sportPrice),
+      headers: { "X-Entity-Ref-ID": key },
+      tags: [{ name: "email_id", value: PREREMINDER_EMAIL_ID }, { name: "type", value: "transactional" }],
+    }),
+  });
+  const data = await res.json().catch(() => ({})) as { id?: string };
+  if (!res.ok || !RESEND_KEY) {
+    await supabase.from("email_sends").delete().eq("user_id", d.userId).eq("email_id", PREREMINDER_EMAIL_ID);
+    console.error("trial_will_end Resend error", res.status);
+    return { sent: false, reason: "resend_error" };
+  }
+  await logEvent("email_sent", { userId: d.userId, sport: "general", source: "stripe",
+    props: { email_id: PREREMINDER_EMAIL_ID, template_version: PREREMINDER_COPY_VERSION, resend_id: data.id ?? null, stripe_event: event.id, testmode: testEvent } });
+  return { sent: true, reason: "sent" };
 }
 
 Deno.serve(async (req: Request) => {
@@ -350,6 +399,12 @@ Deno.serve(async (req: Request) => {
   }
   const alertJim = !testEvent; // no internal PAID alerts for fixture test events
   const arlOn = testEvent || ARL_LIVE;
+
+  if (type === "customer.subscription.trial_will_end") {
+    const r = await handleTrialWillEnd(supabase, event, obj, testEvent);
+    console.log("trial_will_end", r.reason, event.id);
+    return new Response(JSON.stringify({ received: true, reminder: r.reason }), { headers: { "Content-Type": "application/json" } });
+  }
 
   if (type === "checkout.session.completed") {
     const meta       = (obj.metadata ?? {}) as Record<string, string>;
