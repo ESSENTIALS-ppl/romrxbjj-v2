@@ -181,6 +181,15 @@ Deno.serve(async (req: Request) => {
       const baseCaller = await getCallerUser(admin, req);
       if (!baseCaller || baseCaller.id !== body.user_id) return json(401, { error: "auth_required" });
     }
+    // F-07: refuse a second Base checkout while a Stripe-backed Base is active (double click / two tabs).
+    // base_stripe_subscription_id is only set by the webhook, so beta-activated users without a Stripe sub are not blocked.
+    {
+      const { data: existingBase } = await admin.from("users")
+        .select("base_status, base_stripe_subscription_id").eq("id", body.user_id).maybeSingle();
+      if (existingBase?.base_status === "active" && existingBase.base_stripe_subscription_id) {
+        return json(409, { error: "base_already_active", message: "Base is already active on this account." });
+      }
+    }
     // Fail closed once the free period is over (or under Stripe's 48h trial_end minimum): the Base path always sends the
     // fixed trial_end (Jan 1, 2027) and Legal has not supplied post-Jan-1 Base copy yet. Applies to live and test paths.
     if (Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000) {
@@ -328,6 +337,14 @@ Deno.serve(async (req: Request) => {
     const baseStatus = (profileData as { profile?: { base_status?: string } })?.profile?.base_status;
     if (baseStatus !== "active") {
       return json(409, { error: "base_required", checkout_url: null });
+    }
+    // F-07: refuse a second pack checkout when this sport already has a live (active/trialing, unexpired) entitlement.
+    {
+      const { data: ent } = await admin.from("sport_entitlements")
+        .select("status, expires_at").eq("user_id", userId).eq("sport", token).maybeSingle();
+      const live = ent && (ent.status === "active" || ent.status === "trialing") &&
+        (!ent.expires_at || new Date(ent.expires_at as string).getTime() > Date.now());
+      if (live) return json(409, { error: "sport_already_active", message: "This sport pack is already active on your account." });
     }
     // v39: price is always server-side; a client-supplied price_id is ignored.
     const priceId = SPORT_PRICE_IDS[token];

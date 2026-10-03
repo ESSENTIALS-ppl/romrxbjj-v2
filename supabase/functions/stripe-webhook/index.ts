@@ -75,6 +75,39 @@ const BRAND_HQ: Brand = {
   accent: "#0047AB",
 };
 
+/**
+ * F-07: duplicate-subscription guard for checkout.session.completed.
+ * If the user already has a DIFFERENT live subscription for the same thing (Base, or a sport pack), the new
+ * subscription is canceled and Jim is alerted to refund the first charge. Replays of the same event are not duplicates.
+ */
+async function cancelDuplicateSub(subId: string | undefined, userId: string, what: string, existingSubId: string, email: string, alert: boolean) {
+  if (!subId) return;
+  try { await cancelStripeSub(subId); } catch (e) { console.error("duplicate cancel failed", subId, (e as Error)?.message); }
+  if (alert) {
+    await sendEmail(BRAND_HQ, JIM_EMAIL, `DUPLICATE ${what} subscription canceled: ${email}`,
+      `<p>A second ${what} checkout completed while one was already live. The new subscription was canceled automatically; refund the first charge in Stripe.</p>
+       <p><strong>User ID:</strong> ${userId}<br><strong>Kept subscription:</strong> ${existingSubId}<br><strong>Canceled subscription:</strong> ${subId}</p>`);
+  }
+}
+
+/**
+ * F-07: is this subscription superseded? True when the user already has a DIFFERENT live subscription recorded for
+ * the same thing (Base or a sport pack). Events for a superseded sub (created/updated/deleted) must not overwrite or
+ * revoke the live one. The recorded id is only ever set by this webhook, so null never counts as superseded.
+ */
+async function isSupersededSub(sb: ReturnType<typeof createClient>, kind: "base" | "sport", userId: string, sport: string | null, subId: string): Promise<boolean> {
+  if (!subId) return false;
+  if (kind === "base") {
+    const { data } = await sb.from("users").select("base_status, base_stripe_subscription_id").eq("id", userId).maybeSingle();
+    return !!data && data.base_status === "active"
+      && !!data.base_stripe_subscription_id && data.base_stripe_subscription_id !== subId;
+  }
+  const { data } = await sb.from("sport_entitlements").select("status, stripe_subscription_id")
+    .eq("user_id", userId).eq("sport", sport ?? "").maybeSingle();
+  return !!data && (data.status === "active" || data.status === "trialing")
+    && !!data.stripe_subscription_id && data.stripe_subscription_id !== subId;
+}
+
 async function sendEmail(brand: Brand, to: string, subject: string, html: string) {
   if (!RESEND_KEY) return;
   await fetch("https://api.resend.com/emails", {
@@ -363,6 +396,13 @@ Deno.serve(async (req: Request) => {
     const purpose = (meta.purpose ?? "").toLowerCase();
 
     if (purpose === "base" && meta.user_id) {
+      {
+        const { data: prior } = await supabase.from("users").select("base_status, base_stripe_subscription_id").eq("id", meta.user_id).maybeSingle();
+        if (prior?.base_status === "active" && prior.base_stripe_subscription_id && subId && prior.base_stripe_subscription_id !== subId) {
+          await cancelDuplicateSub(subId, meta.user_id, "Base", prior.base_stripe_subscription_id as string, email, alertJim);
+          return new Response(JSON.stringify({ received: true, duplicate_canceled: true }), { headers: { "Content-Type": "application/json" } });
+        }
+      }
       await supabase.from("users").update({
         stripe_customer_id: customerId,
         base_status: "active",
@@ -422,6 +462,15 @@ Deno.serve(async (req: Request) => {
     }
 
     if (purpose === "sport_unlock" && meta.user_id && meta.sport) {
+      {
+        const { data: priorEnt } = await supabase.from("sport_entitlements").select("status, stripe_subscription_id")
+          .eq("user_id", meta.user_id).eq("sport", meta.sport).maybeSingle();
+        if (priorEnt && (priorEnt.status === "active" || priorEnt.status === "trialing") && priorEnt.stripe_subscription_id
+            && subId && priorEnt.stripe_subscription_id !== subId) {
+          await cancelDuplicateSub(subId, meta.user_id, `${meta.sport} pack`, priorEnt.stripe_subscription_id as string, email, alertJim);
+          return new Response(JSON.stringify({ received: true, duplicate_canceled: true }), { headers: { "Content-Type": "application/json" } });
+        }
+      }
       await supabase.from("sport_entitlements").upsert({
         user_id: meta.user_id,
         sport: meta.sport,
@@ -556,6 +605,10 @@ Deno.serve(async (req: Request) => {
     const userId     = meta.user_id ?? meta.supabase_user_id ?? null;
 
     if (purpose === "base" && userId) {
+      if (await isSupersededSub(supabase, "base", userId, null, subId)) {
+        console.warn("superseded subscription event ignored", type, subId);
+        return new Response(JSON.stringify({ received: true, ignored: "superseded_subscription" }), { headers: { "Content-Type": "application/json" } });
+      }
       // Jim 2026-09-29 (decision c): on cancel, Base access ends IMMEDIATELY (free period included). A scheduled
       // cancel (cancel_at_period_end / cancel_at, e.g. portal still in period-end mode) is converted to an immediate
       // Stripe cancel with no proration, and access is revoked now. Status canceled revokes too.
@@ -615,6 +668,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (purpose === "sport_unlock" && userId && meta.sport) {
+      if (await isSupersededSub(supabase, "sport", userId, meta.sport, subId)) {
+        console.warn("superseded subscription event ignored", type, subId);
+        return new Response(JSON.stringify({ received: true, ignored: "superseded_subscription" }), { headers: { "Content-Type": "application/json" } });
+      }
       await supabase.from("sport_entitlements").upsert({
         user_id: userId,
         sport: meta.sport,
@@ -659,6 +716,10 @@ Deno.serve(async (req: Request) => {
     const userId     = meta.user_id ?? meta.supabase_user_id ?? null;
 
     if (purpose === "base" && userId) {
+      if (await isSupersededSub(supabase, "base", userId, null, subId)) {
+        console.warn("superseded subscription event ignored", type, subId);
+        return new Response(JSON.stringify({ received: true, ignored: "superseded_subscription" }), { headers: { "Content-Type": "application/json" } });
+      }
       // Jim lock 2026-09-08: Base cancel → sport packs cancel too (replaces Option 3)
       await supabase.from("users").update({
         base_status: "canceled",
@@ -675,6 +736,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (purpose === "sport_unlock" && userId && meta.sport) {
+      if (await isSupersededSub(supabase, "sport", userId, meta.sport, subId)) {
+        console.warn("superseded subscription event ignored", type, subId);
+        return new Response(JSON.stringify({ received: true, ignored: "superseded_subscription" }), { headers: { "Content-Type": "application/json" } });
+      }
       await supabase.from("sport_entitlements").update({
         status: "canceled",
       }).eq("user_id", userId).eq("sport", meta.sport);
