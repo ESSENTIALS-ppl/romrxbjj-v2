@@ -128,7 +128,17 @@ function computeRomTotal(a: Record<string, unknown>): number {
   return Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length);
 }
 
+// CORS (Reid E2E): the browser preflight (OPTIONS) used to fall through to req.json() and answer 400
+// missing_assessment_id, so the belt-change call from romrx.io failed in browsers. Same header set the other
+// browser-called functions use. No auth change here (verify_jwt stays false: the assessments DB webhook posts without a header, F-08).
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
   try {
     const body = await req.json().catch(() => ({}));
     const record = (body?.record ?? body) as Record<string, unknown>;
@@ -260,6 +270,6 @@ Deno.serve(async (req: Request) => {
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
 }
