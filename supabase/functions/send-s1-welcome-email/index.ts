@@ -1,4 +1,6 @@
-// send-s1-welcome-email v25 (2026-09-29): trigger auth moved off the inline service_role bearer.
+// send-s1-welcome-email v26 (2026-10-03, DRAFT, not deployed): footer shows the full postal address (_shared/email_footer.ts)
+//   and an unsubscribe link (same {base}/unsubscribe?email= pattern as the drip emails).
+// - v25 (2026-09-29): trigger auth moved off the inline service_role bearer.
 //   The auth.users trigger on_new_user_send_s1_welcome -> public.tg_webhook_send_s1_welcome()
 //   reads a dedicated secret from Supabase Vault (welcome_email_webhook_secret) and sends it as
 //   x-webhook-secret; verified here via RPC public.verify_webhook_secret (service_role only,
@@ -20,6 +22,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/events.ts";
+import { POSTAL_LINE, unsubscribeUrl } from "../_shared/email_footer.ts";
 const serve = (h: (req: Request) => Promise<Response>) => Deno.serve(h);
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -87,7 +90,6 @@ interface Brand {
   fromName: string;
   fromEmail: string;
   domain: string;
-  city: string;
   accent: string;
   protocol: string;
   markerCount: string;
@@ -109,7 +111,6 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrxbjj.com",
     domain: "https://romrxbjj.com",
-    city: "Dublin, Ohio",
     accent: "#c8102e",
     protocol: "Position Readiness Protocol&trade;",
     markerCount: "8 key ROM markers",
@@ -129,7 +130,6 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrxbodybuilding.com",
     domain: "https://romrxbodybuilding.com",
-    city: "Dublin, Ohio",
     accent: "#1e6fd9",
     protocol: "Range of Motion Readiness Protocol&trade;",
     markerCount: "key ROM markers",
@@ -149,7 +149,6 @@ const BRANDS: Record<string, Brand> = {
     fromName: "Jim Scott",
     fromEmail: "jim@romrx.io",
     domain: "https://romrx.io",
-    city: "Dublin, Ohio",
     accent: "#1e6fd9",
     protocol: "Personalized Readiness Profile&trade;",
     markerCount: "key ROM markers",
@@ -293,9 +292,10 @@ serve(async (req) => {
           <tr>
             <td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
               <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">
-                ${b.brandName} &bull; ${b.city}<br />
+                ${POSTAL_LINE}<br />
                 You're receiving this because you created a ${b.brandName} account.<br />
-                <a href="mailto:${b.fromEmail}" style="color:#999999;">${b.fromEmail}</a>
+                <a href="mailto:${b.fromEmail}" style="color:#999999;">${b.fromEmail}</a><br />
+                <a href="${unsubscribeUrl(sport === "general" ? `${b.domain}/app` : b.domain, email)}" style="color:#999999;">unsubscribe</a>
               </p>
             </td>
           </tr>

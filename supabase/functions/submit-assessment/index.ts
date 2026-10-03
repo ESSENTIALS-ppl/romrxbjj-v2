@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import { logEvent } from "../_shared/events.ts";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -96,8 +97,8 @@ function greatJobConfig(sport: string) {
     betaLine: "ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.",
   };
 }
-async function sendGreatJob(sport: string, email: string, firstName: string) {
-  if (!RESEND_API_KEY) return;
+/** Assessment-complete ("great job") email HTML. Pure function so tests and previews can render it. */
+export function renderGreatJobHtml(sport: string, email: string, firstName: string): string {
   const c = greatJobConfig(sport);
   const profileUrl = `${c.domain}${c.ctaPath}`;
   const html = `
@@ -126,11 +127,17 @@ async function sendGreatJob(sport: string, email: string, firstName: string) {
         <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;"><strong>Jim Scott</strong><br/>Founder, ROMRx LLC<br/><a href="mailto:${c.replyTo}" style="color:${c.accent};">${c.replyTo}</a></p>
       </td></tr>
       <tr><td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
-        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${c.brand} &bull; Dublin, Ohio<br/>You&rsquo;re receiving this because you completed a ${c.brand} assessment.<br/><a href="${c.unsubDomain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
+        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${POSTAL_LINE}<br/>You&rsquo;re receiving this because you completed a ${c.brand} assessment.<br/><a href="${c.unsubDomain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
       </td></tr>
     </table>
   </td></tr></table>
 </body></html>`;
+  return html;
+}
+async function sendGreatJob(sport: string, email: string, firstName: string) {
+  if (!RESEND_API_KEY) return;
+  const c = greatJobConfig(sport);
+  const html = renderGreatJobHtml(sport, email, firstName);
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
