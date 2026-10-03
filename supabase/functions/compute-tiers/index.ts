@@ -18,7 +18,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildRequirements, classifyMove, toNum } from "./rule.ts";
+import { buildRequirements, classifyMove, toNum, type MoveResult } from "./rule.ts";
+import { packRatingIfEnabled } from "./pack_rating.ts";
 import { ANKLE_DF_CM_TARGET, gradeBaseJoints } from "./base_norms.ts";
 
 const JOINT_TARGETS: Record<string, number> = {
@@ -184,12 +185,25 @@ Deno.serve(async (req: Request) => {
       matrixByCode.set(code, list);
     }
 
+    // Decision #6: the sheet's dominant-side field decides LEAD / HOOK / TRAIL. athletes.dominant_side ('left' | 'right');
+    // missing = worse side. Read only; never blocks the run.
+    let dominant: string | null = null;
+    try {
+      const q = supa.from("athletes").select("dominant_side");
+      const { data: ath } = await (athleteId ? q.eq("id", athleteId) : q.eq("user_id", userId)).limit(1).maybeSingle();
+      dominant = ((ath as Record<string, unknown> | null)?.dominant_side as string | null) ?? null;
+    } catch (e) {
+      console.error("dominant side lookup failed:", String(e));
+    }
+
     const now = new Date().toISOString();
     const rows: Record<string, unknown>[] = [];
+    const moveResults: MoveResult[] = [];
     const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0, GREY: 0 };
 
     for (const t of techniques as Record<string, unknown>[]) {
-      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t));
+      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t), dominant as "left" | "right" | null);
+      moveResults.push(res);
       counts[res.tier]++;
       rows.push({
         user_id: userId,
@@ -224,6 +238,9 @@ Deno.serve(async (req: Request) => {
       base_grades: baseGrades,
       protocol: protocolPersist,
       eligibility: { written: rows.length, ...counts },
+      // Decision #5 DRAFT: only present when PACK_PERCENT_ENABLED=true (default off). Not persisted.
+      ...(packRatingIfEnabled(Deno.env.get("PACK_PERCENT_ENABLED") === "true", moveResults)
+        ? { pack_rating: packRatingIfEnabled(true, moveResults) } : {}),
     });
   } catch (e) {
     return json({ success: false, error: "unexpected", detail: String(e) }, 500);

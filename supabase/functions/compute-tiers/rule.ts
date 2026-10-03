@@ -21,7 +21,14 @@ export type GreyReason = "no_rule" | "incomplete";
 // be centimeters (then they are used as cm exactly as before).
 export const ANKLE_LEGACY_REQUIREMENTS_ARE_CM = false;
 
-export const YELLOW_BAND = 0.90; // OPEN QUESTION Q1: Jim's sheet says "within 10 degrees"; kept at the current 90% ratio until he decides.
+// Decision #4 (Jim, closed): YELLOW is a FLAT distance below the requirement, not a 90% ratio.
+// A reading within 10 degrees below the requirement is YELLOW (10 degrees exactly is still YELLOW, "within 10"),
+// and the ankle (centimeters) uses 2 cm. Anything further below is RED. At or above the requirement is GREEN.
+export const YELLOW_TOLERANCE_DEG = 10;
+export const YELLOW_TOLERANCE_ANKLE_CM = 2;
+export function yellowTolerance(joint: string): number {
+  return joint === "ankle_df" ? YELLOW_TOLERANCE_ANKLE_CM : YELLOW_TOLERANCE_DEG;
+}
 
 const BILATERAL: Record<string, [string, string]> = {
   hip_er: ["hip_er_l", "hip_er_r"],
@@ -73,17 +80,46 @@ export function toNum(v: unknown): number | null {
   return isFinite(n) ? n : null;
 }
 
-// Laterality (Jim's matrix): ANY = better side is enough; everything else uses the worse side.
-// OPEN QUESTION Q6: LEAD / HOOK / TRAIL need a dominant-side field; until then the worse side is used.
-export function athleteValue(a: Record<string, unknown>, joint: string, laterality?: string | null): number | null {
+// Laterality (Decision #6, Jim closed: follow the sheet's rule per move; the sheet's dominant-side field decides):
+//   BOTH / MIDLINE / blank / N/A = worse side (MIDLINE joints have one value)
+//   ANY                          = better side
+//   LEAD                         = the DOMINANT side
+//   HOOK, TRAIL                  = the OTHER (non-dominant) side
+// If the athlete has no dominant side on file the worse side is used (never looser than the sheet) and, if the named
+// side was not measured, the side that was measured is used. Side gaps are a NOTE only (see sideGapNote); the
+// sheet's 15% / 25% asymmetry downgrade of the color is DROPPED and never applied here.
+export type Dominant = "left" | "right" | null | undefined;
+export function normalizeDominant(raw: unknown): "left" | "right" | null {
+  const s = String(raw ?? "").trim().toLowerCase();
+  return s === "left" || s === "l" ? "left" : s === "right" || s === "r" ? "right" : null;
+}
+export function athleteValue(a: Record<string, unknown>, joint: string, laterality?: string | null, dominant?: Dominant): number | null {
   if (joint in BILATERAL) {
-    const [l, r] = BILATERAL[joint];
-    const vs = [toNum(a[l]), toNum(a[r])].filter((x): x is number => x != null);
+    const [lk, rk] = BILATERAL[joint];
+    const l = toNum(a[lk]), r = toNum(a[rk]);
+    const vs = [l, r].filter((x): x is number => x != null);
     if (!vs.length) return null;
-    return String(laterality ?? "").toUpperCase() === "ANY" ? Math.max(...vs) : Math.min(...vs);
+    const rule = String(laterality ?? "").toUpperCase();
+    const dom = normalizeDominant(dominant);
+    if (rule === "ANY") return Math.max(...vs);
+    if ((rule === "LEAD" || rule === "HOOK" || rule === "TRAIL") && dom) {
+      const wantDominant = rule === "LEAD";
+      const wanted = (dom === "left") === wantDominant ? l : r; // left-dominant + LEAD -> left; left-dominant + HOOK/TRAIL -> right
+      return wanted ?? Math.min(...vs);
+    }
+    return Math.min(...vs);
   }
   if (joint in SINGLE) return toNum(a[SINGLE[joint]]);
   return null;
+}
+
+// Side gap in degrees (centimeters for the ankle) for the UI note. Never changes a color.
+export function sideGapNote(a: Record<string, unknown>, joint: string): { left: number; right: number; gap: number } | null {
+  if (!(joint in BILATERAL)) return null;
+  const [lk, rk] = BILATERAL[joint];
+  const l = toNum(a[lk]), r = toNum(a[rk]);
+  if (l == null || r == null) return null;
+  return { left: l, right: r, gap: Math.round(Math.abs(l - r) * 10) / 10 };
 }
 
 export type Requirement = {
@@ -143,15 +179,16 @@ export type MoveResult = {
   limiting: string[]; // legacy text array, same format as before
 };
 
-export function classifyJoint(value: number | null, required: number): Status {
+export function classifyJoint(value: number | null, required: number, joint = ""): Status {
   if (value == null) return "GREY";
-  const ratio = value / required;
-  if (ratio >= 1) return "GREEN";
-  if (ratio >= YELLOW_BAND) return "YELLOW";
+  if (value >= required) return "GREEN";
+  if (value >= required - yellowTolerance(joint)) return "YELLOW";
   return "RED";
 }
 
-export function classifyMove(a: Record<string, unknown>, reqs: Requirement[]): MoveResult {
+// Move color (Decision #3): the WORST measured REQUIRED joint wins. A required joint that is not measured, or a move
+// with no rule, is GREY ("Not rated"), never GREEN. A real RED / YELLOW on another joint still beats GREY.
+export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], dominant?: Dominant): MoveResult {
   if (reqs.length === 0) return { tier: "GREY", grey_reason: "no_rule", joint_status: [], limiting: [] };
   const joint_status: JointStatus[] = [];
   const limiting: string[] = [];
@@ -161,8 +198,8 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[]): M
       limiting.push(`${r.joint}:cm_requirement_pending`);
       continue;
     }
-    const v = EVALUABLE.has(r.joint) ? athleteValue(a, r.joint, r.laterality) : null;
-    const status = classifyJoint(v, r.required);
+    const v = EVALUABLE.has(r.joint) ? athleteValue(a, r.joint, r.laterality, dominant) : null;
+    const status = classifyJoint(v, r.required, r.joint);
     joint_status.push({ joint: r.joint, status });
     if (status === "GREY") limiting.push(`${r.joint}:not_measured(min ${r.required})`);
     else if (status !== "GREEN") limiting.push(`${r.joint}:${v} vs min ${r.required}`);

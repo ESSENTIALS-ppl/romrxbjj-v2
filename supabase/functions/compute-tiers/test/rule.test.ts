@@ -7,9 +7,9 @@ const M = (rows: [string, number, string?][]) => buildRequirements(rows.map(([jo
 // worst-side + worst-joint
 let r = classifyMove(A, M([["Hip Flexion", 100], ["Hip Abduction", 50]]));
 assert.equal(r.tier, "GREEN");
-r = classifyMove(A, M([["Hip Flexion", 110], ["Hip Abduction", 50]]));   // 100/110 = 0.909 -> YELLOW
+r = classifyMove(A, M([["Hip Flexion", 110], ["Hip Abduction", 50]]));   // 100 vs 110 = 10 below -> YELLOW (flat 10)
 assert.equal(r.tier, "YELLOW");
-r = classifyMove(A, M([["Hip Flexion", 125], ["Hip Abduction", 50], ["Lumbar Flexion", 45, "MIDLINE"]])); // 100/125 = 0.8 -> RED
+r = classifyMove(A, M([["Hip Flexion", 125], ["Hip Abduction", 50], ["Lumbar Flexion", 45, "MIDLINE"]])); // 25 below -> RED
 assert.equal(r.tier, "RED");
 assert.deepEqual(r.joint_status.map(j => j.status), ["RED", "GREEN", "GREEN"]);
 // no rule -> GREY, never GREEN (the 19 moves that used to default GREEN)
@@ -54,9 +54,11 @@ assert.equal(r.tier, "RED");
 // explicit cm requirement is compared in cm and replaces the legacy ankle row
 r = classifyMove(AK, M([["Ankle DF", 20], ["Ankle DF (cm)", 10]]));
 assert.equal(r.tier, "GREEN");
-r = classifyMove(AK, M([["Ankle DF (cm)", 13]]));                               // 11/13 = 0.846 -> RED
+r = classifyMove(AK, M([["Ankle DF (cm)", 13]]));                               // 11 vs 13 = 2 cm below -> YELLOW (flat 2 cm, decision #4)
+assert.equal(r.tier, "YELLOW");
+r = classifyMove(AK, M([["Ankle DF (cm)", 14]]));                               // 3 cm below -> RED
 assert.equal(r.tier, "RED");
-r = classifyMove(AK, M([["ankle_df_cm", 12]]));                                 // 11/12 = 0.917 -> YELLOW
+r = classifyMove(AK, M([["ankle_df_cm", 12]]));                                 // 1 cm below -> YELLOW
 assert.equal(r.tier, "YELLOW");
 r = classifyMove(AK, buildRequirements([], { ankle_df_min: 20, ankle_df_cm_min: 10 })); // cm column beats legacy
 assert.equal(r.tier, "GREEN");
