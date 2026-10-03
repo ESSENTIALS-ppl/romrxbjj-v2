@@ -54,15 +54,17 @@ $$;
 -- Straight-leg raise, ONE leg, sex specific (mirror base_norms.ts). Youdas 2005 JOSPT 35(4):246-252 (PMID 15901126);
 -- means/SDs abstract-verified only. GREEN at or above mean - 1 SD. YELLOW edge mode (PENDING JIM, mirrors
 -- HIP_FLEX_GRADING_MODE): 'flat10' (default) = within 10 degrees below the GREEN edge; 'published_sd' = down to mean - 2 SD.
--- Missing/unknown sex = GREY (we do not guess an edge). Over 90 degrees is graded normally (PENDING JIM, mirrors
+-- Missing/unknown sex follows c_sex_missing (mirrors HIP_FLEX_MISSING_SEX_POLICY): 'pooled' (default, Grant for Jim) = one sex-neutral
+-- PROPOSED norm derived from the men and women rows, 'grey' = Not rated, 'lenient' = lower of the two edges. Over 90 degrees is graded normally (PENDING JIM, mirrors
 -- HIP_FLEX_ABOVE_REVIEW_HANDLING).
 CREATE OR REPLACE FUNCTION public.rom_slr_leg(p_gender text, p_value numeric) RETURNS text
 LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
   c_mode constant text := 'flat10';           -- PENDING JIM: 'flat10' | 'published_sd'
-  -- PENDING JIM (mirrors HIP_FLEX_SEX_MISSING_POLICY; users.gender is empty for 31 of 35 users): 'grey' = Not rated (default,
-  -- Quinn's table has no combined row) | 'combined_lenient' = the lower of the men and women edges (derived, not published)
-  c_sex_missing constant text := 'grey';
+  -- Mirrors HIP_FLEX_MISSING_SEX_POLICY (users.gender is empty for 31 of 35 users). 'pooled' (DEFAULT, decided by Grant for Jim) =
+  -- one sex-neutral norm, PROPOSED/derived from Youdas men (n106, 68.5/6.8) and women (n108, 76.3/9.5): mean 72.4, SD 9.1,
+  -- GREEN 63.3, YELLOW 53.3 (flat10) or 54.2 (published_sd); needs Quinn | 'grey' = Not rated | 'lenient' = lower of the men and women edges.
+  c_sex_missing constant text := 'pooled';
   v_sex text := lower(btrim(coalesce(p_gender, '')));
   v_green numeric; v_yellow numeric;
 BEGIN
@@ -71,7 +73,9 @@ BEGIN
     v_green := 61.7; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 54.9 ELSE 51.7 END;
   ELSIF v_sex IN ('female', 'f', 'woman') THEN
     v_green := 66.8; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 57.3 ELSE 56.8 END;
-  ELSIF c_sex_missing = 'combined_lenient' THEN
+  ELSIF c_sex_missing = 'pooled' THEN
+    v_green := 63.3; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 54.2 ELSE 53.3 END;
+  ELSIF c_sex_missing = 'lenient' THEN
     v_green := 61.7; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 54.9 ELSE 51.7 END;
   ELSE
     RETURN 'GREY';

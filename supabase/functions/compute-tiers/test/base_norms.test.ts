@@ -51,9 +51,9 @@ assert.equal(gradeHipFlexion("male", 53, 53).grading_mode, "flat10");
 assert.equal(g("male", 64), "GREEN");
 assert.equal(g("female", 64), "YELLOW");
 
-// MISSING / unknown sex: GREY with reason sex_missing, never GREEN (even for a big number)
+// MISSING / unknown sex, policy "grey" (explicit): GREY with reason sex_missing, never GREEN (even for a big number)
 for (const s of [null, "", "other", "prefer_not_to_say"]) {
-  const r = gradeHipFlexLeg(s, 75);
+  const r = gradeHipFlexLeg(s, 75, "flat10", "grey");
   assert.deepEqual([r.status, r.reason], ["GREY", "sex_missing"]);
 }
 // UNMEASURED: GREY not_measured, never GREEN (null, undefined, empty, NaN)
@@ -62,7 +62,8 @@ for (const v of [null, undefined, "", "abc"]) {
   assert.deepEqual([r.status, r.reason], ["GREY", "not_measured"]);
 }
 assert.equal(gradeHipFlexion("male", null, null).status, "GREY");
-assert.equal(gradeHipFlexion(null, 70, 70).status, "GREY");
+assert.equal(gradeHipFlexion(null, 70, 70, "flat10", "grey").status, "GREY");
+assert.equal(gradeHipFlexion(null, null, null).status, "GREY"); // unmeasured stays GREY under the default pooled policy
 
 // PER LEG, no blend: the joint is the worse graded leg
 let h = gradeHipFlexion("male", 70, 50);
@@ -87,8 +88,10 @@ assert.equal(hipFlexAsymmetry(70, null).flag, null);      // cannot tell
 assert.equal(hipFlexAsymmetry(null, null).flag, null);
 assert.equal(hipFlexAsymmetry(70, 70).threshold_source, "REASONING");
 // asymmetry flag survives missing sex and does not change colors
-h = gradeHipFlexion(null, 80, 55);
+h = gradeHipFlexion(null, 80, 55, "flat10", "grey");
 assert.deepEqual([h.status, h.asymmetry.flag], ["GREY", true]);
+h = gradeHipFlexion(null, 80, 55); // default pooled: worst leg (55 is YELLOW on 53.3 to 63.3), gap still flagged
+assert.deepEqual([h.status, h.asymmetry.flag], ["YELLOW", true]);
 h = gradeHipFlexion("male", 82, 70);
 assert.deepEqual([h.status, h.asymmetry.flag], ["GREEN", true]); // gap flagged, both legs GREEN
 
@@ -131,7 +134,7 @@ assert.deepEqual([k.status, k.partial], ["GREEN", true]);
 // bundle used by index.ts
 const b = gradeBaseJoints("female", { hip_flex_l: 70, hip_flex_r: 60, ankle_df_l: 11, ankle_df_r: 9 });
 assert.deepEqual([b.hip_flex.status, b.hip_flex.asymmetry.flag, b.ankle_df.status], ["YELLOW", false, "YELLOW"]);
-const none = gradeBaseJoints(null, {});
+const none = gradeBaseJoints(null, {}); // nothing measured: GREY under any policy
 assert.deepEqual([none.hip_flex.status, none.ankle_df.status], ["GREY", "GREY"]);
 console.log("compute-tiers base_norms tests: ok");
 
@@ -146,8 +149,9 @@ import { buildRequirements, classifyMove } from "../rule.ts";
   const r = classifyMove(A, reqs, null, { hip_flex: { basis: "slr_norm", left: hf.left.status, right: hf.right.status } });
   assert.equal(r.tier, "GREEN");
   assert.equal(r.joint_status.find(j => j.joint === "hip_flex")!.basis, "slr_norm");
-  // sex missing: hip flexion GREY -> move GREY (incomplete), never GREEN
-  const g2 = gradeBaseJoints(null, A).hip_flex;
+  // sex missing under policy "grey": hip flexion GREY -> move GREY (incomplete), never GREEN
+  // (this block pins the "grey" policy; the default pooled policy is covered further down)
+  const g2 = gradeHipFlexion(null, A.hip_flex_l, A.hip_flex_r, "flat10", "grey");
   const r2 = classifyMove(A, reqs, null, { hip_flex: { basis: "slr_norm", left: g2.left.status, right: g2.right.status } });
   assert.deepEqual([r2.tier, r2.grey_reason], ["GREY", "incomplete"]);
   // a real RED elsewhere still wins over an SLR GREEN
@@ -169,30 +173,84 @@ import { buildRequirements, classifyMove } from "../rule.ts";
 }
 console.log("compute-tiers hip move + ankle unit tests: ok");
 
-// ---- SEX-MISSING POLICY (PENDING JIM; 31 of 35 users have no gender on file) ----
-import { HIP_FLEX_SEX_MISSING_POLICY, hipFlexCombinedEdges } from "../base_norms.ts";
+// ---- MISSING-SEX POLICY (DECIDED by Grant for Jim: pooled; switch HIP_FLEX_MISSING_SEX_POLICY; 31 of 35 users have no gender) ----
+import { HIP_FLEX_MISSING_SEX_POLICY, HIP_FLEX_SLR_POOLED_NORM, HIP_FLEX_POOLED_LABEL, hipFlexMissingSexEdges } from "../base_norms.ts";
 {
-  assert.equal(HIP_FLEX_SEX_MISSING_POLICY, "grey");                        // default: Quinn's table has no combined row
-  assert.deepEqual(hipFlexCombinedEdges("flat10"), { green_min: 61.7, yellow_min: 51.7 });       // lower of men / women
-  assert.deepEqual(hipFlexCombinedEdges("published_sd"), { green_min: 61.7, yellow_min: 54.9 });
-  for (const sx of [null, undefined, "", "other", "prefer_not_to_say"]) {
+  const MISSING = [null, undefined, "", "other", "prefer_not_to_say"];
+  assert.equal(HIP_FLEX_MISSING_SEX_POLICY, "pooled");                          // default = Grant's decision
+  // pooled row is derived from the published rows (formula in base_norms.ts)
+  {
+    const n1 = 106, m1 = 68.5, s1 = 6.8, n2 = 108, m2 = 76.3, s2 = 9.5, N = n1 + n2;
+    const M = (n1 * m1 + n2 * m2) / N;
+    const sd = Math.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2 + n1 * (m1 - M) ** 2 + n2 * (m2 - M) ** 2) / (N - 1));
+    const P = HIP_FLEX_SLR_POOLED_NORM;
+    assert.equal(P.mean, Math.round(M * 10) / 10); assert.equal(P.sd, Math.round(sd * 10) / 10);
+    assert.equal(P.green_min, Math.round((M - sd) * 10) / 10);
+    assert.equal(P.yellow_min, Math.round((M - 2 * sd) * 10) / 10);
+    assert.equal(P.yellow_flat10_min, Math.round((P.green_min - 10) * 10) / 10);
+    assert.equal(P.sex, "pooled");
+  }
+  assert.deepEqual(hipFlexMissingSexEdges("pooled", "flat10"), { green_min: 63.3, yellow_min: 53.3 });
+  assert.deepEqual(hipFlexMissingSexEdges("pooled", "published_sd"), { green_min: 63.3, yellow_min: 54.2 });
+  assert.deepEqual(hipFlexMissingSexEdges("lenient", "flat10"), { green_min: 61.7, yellow_min: 51.7 });   // lower of men / women
+  assert.deepEqual(hipFlexMissingSexEdges("lenient", "published_sd"), { green_min: 61.7, yellow_min: 54.9 });
+  assert.equal(hipFlexMissingSexEdges("grey"), null);
+  const lo = HIP_FLEX_SLR_NORMS_EDGES_CHECK();
+  assert.ok(lo.pooledG > lo.maleG && lo.pooledG < lo.femaleG);                 // pooled sits between the two sex edges
+
+  // 1. MISSING sex (empty / null / other / prefer_not_to_say) -> ONE pooled color, same for all of them
+  const pooled = (v: number, mode: "flat10" | "published_sd" = "flat10") => gradeHipFlexion(null, v, v, mode).status;
+  for (const sx of MISSING) {
     const d = gradeHipFlexion(sx, 80, 80);
-    assert.deepEqual([d.status, d.left.reason, d.sex_policy], ["GREY", "sex_missing", "grey"]);
-    const c = gradeHipFlexion(sx, 80, 80, "flat10", "combined_lenient");
-    assert.deepEqual([c.status, c.sex_policy], ["GREEN", "combined_lenient"]);
+    assert.deepEqual([d.status, d.left.reason, d.sex_policy, d.norm_label], ["GREEN", null, "pooled", HIP_FLEX_POOLED_LABEL]);
+    assert.equal(gradeHipFlexion(sx, 64, 64).status, "GREEN");                 // pooled GREEN edge 63.3
+    assert.equal(gradeHipFlexion(sx, 58, 58).status, "YELLOW");
+    assert.equal(gradeHipFlexion(sx, 50, 50).status, "RED");
   }
-  const lenient = (v: number, mode: "flat10" | "published_sd" = "flat10") => gradeHipFlexion(null, v, v, mode, "combined_lenient").status;
-  assert.equal(lenient(61.7), "GREEN"); assert.equal(lenient(61.6), "YELLOW");
-  assert.equal(lenient(51.7), "YELLOW"); assert.equal(lenient(51.6), "RED");
-  assert.equal(lenient(54.9, "published_sd"), "YELLOW"); assert.equal(lenient(54.8, "published_sd"), "RED");
-  assert.equal(lenient(null as unknown as number), "GREY");                  // unmeasured is still GREY, never GREEN
-  // sex on file is unaffected by the policy
-  for (const pol of ["grey", "combined_lenient"] as const) {
-    const w = gradeHipFlexion("female", 64, 64, "flat10", pol);
-    assert.deepEqual([w.status, w.sex_policy], ["YELLOW", "sex_on_file"]);
-  }
-  // asymmetry flag and over-90 flag still reported with no sex under "grey"
+  assert.equal(pooled(63.3), "GREEN"); assert.equal(pooled(63.2), "YELLOW");
+  assert.equal(pooled(53.3), "YELLOW"); assert.equal(pooled(53.2), "RED");
+  assert.equal(pooled(54.2, "published_sd"), "YELLOW"); assert.equal(pooled(54.1, "published_sd"), "RED");
+  assert.ok(!/(^|\W)(men|man|male|women|woman|female)(\W|$)/i.test(HIP_FLEX_POOLED_LABEL.replace("men and women combined", "")), "wording stays sex-neutral");
+  assert.equal(pooled(null as unknown as number), "GREY");                    // unmeasured is still GREY, never GREEN
+  // no false "low": a reading that is GREEN on the men's table is not RED here, and nothing is stricter than the women's table
+  assert.notEqual(pooled(62), "RED");
+  // asymmetry flag and over-90 flag still reported with missing sex
   const x = gradeHipFlexion(null, 95, 70);
-  assert.deepEqual([x.status, x.asymmetry.flag, x.left.above_review_limit], ["GREY", true, true]);
+  assert.deepEqual([x.status, x.asymmetry.flag, x.left.above_review_limit], ["GREEN", true, true]);
+
+  // 2. sex PRESENT -> sex-specific norms, under EVERY policy (the pooled row is never used)
+  for (const pol of ["pooled", "grey", "lenient"] as const) {
+    const w = gradeHipFlexion("female", 64, 64, "flat10", pol);
+    assert.deepEqual([w.status, w.sex_policy, w.norm_label], ["YELLOW", "sex_on_file", null]);   // 64 is YELLOW on the women's table
+    const m = gradeHipFlexion("male", 62, 62, "flat10", pol);
+    assert.deepEqual([m.status, m.sex_policy], ["GREEN", "sex_on_file"]);                         // 62 is GREEN on the men's table
+    assert.equal(gradeHipFlexion("male", 52, 52, "flat10", pol).status, "YELLOW");
+  }
+  // same reading, three answers: man GREEN, woman YELLOW, missing sex GREEN (pooled GREEN 63.3) -> 64 vs 62 splits them
+  assert.deepEqual(["male", "female", null].map(sx => gradeHipFlexion(sx, 62, 62).status), ["GREEN", "YELLOW", "YELLOW"]);
+  assert.deepEqual(["male", "female", null].map(sx => gradeHipFlexion(sx, 64, 64).status), ["GREEN", "YELLOW", "GREEN"]);
+
+  // 3. the SWITCH flips the missing-sex result (and only that)
+  const flip = (pol: "pooled" | "grey" | "lenient", v: number) => gradeHipFlexion(null, v, v, "flat10", pol);
+  assert.deepEqual(["pooled", "grey", "lenient"].map(p => flip(p as never, 62).status), ["YELLOW", "GREY", "GREEN"]);
+  assert.deepEqual(["pooled", "grey", "lenient"].map(p => flip(p as never, 52).status), ["RED", "GREY", "YELLOW"]);
+  assert.deepEqual(["pooled", "grey", "lenient"].map(p => flip(p as never, 80).status), ["GREEN", "GREY", "GREEN"]);
+  assert.deepEqual(["pooled", "grey", "lenient"].map(p => flip(p as never, 80).sex_policy), ["pooled", "grey", "lenient"]);
+  assert.equal(flip("grey", 80).left.reason, "sex_missing");
+  assert.equal(flip("grey", 95).left.above_review_limit, true);
+  assert.equal(flip("lenient", 61.7).status, "GREEN"); assert.equal(flip("lenient", 61.6).status, "YELLOW");
+  assert.equal(flip("lenient", 51.6).status, "RED");
+
+  // 4. a move that lists hip flexion: missing sex now follows the pooled color (was GREY/incomplete under "grey")
+  const reqs2 = buildRequirements([{ joint: "Hip Flexion", required_value: 110, laterality_rule: "BOTH" }, { joint: "Hip ER", required_value: 40, laterality_rule: "BOTH" }]);
+  const A2 = { hip_flex_l: 68, hip_flex_r: 70, hip_er_l: 50, hip_er_r: 50 };
+  for (const [pol, tier] of [["pooled", "GREEN"], ["grey", "GREY"], ["lenient", "GREEN"]] as const) {
+    const hf = gradeHipFlexion(null, A2.hip_flex_l, A2.hip_flex_r, "flat10", pol);
+    const mv = classifyMove(A2, reqs2, null, { hip_flex: { basis: "slr_norm", left: hf.left.status, right: hf.right.status } });
+    assert.equal(mv.tier, tier, pol);
+  }
 }
-console.log("compute-tiers sex-missing policy tests: ok");
+function HIP_FLEX_SLR_NORMS_EDGES_CHECK() {
+  return { maleG: hipFlexEdges("male").green_min, femaleG: hipFlexEdges("female").green_min, pooledG: hipFlexMissingSexEdges("pooled")!.green_min };
+}
+console.log("compute-tiers missing-sex policy tests: ok");
