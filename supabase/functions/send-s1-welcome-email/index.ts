@@ -1,4 +1,10 @@
-// send-s1-welcome-email v24 (2026-09-24): Base/general duration "about 15 minutes" (locked claim; BJJ/BB already 15).
+// send-s1-welcome-email v25 (2026-09-29): trigger auth moved off the inline service_role bearer.
+//   The auth.users trigger on_new_user_send_s1_welcome -> public.tg_webhook_send_s1_welcome()
+//   reads a dedicated secret from Supabase Vault (welcome_email_webhook_secret) and sends it as
+//   x-webhook-secret; verified here via RPC public.verify_webhook_secret (service_role only,
+//   boolean result). The legacy service-role bearer paths remain accepted until the legacy
+//   service_role key is disabled (see KEYS-DELETIONDOC-NOTES 2026-09-29).
+// - v24 (2026-09-24): Base/general duration "about 15 minutes" (locked claim; BJJ/BB already 15).
 // - v23 (2026-09-24): Base/general copy says "top three problem areas" (Jim LOCK via Grant).
 //   BJJ / Bodybuilding brands untouched (sport packs keep their own copy).
 // - v22 (2026-09-21): restore full branded HTML from PR #28 + keep email_sends (redeploy after v21 stub).
@@ -20,7 +26,34 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const EMAIL_ID = "s1_1_welcome";
 
+const VAULT_SECRET_NAME = "welcome_email_webhook_secret";
+
+async function webhookSecretOk(got: string): Promise<boolean> {
+  if (!got || !SUPABASE_URL || !SERVICE_ROLE_KEY) return false;
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await admin.rpc("verify_webhook_secret", {
+      p_name: VAULT_SECRET_NAME,
+      p_candidate: got,
+    });
+    if (error) {
+      console.error("verify_webhook_secret error:", error.message);
+      return false;
+    }
+    return data === true;
+  } catch (e) {
+    console.error("verify_webhook_secret threw:", String(e));
+    return false;
+  }
+}
+
 async function callerIsTrusted(req: Request): Promise<boolean> {
+  // Preferred (v25+): Vault-backed webhook secret from the DB trigger.
+  const hook = (req.headers.get("x-webhook-secret") ?? "").trim();
+  if (hook) return await webhookSecretOk(hook);
+  // Legacy: service-role bearer (kept until the legacy service_role key is disabled).
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth.startsWith("Bearer ")) return false;
   const token = auth.slice(7).trim();
