@@ -60,6 +60,9 @@ CREATE OR REPLACE FUNCTION public.rom_slr_leg(p_gender text, p_value numeric) RE
 LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
   c_mode constant text := 'flat10';           -- PENDING JIM: 'flat10' | 'published_sd'
+  -- PENDING JIM (mirrors HIP_FLEX_SEX_MISSING_POLICY; users.gender is empty for 31 of 35 users): 'grey' = Not rated (default,
+  -- Quinn's table has no combined row) | 'combined_lenient' = the lower of the men and women edges (derived, not published)
+  c_sex_missing constant text := 'grey';
   v_sex text := lower(btrim(coalesce(p_gender, '')));
   v_green numeric; v_yellow numeric;
 BEGIN
@@ -68,6 +71,8 @@ BEGIN
     v_green := 61.7; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 54.9 ELSE 51.7 END;
   ELSIF v_sex IN ('female', 'f', 'woman') THEN
     v_green := 66.8; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 57.3 ELSE 56.8 END;
+  ELSIF c_sex_missing = 'combined_lenient' THEN
+    v_green := 61.7; v_yellow := CASE WHEN c_mode = 'published_sd' THEN 54.9 ELSE 51.7 END;
   ELSE
     RETURN 'GREY';
   END IF;

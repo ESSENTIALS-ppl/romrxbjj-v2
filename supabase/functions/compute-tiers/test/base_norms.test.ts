@@ -168,3 +168,31 @@ import { buildRequirements, classifyMove } from "../rule.ts";
   }
 }
 console.log("compute-tiers hip move + ankle unit tests: ok");
+
+// ---- SEX-MISSING POLICY (PENDING JIM; 31 of 35 users have no gender on file) ----
+import { HIP_FLEX_SEX_MISSING_POLICY, hipFlexCombinedEdges } from "../base_norms.ts";
+{
+  assert.equal(HIP_FLEX_SEX_MISSING_POLICY, "grey");                        // default: Quinn's table has no combined row
+  assert.deepEqual(hipFlexCombinedEdges("flat10"), { green_min: 61.7, yellow_min: 51.7 });       // lower of men / women
+  assert.deepEqual(hipFlexCombinedEdges("published_sd"), { green_min: 61.7, yellow_min: 54.9 });
+  for (const sx of [null, undefined, "", "other", "prefer_not_to_say"]) {
+    const d = gradeHipFlexion(sx, 80, 80);
+    assert.deepEqual([d.status, d.left.reason, d.sex_policy], ["GREY", "sex_missing", "grey"]);
+    const c = gradeHipFlexion(sx, 80, 80, "flat10", "combined_lenient");
+    assert.deepEqual([c.status, c.sex_policy], ["GREEN", "combined_lenient"]);
+  }
+  const lenient = (v: number, mode: "flat10" | "published_sd" = "flat10") => gradeHipFlexion(null, v, v, mode, "combined_lenient").status;
+  assert.equal(lenient(61.7), "GREEN"); assert.equal(lenient(61.6), "YELLOW");
+  assert.equal(lenient(51.7), "YELLOW"); assert.equal(lenient(51.6), "RED");
+  assert.equal(lenient(54.9, "published_sd"), "YELLOW"); assert.equal(lenient(54.8, "published_sd"), "RED");
+  assert.equal(lenient(null as unknown as number), "GREY");                  // unmeasured is still GREY, never GREEN
+  // sex on file is unaffected by the policy
+  for (const pol of ["grey", "combined_lenient"] as const) {
+    const w = gradeHipFlexion("female", 64, 64, "flat10", pol);
+    assert.deepEqual([w.status, w.sex_policy], ["YELLOW", "sex_on_file"]);
+  }
+  // asymmetry flag and over-90 flag still reported with no sex under "grey"
+  const x = gradeHipFlexion(null, 95, 70);
+  assert.deepEqual([x.status, x.asymmetry.flag, x.left.above_review_limit], ["GREY", true, true]);
+}
+console.log("compute-tiers sex-missing policy tests: ok");

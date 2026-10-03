@@ -98,6 +98,17 @@ export const HIP_FLEX_ASYMMETRY_SOURCE: NormSource = "REASONING";
 export const HIP_FLEX_REVIEW_ABOVE_DEG = 90;
 export const HIP_FLEX_ABOVE_REVIEW_HANDLING: "grade_normally" | "grey" = "grade_normally"; // PENDING JIM
 
+// SEX-MISSING POLICY (PENDING JIM). Fact (Oct 3): users.gender is empty for 31 of 35 users, so this is the COMMON case.
+//   "grey"             = leg is GREY, reason sex_missing, "Not rated" (never GREEN, no guessed edge). DEFAULT, because
+//                        Quinn's norm table has NO combined-sex row (only men and women), so a combined edge would be our own invention.
+//   "combined_lenient" = use the more lenient (lower) of the men and women edges for each line: GREEN from 61.7,
+//                        YELLOW from 51.7 (flat10) or 54.9 (published_sd). DERIVED, not published (labelled
+//                        "combined_lenient" in the result, never presented as a norm). A woman at 63 reads GREEN
+//                        here although she is YELLOW on the women's table: that is the cost of this option.
+// Change ONLY this constant. The result always says which policy produced the color (sex_policy).
+export type HipFlexSexMissingPolicy = "grey" | "combined_lenient";
+export const HIP_FLEX_SEX_MISSING_POLICY: HipFlexSexMissingPolicy = "grey"; // PENDING JIM
+
 // users.gender values written by Base CompleteProfile: male, female, other, prefer_not_to_say, or null (optional).
 // Anything that is not clearly male or female is "unknown".
 // Missing/unknown sex fallback (stated plainly): the leg is GREY with reason sex_missing. We do NOT guess an edge,
@@ -123,22 +134,30 @@ export type LegGrade = {
   above_review_limit: boolean;
 };
 
+export function hipFlexCombinedEdges(mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): { green_min: number; yellow_min: number } {
+  const m = hipFlexEdges("male", mode), f = hipFlexEdges("female", mode);
+  return { green_min: Math.min(m.green_min, f.green_min), yellow_min: Math.min(m.yellow_min, f.yellow_min) };
+}
+
 export function hipFlexEdges(sex: "male" | "female", mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): { green_min: number; yellow_min: number } {
   const r = HIP_FLEX_SLR_NORMS[sex];
   const y = mode === "published_sd" ? r.yellow_min : r.yellow_flat10_min;
   return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: y - HIP_FLEX_YELLOW_WIDEN_DEG };
 }
 
-export function gradeHipFlexLeg(sexRaw: unknown, value: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): LegGrade {
+export function gradeHipFlexLeg(
+  sexRaw: unknown, value: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+  policy: HipFlexSexMissingPolicy = HIP_FLEX_SEX_MISSING_POLICY,
+): LegGrade {
   const v = num(value);
   if (v == null) return { status: "GREY", reason: "not_measured", above_review_limit: false };
   const above = v > HIP_FLEX_REVIEW_ABOVE_DEG;
   const sex = normalizeSex(sexRaw);
-  if (sex === "unknown") return { status: "GREY", reason: "sex_missing", above_review_limit: above };
+  if (sex === "unknown" && policy === "grey") return { status: "GREY", reason: "sex_missing", above_review_limit: above };
   if (above && HIP_FLEX_ABOVE_REVIEW_HANDLING === "grey") {
     return { status: "GREY", reason: "above_review_limit", above_review_limit: true };
   }
-  const e = hipFlexEdges(sex, mode);
+  const e = sex === "unknown" ? hipFlexCombinedEdges(mode) : hipFlexEdges(sex, mode);
   const status: Status = v >= e.green_min ? "GREEN" : v >= e.yellow_min ? "YELLOW" : "RED";
   return { status, reason: null, above_review_limit: above };
 }
@@ -177,11 +196,15 @@ export type HipFlexGrade = {
   asymmetry: Asymmetry;
   above_review_limit_handling: "grade_normally" | "grey"; // PENDING JIM
   grading_mode: HipFlexGradingMode; // PENDING JIM
+  sex_policy: HipFlexSexMissingPolicy | "sex_on_file"; // which rule produced the color
 };
 
-export function gradeHipFlexion(sexRaw: unknown, left: unknown, right: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): HipFlexGrade {
-  const l = gradeHipFlexLeg(sexRaw, left, mode);
-  const r = gradeHipFlexLeg(sexRaw, right, mode);
+export function gradeHipFlexion(
+  sexRaw: unknown, left: unknown, right: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+  policy: HipFlexSexMissingPolicy = HIP_FLEX_SEX_MISSING_POLICY,
+): HipFlexGrade {
+  const l = gradeHipFlexLeg(sexRaw, left, mode, policy);
+  const r = gradeHipFlexLeg(sexRaw, right, mode, policy);
   const measured = [num(left), num(right)].filter(x => x != null).length;
   return {
     joint: "hip_flex",
@@ -193,6 +216,7 @@ export function gradeHipFlexion(sexRaw: unknown, left: unknown, right: unknown, 
     asymmetry: hipFlexAsymmetry(left, right),
     above_review_limit_handling: HIP_FLEX_ABOVE_REVIEW_HANDLING,
     grading_mode: mode,
+    sex_policy: normalizeSex(sexRaw) === "unknown" ? policy : "sex_on_file",
   };
 }
 
