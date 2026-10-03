@@ -1,7 +1,7 @@
 // Tests for Jim's closed decisions #3, #4, #5, #6 (compute-tiers v43 DRAFT).
 import assert from "node:assert/strict";
 import {
-  buildRequirements, classifyMove, classifyJoint, athleteValue, sideGapNote, normalizeDominant,
+  buildRequirements, classifyMove, classifyJoint, athleteValue, pickLegStatus, ONE_SIDE_MISSING_POLICY, sideGapNote, normalizeDominant,
   YELLOW_TOLERANCE_DEG, YELLOW_TOLERANCE_ANKLE_CM,
 } from "../rule.ts";
 import { packRating, packRatingIfEnabled, PACK_PERCENT_MODE, type MoveForRating } from "../pack_rating.ts";
@@ -55,7 +55,27 @@ assert.equal(athleteValue(S, "hip_er", null, "right"), 30);
 for (const r of ["LEAD", "HOOK", "TRAIL"]) assert.equal(athleteValue(S, "hip_er", r, null), 30, r);
 assert.equal(athleteValue(S, "hip_er", "LEAD", "sideways" as never), 30);
 // named side not measured: use the side that was
-assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "LEAD", "right"), 40);
+// ONE SIDE LOGGED (PENDING JIM, default "grey"): the named side missing = not measured (GREY), never a guess
+assert.equal(ONE_SIDE_MISSING_POLICY, "grey");
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "LEAD", "right"), null);      // dominant right side not logged
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "LEAD", "left"), 40);         // the rule needs only the left side
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "HOOK", "right"), 40);        // non-dominant = left
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "BOTH"), null);
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "ANY"), null);
+assert.equal(athleteValue({ hip_er_r: 40 }, "hip_er", "MIDLINE"), null);
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "BOTH", null, "use_measured_side"), 40);   // old behavior behind the one constant
+assert.equal(athleteValue({ hip_er_l: 40 }, "hip_er", "LEAD", "right", "use_measured_side"), 40);
+assert.equal(classifyMove({ hip_er_r: 10 }, M([["Hip ER", 45]])).tier, "GREY");     // one side RED-looking but other side blank -> Not rated
+// per-leg SLR color follows the same side selection
+assert.equal(pickLegStatus("GREEN", "YELLOW", "BOTH"), "YELLOW");
+assert.equal(pickLegStatus("GREEN", "YELLOW", "ANY"), "GREEN");
+assert.equal(pickLegStatus("GREEN", "YELLOW", "LEAD", "left"), "GREEN");
+assert.equal(pickLegStatus("GREEN", "YELLOW", "LEAD", "right"), "YELLOW");
+assert.equal(pickLegStatus("GREEN", "YELLOW", "TRAIL", "left"), "YELLOW");
+assert.equal(pickLegStatus("GREEN", "GREY", "BOTH"), "GREY");
+assert.equal(pickLegStatus("GREEN", "GREY", "LEAD", "left"), "GREEN");
+assert.equal(pickLegStatus("GREY", "GREY", "ANY"), "GREY");
+assert.equal(pickLegStatus("RED", "GREY", "BOTH", null, "use_measured_side"), "RED");
 assert.equal(normalizeDominant("Right"), "right");
 assert.equal(normalizeDominant("L"), "left");
 assert.equal(normalizeDominant("ambidextrous"), null);
@@ -117,3 +137,12 @@ assert.equal(packRating([mv("GREY", [["a", "GREY"]], "incomplete")]).can_do, 0);
 // no shared AT RISK / ELITE label anywhere in the output
 assert.ok(!/AT RISK|ELITE/i.test(JSON.stringify(packRating(moves))));
 console.log("compute-tiers decisions tests: ok");
+
+// ---- invalid entries: negative = not measured (GREY), zero = real value (RED) ----
+import { toNum } from "../rule.ts";
+import { gradeHipFlexLeg as _hip, gradeAnkleCmLeg as _ank } from "../base_norms.ts";
+assert.equal(toNum(-1), null); assert.equal(toNum(0), 0); assert.equal(toNum(""), null); assert.equal(toNum(true), null); assert.equal(toNum("45"), 45);
+assert.equal(classifyMove({ lumbar_flex: -1 }, buildRequirements([{ joint: "Lumbar Flexion", required_value: 50, laterality_rule: "MIDLINE" }])).tier, "GREY");
+assert.equal(classifyMove({ shoulder_flex_l: 0, shoulder_flex_r: 0 }, buildRequirements([{ joint: "Shoulder Flexion", required_value: 165, laterality_rule: "BOTH" }])).tier, "RED");
+assert.equal(_hip("male", -5).status, "GREY"); assert.equal(_hip("male", 0).status, "RED"); assert.equal(_ank(0).status, "RED"); assert.equal(_ank(-2).status, "GREY");
+console.log("compute-tiers invalid-entry tests: ok");

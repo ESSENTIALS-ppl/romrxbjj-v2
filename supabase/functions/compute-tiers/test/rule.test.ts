@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildRequirements, classifyMove, classifyJoint, normalizeJoint, ANKLE_LEGACY_REQUIREMENTS_ARE_CM } from "../rule.ts";
+import { buildRequirements, classifyMove, classifyJoint, normalizeJoint, ANKLE_LEGACY_REQUIREMENTS_ARE_CM, GREY_BEATS_YELLOW } from "../rule.ts";
 
 const A = { hip_flex_l: 120, hip_flex_r: 100, hip_abd_l: 60, hip_abd_r: 60, lumbar_flex: 50, shoulder_flex_l: 170, shoulder_flex_r: 170 };
 const M = (rows: [string, number, string?][]) => buildRequirements(rows.map(([joint, v, l]) => ({ joint, required_value: v, laterality_rule: l ?? "BOTH" })));
@@ -21,11 +21,13 @@ assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"]);
 // a joint the app never collects (hip extension) can never produce GREEN
 r = classifyMove(A, M([["Hip Flexion", 100], ["Hip Extension", 25]]));
 assert.equal(r.tier, "GREY");
-// RED / YELLOW still beat GREY (worst MEASURED joint wins)
+// RED still beats GREY; YELLOW + unmeasured = GREY while GREY_BEATS_YELLOW (PENDING JIM, default true)
+assert.equal(GREY_BEATS_YELLOW, true);
 r = classifyMove(A, M([["Hip Flexion", 125], ["Cervical Rotation", 60, "MIDLINE"]]));
 assert.equal(r.tier, "RED");
 r = classifyMove(A, M([["Hip Flexion", 110], ["Cervical Rotation", 60, "MIDLINE"]]));
-assert.equal(r.tier, "YELLOW");
+assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"]);
+assert.deepEqual(r.joint_status.map(j => j.status).sort(), ["GREY", "YELLOW"]);   // the measured YELLOW is still in joint_status
 // ANY laterality uses the better side
 r = classifyMove(A, M([["Hip Flexion", 118, "ANY"]]));
 assert.equal(r.tier, "GREEN");

@@ -123,9 +123,9 @@ export function normalizeSex(raw: unknown): Sex {
 }
 
 function num(v: unknown): number | null {
-  if (v == null || v === "") return null;
+  if (v == null || v === "" || typeof v === "boolean") return null;
   const n = typeof v === "number" ? v : Number(v);
-  return isFinite(n) ? n : null;
+  return isFinite(n) && n >= 0 ? n : null; // negative = invalid entry = not measured; 0 is a real value
 }
 
 export type LegGrade = {

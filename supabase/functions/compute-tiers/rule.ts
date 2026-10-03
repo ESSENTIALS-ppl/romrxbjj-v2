@@ -47,6 +47,17 @@ const SINGLE: Record<string, string> = {
   cervical_flex: "cervical_flex",
   cervical_ext: "cervical_ext",
 };
+// PENDING JIM (confirm): move with one YELLOW joint and one unmeasured joint. true = GREY "Not rated" (default; RED still wins),
+// false = YELLOW (the measured joint is shown). Change ONLY this constant (SQL mirror: c_grey_beats_yellow).
+export const GREY_BEATS_YELLOW = true;
+
+// PENDING JIM (confirm): one side of a two-sided test is missing (for example only the right leg was logged).
+//   "grey"             = the joint is GREY ("Not rated") unless the move's sheet rule needs only the side that was logged
+//                        (LEAD / HOOK / TRAIL with a known dominant side). Never GREEN from a blank side. Default (Quinn's reference).
+//   "use_measured_side" = old behavior: grade with the side(s) that exist.
+// Change ONLY this constant.
+export type OneSidePolicy = "grey" | "use_measured_side";
+export const ONE_SIDE_MISSING_POLICY: OneSidePolicy = "grey";
 export const EVALUABLE = new Set([...Object.keys(BILATERAL), ...Object.keys(SINGLE)]);
 
 // rom_thresholds.joint spellings -> app joint keys. Anything not here (for example hip_ext, thoracic) is kept as its
@@ -74,10 +85,12 @@ export function normalizeJoint(raw: string): string {
   return JOINT_ALIAS[k] ?? k.replace(/\s+/g, "_");
 }
 
+// A negative reading is an invalid entry and counts as NOT MEASURED (GREY). Zero is a real value (RED when a bar exists).
+// Matches Quinn's reference (negative = invalid). Booleans and empty strings are not readings.
 export function toNum(v: unknown): number | null {
-  if (v == null) return null;
+  if (v == null || typeof v === "boolean" || v === "") return null;
   const n = typeof v === "number" ? v : Number(v);
-  return isFinite(n) ? n : null;
+  return isFinite(n) && n >= 0 ? n : null;
 }
 
 // Laterality (Decision #6, Jim closed: follow the sheet's rule per move; the sheet's dominant-side field decides):
@@ -93,7 +106,7 @@ export function normalizeDominant(raw: unknown): "left" | "right" | null {
   const s = String(raw ?? "").trim().toLowerCase();
   return s === "left" || s === "l" ? "left" : s === "right" || s === "r" ? "right" : null;
 }
-export function athleteValue(a: Record<string, unknown>, joint: string, laterality?: string | null, dominant?: Dominant): number | null {
+export function athleteValue(a: Record<string, unknown>, joint: string, laterality?: string | null, dominant?: Dominant, policy: OneSidePolicy = ONE_SIDE_MISSING_POLICY): number | null {
   if (joint in BILATERAL) {
     const [lk, rk] = BILATERAL[joint];
     const l = toNum(a[lk]), r = toNum(a[rk]);
@@ -101,16 +114,36 @@ export function athleteValue(a: Record<string, unknown>, joint: string, laterali
     if (!vs.length) return null;
     const rule = String(laterality ?? "").toUpperCase();
     const dom = normalizeDominant(dominant);
-    if (rule === "ANY") return Math.max(...vs);
+    const strict = policy === "grey";
+    if (rule === "ANY") return strict && vs.length < 2 ? null : Math.max(...vs);
     if ((rule === "LEAD" || rule === "HOOK" || rule === "TRAIL") && dom) {
       const wantDominant = rule === "LEAD";
       const wanted = (dom === "left") === wantDominant ? l : r; // left-dominant + LEAD -> left; left-dominant + HOOK/TRAIL -> right
-      return wanted ?? Math.min(...vs);
+      if (wanted != null) return wanted;
+      return strict ? null : Math.min(...vs);
     }
-    return Math.min(...vs);
+    return strict && vs.length < 2 ? null : Math.min(...vs);
   }
   if (joint in SINGLE) return toNum(a[SINGLE[joint]]);
   return null;
+}
+
+// Same side selection for a joint that is already colored per leg (hip flexion straight-leg raise: Status per leg).
+export function pickLegStatus(left: Status, right: Status, laterality?: string | null, dominant?: Dominant, policy: OneSidePolicy = ONE_SIDE_MISSING_POLICY): Status {
+  const rank: Record<string, number> = { GREEN: 0, YELLOW: 1, RED: 2 };
+  const strict = policy === "grey";
+  const rule = String(laterality ?? "").toUpperCase();
+  const dom = normalizeDominant(dominant);
+  const both = [left, right].filter(x => x !== "GREY");
+  if (!both.length) return "GREY";
+  if ((rule === "LEAD" || rule === "HOOK" || rule === "TRAIL") && dom) {
+    const wanted = (dom === "left") === (rule === "LEAD") ? left : right;
+    if (wanted !== "GREY") return wanted;
+    return strict ? "GREY" : both.reduce((w, x) => (rank[x] > rank[w] ? x : w), both[0]);
+  }
+  if (strict && both.length < 2) return "GREY";
+  if (rule === "ANY") return both.reduce((b, x) => (rank[x] < rank[b] ? x : b), both[0]);
+  return both.reduce((w, x) => (rank[x] > rank[w] ? x : w), both[0]);
 }
 
 // Side gap in degrees (centimeters for the ankle) for the UI note. Never changes a color.
@@ -174,7 +207,7 @@ export function buildRequirements(
 // basis "slr_norm" marks a joint colored from the Base straight-leg norm table instead of the move's own number (flagged,
 // PENDING JIM: HIP_FLEX_MOVES_USE_SLR_COLOR in base_norms.ts). Names and colors only; no degrees.
 export type JointStatus = { joint: string; status: Status; basis?: "slr_norm" };
-export type JointOverrides = Partial<Record<string, { status: Status; basis: "slr_norm" }>>;
+export type JointOverrides = Partial<Record<string, { basis: "slr_norm"; left: Status; right: Status }>>;
 export type MoveResult = {
   tier: Status;
   grey_reason: GreyReason | null;
@@ -198,9 +231,10 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], do
   for (const r of reqs) {
     const ov = overrides?.[r.joint];
     if (ov) {
-      joint_status.push({ joint: r.joint, status: ov.status, basis: ov.basis });
-      if (ov.status === "GREY") limiting.push(`${r.joint}:slr_not_rated`);
-      else if (ov.status !== "GREEN") limiting.push(`${r.joint}:slr_norm`);
+      const st = pickLegStatus(ov.left, ov.right, r.laterality, dominant);
+      joint_status.push({ joint: r.joint, status: st, basis: ov.basis });
+      if (st === "GREY") limiting.push(`${r.joint}:slr_not_rated`);
+      else if (st !== "GREEN") limiting.push(`${r.joint}:slr_norm`);
       continue;
     }
     if (r.unit_pending) {
@@ -216,6 +250,9 @@ export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], do
   }
   const has = (s: Status) => joint_status.some(j => j.status === s);
   if (has("RED")) return { tier: "RED", grey_reason: null, joint_status, limiting };
+  // Only a RED is conclusive when a joint is unmeasured (a YELLOW could still end up RED once measured, and a move that
+  // cannot be fully judged is "Not rated"). GREY_BEATS_YELLOW = Quinn's reference and Jim's "missing joint = GREY".
+  if (GREY_BEATS_YELLOW && has("GREY")) return { tier: "GREY", grey_reason: "incomplete", joint_status, limiting };
   if (has("YELLOW")) return { tier: "YELLOW", grey_reason: null, joint_status, limiting };
   if (has("GREY")) return { tier: "GREY", grey_reason: "incomplete", joint_status, limiting };
   return { tier: "GREEN", grey_reason: null, joint_status, limiting: [] };

@@ -156,6 +156,8 @@ BEGIN
 END;
 $function$;
 
+DROP FUNCTION IF EXISTS public.rom_pick_leg_status(text, text, text, text);
+DROP FUNCTION IF EXISTS public.rom_valid_reading(numeric);
 DROP FUNCTION IF EXISTS public.rom_slr_status(text, numeric, numeric);
 DROP FUNCTION IF EXISTS public.rom_slr_leg(text, numeric);
 DROP FUNCTION IF EXISTS public.rom_classify_joint(numeric, numeric, text);
