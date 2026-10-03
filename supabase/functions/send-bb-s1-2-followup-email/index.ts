@@ -4,6 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// F-06: ledger key in public.email_sends (primary key user_id + email_id = send once per person).
+const EMAIL_ID = "bb_s1_2_followup";
 
 const ACCENT = "#1e6fd9";
 const DOMAIN = "https://romrxbodybuilding.com";
@@ -30,6 +32,9 @@ async function cronCallerOk(req: Request): Promise<boolean> {
 
 serve(async (_req) => {
   if (!(await cronCallerOk(_req))) return new Response("forbidden", { status: 403 });
+  // F-06: test accounts (jim+romrx-...@romrx.io flagged fixtures) are skipped unless a manual trigger passes {"include_fixtures": true}.
+  let includeFixtures = false;
+  try { includeFixtures = (await _req.json())?.include_fixtures === true; } catch (_e) { /* cron sends no body */ }
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -39,7 +44,7 @@ serve(async (_req) => {
 
     const { data: users, error: usersError } = await supabase
       .from("users")
-      .select("id, email, full_name, created_at, active_sport")
+      .select("id, email, full_name, created_at, active_sport, marketing_opt_out")
       .eq("active_sport", "bodybuilding")
       .gte("created_at", windowStart)
       .lte("created_at", windowEnd);
@@ -70,19 +75,21 @@ serve(async (_req) => {
     console.log(`BB S1-2 — Total: ${users.length}, Assessed: ${assessedIds.size}, Eligible: ${eligibleUsers.length}`);
 
     let sent = 0;
+    const skipped = { opt_out: 0, fixture: 0, already_sent: 0 };
     const errors: any[] = [];
 
     for (const user of eligibleUsers) {
       const firstName = (user.full_name ?? "").split(" ")[0] || "there";
       const email = user.email;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("marketing_opt_out")
-        .eq("email", user.email)
-        .single();
-      if (profile?.marketing_opt_out) {
-        continue;
+      // F-06: opt-out comes from users.marketing_opt_out (the old profiles table never existed, so Stop was ignored).
+      if (user.marketing_opt_out) { skipped.opt_out++; continue; }
+      if (!includeFixtures) {
+        const { data: isTest } = await supabase.rpc("is_test_account", { p_email: email });
+        if (isTest === true) { skipped.fixture++; continue; }
       }
+      // F-06: send-once claim BEFORE Resend. The hourly job sees each user in two consecutive runs of the 2h window.
+      const { error: claimErr } = await supabase.from("email_sends").insert({ user_id: user.id, email_id: EMAIL_ID });
+      if (claimErr) { skipped.already_sent++; continue; }
 
       const htmlBody = `
 <!DOCTYPE html>
@@ -174,6 +181,7 @@ serve(async (_req) => {
         headers: {
           "Authorization": `Bearer ${RESEND_API_KEY}`,
           "Content-Type": "application/json",
+          "Idempotency-Key": `${EMAIL_ID}-${user.id}`,
         },
         body: JSON.stringify({
           from: FROM,
@@ -193,13 +201,14 @@ serve(async (_req) => {
         sent++;
         console.log(`BB S1-2 sent to ${email}`);
       } else {
+        await supabase.from("email_sends").delete().eq("user_id", user.id).eq("email_id", EMAIL_ID); // release claim so the next run can retry
         const errData = await res.json();
         console.error(`Failed for ${email}:`, errData);
         errors.push({ email, error: errData });
       }
     }
 
-    return new Response(JSON.stringify({ sent, errors }), { status: 200 });
+    return new Response(JSON.stringify({ sent, skipped, errors }), { status: 200 });
 
   } catch (err) {
     console.error("Unexpected error:", err);
