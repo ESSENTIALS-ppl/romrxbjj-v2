@@ -36,6 +36,21 @@ function R(n) {
   return J[n] ?? String(n).replace(/_/g, " ");
 }
 
+/**
+ * HIP_FLEX_UNSCORED (Jim closed this, Oct 3 2026): hip flexion (straight-leg raise) is never judged against 120, so ROMBot never
+ * names it as a weak spot, band or priority joint. Stored worst_joints / joint_scores entries for it are ignored here (old rows
+ * exist until the data is recomputed). Set to false to restore the old behavior. Retired when the sex-specific norm engine
+ * (romrxbjj-v2 #74) ships. Mirrors romrx-io-web mobilityBands.ts HIP_FLEX_UNSCORED_FALLBACK.
+ */
+const HIP_FLEX_UNSCORED = true;
+function isUnscoredJoint(k) {
+  return HIP_FLEX_UNSCORED && String(k ?? "").replace(/_(l|r)$/, "") === "hip_flex";
+}
+/** Drop unscored joints from a list of joint keys or joint_scores rows; anything else passes through. */
+function scoredOnly(list) {
+  return Array.isArray(list) ? list.filter((e) => !isUnscoredJoint(typeof e === "string" ? e : jointKeyOf(e))) : list;
+}
+
 /** Map joint_scores score (1|2|3) or internal aliases to Base band labels. */
 function bandFromScore(score) {
   if (score === 1 || score === "1" || score === "at_risk" || score === "red" || score === "needs_focus") {
@@ -137,7 +152,7 @@ function D(n, l) {
     const o = c.full_name ?? "Unknown Athlete";
     const m = c.belt ?? "white";
     const s = c.technique_summary;
-    const h = c.worst_joints;
+    const h = scoredOnly(c.worst_joints);
     const a = c.green_techniques;
     const r = c.yellow_techniques;
     const p = c.saved_game_plans;
@@ -228,9 +243,9 @@ function baseJointLabel(k) {
 function CBase(n) {
   const g = n.full_name ?? "Athlete";
   const m = n.protocol;
-  const h = n.worst_joints;
+  const h = scoredOnly(n.worst_joints);
   const p = n.saved_game_plans;
-  const jointScores = n.joint_scores;
+  const jointScores = scoredOnly(n.joint_scores);
   const bandsBlock = formatMobilityBands(jointScores);
   const overallBand = overallBandFromJointScores(jointScores);
   const overallLine = overallBand
@@ -335,7 +350,7 @@ function CSport(n, l) {
   const o = n.technique_summary;
   const m = n.protocol;
   const s = n.red_techniques;
-  const h = n.worst_joints;
+  const h = scoredOnly(n.worst_joints);
   const a = n.green_techniques;
   const r = n.yellow_techniques;
   const p = n.saved_game_plans;
@@ -700,4 +715,4 @@ async function V(n) {
   }
 }
 
-export { V as handleRequest };
+export { V as handleRequest, CBase, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };

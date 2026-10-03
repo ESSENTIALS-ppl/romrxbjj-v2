@@ -107,26 +107,14 @@ function classify(a: Record<string, unknown>, technique: Record<string, unknown>
 }
 
 function computeWorstJointKeys(a: Record<string, unknown>, limit = 5): string[] {
-  const rows: { key: string; pct: number }[] = [];
-  for (const [key, target] of Object.entries(JOINT_TARGETS)) {
-    const num = toNum(a[key]);
-    if (num == null) continue;
-    rows.push({ key, pct: Math.max(0, Math.min(1, num / target)) });
-  }
-  rows.sort((x, y) => x.pct - y.pct);
-  return rows.slice(0, limit).map(r => r.key);
+  // body in ./joint_totals.ts (pure, unit tested); HIP_FLEX_UNSCORED there keeps hip flexion out of weak spots and the /100
+  return worstJointKeys(a, JOINT_TARGETS, toNum, limit);
 }
 
 function computeRomTotal(a: Record<string, unknown>): number {
-  const pcts: number[] = [];
-  for (const [key, target] of Object.entries(JOINT_TARGETS)) {
-    const num = toNum(a[key]);
-    if (num == null) continue;
-    pcts.push(Math.max(0, Math.min(1, num / target)) * 100);
-  }
-  if (pcts.length === 0) return 0;
-  return Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length);
+  return romTotal(a, JOINT_TARGETS, toNum);
 }
+import { romTotal, worstJointKeys } from "./joint_totals.ts";
 
 // CORS (Reid E2E): the browser preflight (OPTIONS) used to fall through to req.json() and answer 400
 // missing_assessment_id, so the belt-change call from romrx.io failed in browsers. Same header set the other
