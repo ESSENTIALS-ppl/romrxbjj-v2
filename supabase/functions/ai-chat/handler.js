@@ -310,6 +310,24 @@ Keep responses focused. Use bullet points. Tie advice to this person's mobility 
 Answer in short plain sentences. Prefer simple correct answers over fancy prose. No filler.`;
 }
 
+
+/** Sport apps: label rules so Base band words never reach sport answers. */
+const BASE_BAND_RE = /needs focus|\bsteady\b|mobility bands?/i;
+function sportLabelRules(l) {
+  const bb = String(l).toLowerCase() === "bodybuilding";
+  const unit = bb ? "lift" : "position";
+  const colors = `GREEN means your range of motion lines up with what the ${unit} needs. YELLOW means it is close, so train with awareness. RED means it is below what the ${unit} needs today, so build mobility first.`;
+  const readiness = bb
+    ? ""
+    : `\nThe Position Readiness Score uses AT RISK to ELITE. AT RISK means your measured range is well below the target for these positions. ELITE means you are at or above the targets. Neither is a medical finding, and neither predicts injury.`;
+  return `## Labels in this app (use only these)
+${bb ? "Use GREEN, YELLOW and RED for lifts." : "Use GREEN, YELLOW and RED for techniques, and AT RISK to ELITE for the Position Readiness Score."}
+${colors}${readiness}
+Readiness colors compare your range of motion to what a ${unit} needs. They are not medical clearance and do not say whether a move is safe for you.
+NEVER use the words Needs focus, Building, Steady, or Mobility Bands in this app. Those belong to ROMRx Base. If asked what the bands or levels mean, explain only the labels above. If asked about Base bands, say they are in the ROMRx Base app.
+`;
+}
+
 /** Sport athlete prompt (bjj / bodybuilding): technique tiers unchanged. */
 function CSport(n, l) {
   const g = n.full_name ?? "Athlete";
@@ -375,6 +393,7 @@ ${formatProtocol(m)}
 ## Saved Game Plans
 ${i}
 
+${sportLabelRules(l)}
 ## Critical Rules
 - NEVER reveal specific degree values or ROM thresholds
 - NEVER use technique codes - use technique names only
@@ -623,12 +642,14 @@ async function V(n) {
         query_embedding: i,
         p_sport: m,
         match_threshold: 0.7,
-        match_count: 4,
+        match_count: isBaseSport(m) ? 4 : 8,
       });
-      if (y && y.length > 0) {
+      // Sport apps never get the Base band chunks (sport = general) that name Needs focus / Building / Steady.
+      const yy = !y ? y : isBaseSport(m) ? y : y.filter((_) => !(_.sport === "general" && BASE_BAND_RE.test(`${_.topic} ${_.chunk}`))).slice(0, 4);
+      if (yy && yy.length > 0) {
         e =
           "\n\n## Relevant Research\n" +
-          y
+          yy
             .map((_) => `${_.topic}: ${_.chunk} (${_.source_citation})`)
             .join("\n");
       }
