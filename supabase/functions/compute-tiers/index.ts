@@ -20,7 +20,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { buildRequirements, classifyMove, toNum, type MoveResult } from "./rule.ts";
 import { packRatingIfEnabled } from "./pack_rating.ts";
-import { ANKLE_DF_CM_TARGET, gradeBaseJoints } from "./base_norms.ts";
+import { ANKLE_DF_CM_TARGET, HIP_FLEX_MOVES_USE_SLR_COLOR, gradeBaseJoints } from "./base_norms.ts";
 
 const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 45, hip_er_r: 45,
@@ -201,8 +201,12 @@ Deno.serve(async (req: Request) => {
     const moveResults: MoveResult[] = [];
     const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0, GREY: 0 };
 
+    // Hip flexion on a move takes the Base straight-leg color (PENDING JIM, flag in base_norms.ts). GREY when sex is missing.
+    const hipFlexStatus = (baseGrades as { hip_flex?: { status: "GREEN" | "YELLOW" | "RED" | "GREY" } } | null)?.hip_flex?.status ?? "GREY";
+    const overrides = HIP_FLEX_MOVES_USE_SLR_COLOR ? { hip_flex: { status: hipFlexStatus, basis: "slr_norm" as const } } : undefined;
+
     for (const t of techniques as Record<string, unknown>[]) {
-      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t), dominant as "left" | "right" | null);
+      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t), dominant as "left" | "right" | null, overrides);
       moveResults.push(res);
       counts[res.tier]++;
       rows.push({

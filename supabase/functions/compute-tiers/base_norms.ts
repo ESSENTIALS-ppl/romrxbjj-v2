@@ -13,9 +13,15 @@
 //   passive SLR as trunk-thigh angle (goniometer). Sex difference 8 degrees (P<.001), no age effect.
 //   Means and SDs below are as relayed in Quinn's file /workspace/quinn-research/grok-heavy-slr-norms-20261003.md.
 //   The public abstract confirms sample, method, the 8 degree sex difference and no age effect; it does NOT print the
-//   means or SDs, so they are UNVERIFIED against the full text (see hip-flexion-norms-drafts.md).
-//   Cut rule (Quinn REASONING, not a published cut-off): GREEN at or above mean - 1 SD, YELLOW from mean - 2 SD up
-//   to mean - 1 SD, RED below mean - 2 SD. Youdas published no percentiles.
+//   means or SDs. The pooled and per-age-band means, SDs and n are ABSTRACT-VERIFIED ONLY (full text is paywalled; they
+//   come via Quinn's Heavy notes and pass an internal n-weighted check). Treat as PARTIAL, not verified against the table.
+//   Youdas measured PASSIVE SLR. Base users move actively, so the grade means "compared with published passive values".
+//   GREEN edge (both modes): mean - 1 SD (Quinn REASONING, not a published cut-off; Youdas published no percentiles).
+//   YELLOW edge depends on ONE switch, HIP_FLEX_GRADING_MODE (PENDING JIM, default flat10):
+//     "flat10"        YELLOW = within 10 degrees below the GREEN edge (Jim's closed rule #4), RED below that
+//     "published_sd"  YELLOW from mean - 2 SD up to mean - 1 SD (Quinn's SD rule), RED below mean - 2 SD
+
+import { YELLOW_TOLERANCE_ANKLE_CM } from "./rule.ts";
 
 export type Status = "GREEN" | "YELLOW" | "RED" | "GREY";
 export type Sex = "male" | "female" | "unknown";
@@ -28,23 +34,37 @@ export type HipFlexNormRow = {
   sex: "male" | "female";
   mean: number;
   sd: number;
-  green_min: number;  // mean - 1 SD
-  yellow_min: number; // mean - 2 SD
+  green_min: number;        // mean - 1 SD (both modes)
+  yellow_min: number;       // mean - 2 SD            (mode "published_sd")
+  yellow_flat10_min: number; // green_min - 10         (mode "flat10", default)
   source: string;
 };
 
+// ONE switch for the hip flexion YELLOW edge. PENDING JIM: (1) flat 10 degrees (his closed rule, default) or
+// (2) the published-norm SD scale. Change ONLY this constant.
+export type HipFlexGradingMode = "flat10" | "published_sd";
+export const HIP_FLEX_GRADING_MODE: HipFlexGradingMode = "flat10"; // PENDING JIM
+export const HIP_FLEX_FLAT_YELLOW_DEG = 10;
+
+// PENDING JIM: does a move whose requirement lists hip flexion take the Base straight-leg COLOR for that joint
+// (flagged "slr_norm")? Quinn assumes yes. The matrix hip flexion numbers (100-125 degrees) cannot be compared to a
+// straight-leg raise reading (the average man reaches about 68), so comparing them would paint nearly everything RED.
+//   true  = hip_flex joint on a move = the straight-leg color (GREY when sex is missing or the leg is unmeasured)
+//   false = old behavior: compare the raw SLR degrees to the matrix number
+export const HIP_FLEX_MOVES_USE_SLR_COLOR = true; // PENDING JIM
+
 export const HIP_FLEX_SLR_NORMS: Record<"male" | "female", HipFlexNormRow> = {
   male: {
-    sex: "male", mean: 68.5, sd: 6.8, green_min: 61.7, yellow_min: 54.9,
-    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, men n=106, mean 68.5 +/- 6.8 (avg of sides); cut = mean-1SD / mean-2SD (Quinn REASONING)",
+    sex: "male", mean: 68.5, sd: 6.8, green_min: 61.7, yellow_min: 54.9, yellow_flat10_min: 51.7,
+    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, men n=106, mean 68.5 +/- 6.8 (avg of sides); cut = mean-1SD green; yellow flat10 or mean-2SD (Quinn REASONING); mean/SD abstract-verified only",
   },
   female: {
-    sex: "female", mean: 76.3, sd: 9.5, green_min: 66.8, yellow_min: 57.3,
-    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, women n=108, mean 76.3 +/- 9.5 (avg of sides); cut = mean-1SD / mean-2SD (Quinn REASONING)",
+    sex: "female", mean: 76.3, sd: 9.5, green_min: 66.8, yellow_min: 57.3, yellow_flat10_min: 56.8,
+    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, women n=108, mean 76.3 +/- 9.5 (avg of sides); cut = mean-1SD green; yellow flat10 or mean-2SD (Quinn REASONING); mean/SD abstract-verified only",
   },
 };
 
-// Age bands from Youdas (mean, SD, n). Quinn: ANOVA found no age effect from 20 to 79, so ONE adult cut-off per sex is
+// Age bands from Youdas (mean, SD, n); ABSTRACT-VERIFIED ONLY (paywalled full text, PARTIAL). Quinn: ANOVA found no age effect from 20 to 79, so ONE adult cut-off per sex is
 // used and these are kept as reference only. The 70-79 cells are a little lower and small (10 men, 14 women).
 export const HIP_FLEX_SLR_AGE_BANDS_REFERENCE_ONLY = {
   male: [
@@ -103,12 +123,13 @@ export type LegGrade = {
   above_review_limit: boolean;
 };
 
-export function hipFlexEdges(sex: "male" | "female"): { green_min: number; yellow_min: number } {
+export function hipFlexEdges(sex: "male" | "female", mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): { green_min: number; yellow_min: number } {
   const r = HIP_FLEX_SLR_NORMS[sex];
-  return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: r.yellow_min - HIP_FLEX_YELLOW_WIDEN_DEG };
+  const y = mode === "published_sd" ? r.yellow_min : r.yellow_flat10_min;
+  return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: y - HIP_FLEX_YELLOW_WIDEN_DEG };
 }
 
-export function gradeHipFlexLeg(sexRaw: unknown, value: unknown): LegGrade {
+export function gradeHipFlexLeg(sexRaw: unknown, value: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): LegGrade {
   const v = num(value);
   if (v == null) return { status: "GREY", reason: "not_measured", above_review_limit: false };
   const above = v > HIP_FLEX_REVIEW_ABOVE_DEG;
@@ -117,7 +138,7 @@ export function gradeHipFlexLeg(sexRaw: unknown, value: unknown): LegGrade {
   if (above && HIP_FLEX_ABOVE_REVIEW_HANDLING === "grey") {
     return { status: "GREY", reason: "above_review_limit", above_review_limit: true };
   }
-  const e = hipFlexEdges(sex);
+  const e = hipFlexEdges(sex, mode);
   const status: Status = v >= e.green_min ? "GREEN" : v >= e.yellow_min ? "YELLOW" : "RED";
   return { status, reason: null, above_review_limit: above };
 }
@@ -155,11 +176,12 @@ export type HipFlexGrade = {
   right: LegGrade;
   asymmetry: Asymmetry;
   above_review_limit_handling: "grade_normally" | "grey"; // PENDING JIM
+  grading_mode: HipFlexGradingMode; // PENDING JIM
 };
 
-export function gradeHipFlexion(sexRaw: unknown, left: unknown, right: unknown): HipFlexGrade {
-  const l = gradeHipFlexLeg(sexRaw, left);
-  const r = gradeHipFlexLeg(sexRaw, right);
+export function gradeHipFlexion(sexRaw: unknown, left: unknown, right: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): HipFlexGrade {
+  const l = gradeHipFlexLeg(sexRaw, left, mode);
+  const r = gradeHipFlexLeg(sexRaw, right, mode);
   const measured = [num(left), num(right)].filter(x => x != null).length;
   return {
     joint: "hip_flex",
@@ -170,21 +192,25 @@ export function gradeHipFlexion(sexRaw: unknown, left: unknown, right: unknown):
     right: r,
     asymmetry: hipFlexAsymmetry(left, right),
     above_review_limit_handling: HIP_FLEX_ABOVE_REVIEW_HANDLING,
+    grading_mode: mode,
   };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 // Ankle dorsiflexion: ONE test, knee-to-wall, CENTIMETERS, Base only (Jim closed this on 2026-10-03).
 // ---------------------------------------------------------------------------------------------------------------
-// There is no published cm cut-off (Quinn files: Bennell 1998 shows the cm test is reliable, ICC 0.97-0.99, and
-// healthy adults land around 9 to 12 cm; McBride 2026 PMID 41723909 abstract gives no cm numbers; the matrix numbers
-// 10/15/20 are degrees-authored and are NOT converted). So:
-//   GREEN edge  10 cm  = Base's own existing step config (assessmentSteps2.ts normalLow 10, riskBelow 10)   [EXISTING_BASE_CONFIG]
-//   YELLOW band 1.6 cm below the green edge = Powden 2015 inter-clinician MDC for tape knee-to-wall, used here only as a
-//               noise allowance. NOT a clinical cut-off.                                                  [PROPOSED, for Quinn/Jim]
-//   RED         below the yellow band.
-export const ANKLE_DF_CM_GREEN_MIN = 10;          // EXISTING_BASE_CONFIG
-export const ANKLE_DF_CM_YELLOW_WIDTH = 1.6;      // PROPOSED (Quinn/Jim to confirm)
+// There is NO published cm cut-off (Quinn files: Bennell 1998 shows the cm test is reliable, ICC 0.97-0.99; McBride 2026
+// PMID 41723909 abstract gives no cm numbers; the matrix numbers 10/15/20 are degree-authored and are NEVER converted
+// or compared to a cm reading). So everything below that is a cm edge is PROPOSED, not cited:
+//   YELLOW band  2 cm below the GREEN edge. Jim's closed rule (#4: flat 2 cm for the ankle).
+//                Open Jim question: 2 cm sits just above published measurement error (Powden 2015 MDC 1.6 cm inter-rater /
+//                1.9 cm intra-rater, Konor 2012 1.1-1.5 cm, trained raters), so one self-test reading near a line can
+//                flip color from noise alone.
+//   GREEN edge   10 cm = Base's own existing step config (assessmentSteps2.ts normalLow 10, riskBelow 10). That
+//                "normal 10-20 cm" has no source (Quinn review). PROPOSED, change here only.
+//   RED          below the yellow band. PROPOSED.
+export const ANKLE_DF_CM_GREEN_MIN = 10;                     // PROPOSED (uncited)
+export const ANKLE_DF_CM_YELLOW_WIDTH = YELLOW_TOLERANCE_ANKLE_CM; // 2 cm, Jim's closed rule (one constant, in rule.ts)
 export const ANKLE_DF_CM_YELLOW_SOURCE: NormSource = "PROPOSED";
 // One number used wherever the engine needs an ankle "target" in cm for percent-of-target math (rom_total, worst_joints).
 // It replaces the old literal 20, which was a target written for a degree-style scale and applied to cm (F-17).

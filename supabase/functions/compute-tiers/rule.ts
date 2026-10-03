@@ -171,7 +171,10 @@ export function buildRequirements(
   return [...byJoint.values()];
 }
 
-export type JointStatus = { joint: string; status: Status };
+// basis "slr_norm" marks a joint colored from the Base straight-leg norm table instead of the move's own number (flagged,
+// PENDING JIM: HIP_FLEX_MOVES_USE_SLR_COLOR in base_norms.ts). Names and colors only; no degrees.
+export type JointStatus = { joint: string; status: Status; basis?: "slr_norm" };
+export type JointOverrides = Partial<Record<string, { status: Status; basis: "slr_norm" }>>;
 export type MoveResult = {
   tier: Status;
   grey_reason: GreyReason | null;
@@ -188,11 +191,18 @@ export function classifyJoint(value: number | null, required: number, joint = ""
 
 // Move color (Decision #3): the WORST measured REQUIRED joint wins. A required joint that is not measured, or a move
 // with no rule, is GREY ("Not rated"), never GREEN. A real RED / YELLOW on another joint still beats GREY.
-export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], dominant?: Dominant): MoveResult {
+export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], dominant?: Dominant, overrides?: JointOverrides): MoveResult {
   if (reqs.length === 0) return { tier: "GREY", grey_reason: "no_rule", joint_status: [], limiting: [] };
   const joint_status: JointStatus[] = [];
   const limiting: string[] = [];
   for (const r of reqs) {
+    const ov = overrides?.[r.joint];
+    if (ov) {
+      joint_status.push({ joint: r.joint, status: ov.status, basis: ov.basis });
+      if (ov.status === "GREY") limiting.push(`${r.joint}:slr_not_rated`);
+      else if (ov.status !== "GREEN") limiting.push(`${r.joint}:slr_norm`);
+      continue;
+    }
     if (r.unit_pending) {
       joint_status.push({ joint: r.joint, status: "GREY" });
       limiting.push(`${r.joint}:cm_requirement_pending`);

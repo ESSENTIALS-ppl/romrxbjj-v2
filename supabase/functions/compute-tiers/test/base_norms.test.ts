@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   HIP_FLEX_SLR_NORMS, HIP_FLEX_ASYMMETRY_FLAG_DEG, HIP_FLEX_REVIEW_ABOVE_DEG, HIP_FLEX_ABOVE_REVIEW_HANDLING,
-  HIP_FLEX_YELLOW_WIDEN_DEG, normalizeSex, gradeHipFlexLeg, gradeHipFlexion, hipFlexAsymmetry, worstOf,
+  HIP_FLEX_YELLOW_WIDEN_DEG, HIP_FLEX_GRADING_MODE, HIP_FLEX_FLAT_YELLOW_DEG, HIP_FLEX_MOVES_USE_SLR_COLOR, hipFlexEdges, ANKLE_DF_CM_YELLOW_WIDTH, normalizeSex, gradeHipFlexLeg, gradeHipFlexion, hipFlexAsymmetry, worstOf,
   gradeAnkleCmLeg, gradeAnkleDf, gradeBaseJoints, ANKLE_DF_CM_TARGET, ANKLE_DF_CM_GREEN_MIN,
 } from "../base_norms.ts";
 
@@ -9,6 +9,7 @@ import {
 assert.equal(HIP_FLEX_YELLOW_WIDEN_DEG, 0);
 const M = HIP_FLEX_SLR_NORMS.male, F = HIP_FLEX_SLR_NORMS.female;
 assert.deepEqual([M.green_min, M.yellow_min, F.green_min, F.yellow_min], [61.7, 54.9, 66.8, 57.3]);
+assert.deepEqual([M.yellow_flat10_min, F.yellow_flat10_min], [51.7, 56.8]); // green_min - 10
 assert.ok(Math.abs(M.mean - M.sd - M.green_min) < 1e-9 && Math.abs(M.mean - 2 * M.sd - M.yellow_min) < 1e-9);
 assert.ok(Math.abs(F.mean - F.sd - F.green_min) < 1e-9 && Math.abs(F.mean - 2 * F.sd - F.yellow_min) < 1e-9);
 
@@ -18,20 +19,34 @@ for (const [raw, want] of [["male", "male"], ["Female", "female"], [" M ", "male
   assert.equal(normalizeSex(raw), want, String(raw));
 }
 
-// MALE edges: 61.7 GREEN, 61.6 YELLOW, 54.9 YELLOW, 54.8 RED
+// ONE switch, default = Jim's flat 10 degrees (PENDING JIM vs the published SD scale)
+assert.equal(HIP_FLEX_GRADING_MODE, "flat10");
+assert.equal(HIP_FLEX_FLAT_YELLOW_DEG, 10);
+assert.equal(HIP_FLEX_MOVES_USE_SLR_COLOR, true); // PENDING JIM
+// MALE edges (flat10): 61.7 GREEN, 61.6 YELLOW, 51.7 YELLOW, 51.6 RED
 const g = (sex: string | null, v: number | null) => gradeHipFlexLeg(sex, v).status;
 assert.equal(g("male", 70), "GREEN");
 assert.equal(g("male", 61.7), "GREEN");
 assert.equal(g("male", 61.6), "YELLOW");
-assert.equal(g("male", 54.9), "YELLOW");
-assert.equal(g("male", 54.8), "RED");
+assert.equal(g("male", 51.7), "YELLOW");
+assert.equal(g("male", 51.6), "RED");
 assert.equal(g("male", 30), "RED");
-// FEMALE edges: 66.8 GREEN, 66.7 YELLOW, 57.3 YELLOW, 57.2 RED
+// FEMALE edges (flat10): 66.8 GREEN, 66.7 YELLOW, 56.8 YELLOW, 56.7 RED
 assert.equal(g("female", 80), "GREEN");
 assert.equal(g("female", 66.8), "GREEN");
 assert.equal(g("female", 66.7), "YELLOW");
-assert.equal(g("female", 57.3), "YELLOW");
-assert.equal(g("female", 57.2), "RED");
+assert.equal(g("female", 56.8), "YELLOW");
+assert.equal(g("female", 56.7), "RED");
+// published_sd mode (option 2): YELLOW from mean - 2 SD
+const gs = (sex: string, v: number) => gradeHipFlexLeg(sex, v, "published_sd").status;
+assert.deepEqual(hipFlexEdges("male", "published_sd"), { green_min: 61.7, yellow_min: 54.9 });
+assert.deepEqual(hipFlexEdges("female", "published_sd"), { green_min: 66.8, yellow_min: 57.3 });
+assert.deepEqual(hipFlexEdges("male"), { green_min: 61.7, yellow_min: 51.7 });
+assert.equal(gs("male", 54.9), "YELLOW"); assert.equal(gs("male", 54.8), "RED");
+assert.equal(gs("female", 57.3), "YELLOW"); assert.equal(gs("female", 57.2), "RED");
+assert.equal(gs("male", 53), "RED"); assert.equal(g("male", 53), "YELLOW");   // the 3.2 degree gap between the two options
+assert.equal(gradeHipFlexion("male", 53, 53, "published_sd").grading_mode, "published_sd");
+assert.equal(gradeHipFlexion("male", 53, 53).grading_mode, "flat10");
 // same reading, different sex: 64 is GREEN for a man and YELLOW for a woman
 assert.equal(g("male", 64), "GREEN");
 assert.equal(g("female", 64), "YELLOW");
@@ -95,17 +110,18 @@ assert.equal(worstOf(["GREEN", "GREY"]), "GREEN");
 assert.equal(worstOf(["GREY", "GREY"]), "GREY");
 assert.equal(worstOf(["RED", "YELLOW", "GREEN"]), "RED");
 
-// ANKLE, knee-to-wall, cm: GREEN >= 10, YELLOW 8.4 to <10 (PROPOSED width 1.6), RED below, GREY unmeasured
+// ANKLE, knee-to-wall, cm: GREEN >= 10 (PROPOSED), YELLOW flat 2 cm below (8 to <10, Jim's closed rule), RED below, GREY unmeasured
+assert.equal(ANKLE_DF_CM_YELLOW_WIDTH, 2);
 assert.equal(ANKLE_DF_CM_GREEN_MIN, 10);
 assert.equal(ANKLE_DF_CM_TARGET, 10); // F-17: no longer the literal 20
 const a = (v: number | null) => gradeAnkleCmLeg(v).status;
 assert.equal(a(14), "GREEN");
 assert.equal(a(10), "GREEN");
 assert.equal(a(9.9), "YELLOW");
-assert.equal(a(8.4), "YELLOW");
-assert.equal(a(8.3), "RED");
+assert.equal(a(8), "YELLOW");
+assert.equal(a(7.9), "RED");
 assert.equal(a(null), "GREY");
-let k = gradeAnkleDf(12, 8);
+let k = gradeAnkleDf(12, 7);
 assert.deepEqual([k.left.status, k.right.status, k.status, k.unit, k.test], ["GREEN", "RED", "RED", "cm", "knee_to_wall"]);
 k = gradeAnkleDf(null, null);
 assert.equal(k.status, "GREY");
@@ -118,3 +134,37 @@ assert.deepEqual([b.hip_flex.status, b.hip_flex.asymmetry.flag, b.ankle_df.statu
 const none = gradeBaseJoints(null, {});
 assert.deepEqual([none.hip_flex.status, none.ankle_df.status], ["GREY", "GREY"]);
 console.log("compute-tiers base_norms tests: ok");
+
+// ---- moves that list hip flexion take the straight-leg color (flagged slr_norm, PENDING JIM) ----
+import { buildRequirements, classifyMove } from "../rule.ts";
+{
+  const reqs = buildRequirements([{ joint: "Hip Flexion", required_value: 110, laterality_rule: "BOTH" }, { joint: "Hip ER", required_value: 40, laterality_rule: "BOTH" }]);
+  const A = { hip_flex_l: 68, hip_flex_r: 70, hip_er_l: 50, hip_er_r: 50 };
+  // raw compare of a straight-leg reading to the matrix 110 would be RED (the old, wrong comparison)
+  assert.equal(classifyMove(A, reqs).tier, "RED");
+  const hf = gradeBaseJoints("male", A).hip_flex;
+  const r = classifyMove(A, reqs, null, { hip_flex: { status: hf.status, basis: "slr_norm" } });
+  assert.equal(r.tier, "GREEN");
+  assert.equal(r.joint_status.find(j => j.joint === "hip_flex")!.basis, "slr_norm");
+  // sex missing: hip flexion GREY -> move GREY (incomplete), never GREEN
+  const g2 = gradeBaseJoints(null, A).hip_flex;
+  const r2 = classifyMove(A, reqs, null, { hip_flex: { status: g2.status, basis: "slr_norm" } });
+  assert.deepEqual([r2.tier, r2.grey_reason], ["GREY", "incomplete"]);
+  // a real RED elsewhere still wins over an SLR GREEN
+  const r3 = classifyMove({ ...A, hip_er_l: 10 }, reqs, null, { hip_flex: { status: "GREEN", basis: "slr_norm" } });
+  assert.equal(r3.tier, "RED");
+  // SLR RED colors the move RED
+  const r4 = classifyMove(A, reqs, null, { hip_flex: { status: "RED", basis: "slr_norm" } });
+  assert.equal(r4.tier, "RED");
+}
+
+// ---- ankle cm is NEVER compared to the matrix's degree rows (F-17): such rows stay GREY, never GREEN or RED ----
+{
+  const cm = { ankle_df_l: 11, ankle_df_r: 11 };
+  for (const deg of [10, 15, 20]) {
+    const r = classifyMove(cm, buildRequirements([{ joint: "Ankle DF", required_value: deg, laterality_rule: "BOTH" }]));
+    assert.deepEqual([r.tier, r.grey_reason], ["GREY", "incomplete"], `matrix ${deg}`);
+    assert.equal(r.joint_status[0].status, "GREY");
+  }
+}
+console.log("compute-tiers hip move + ankle unit tests: ok");
