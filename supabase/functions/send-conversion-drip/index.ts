@@ -118,9 +118,9 @@ const STAGES: Stage[] = [
       const inner = `
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Hey ${n},</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Totally fair to wonder if a ROM program is worth it. So here&rsquo;s the honest math.</p>
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 20px;">Most ${who} spend months &mdash; sometimes years &mdash; drilling things their body isn&rsquo;t structurally ready for, then wonder why they stall. The protocol skips that.</p>
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 20px;">Most ${who} spend months &mdash; sometimes years &mdash; drilling things that do not match their current numbers, then wonder why they stall. The protocol skips that.</p>
         <table cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;"><tr><td style="padding:16px 20px;background:#f7f7f7;border-left:3px solid ${b.accent};font-size:15px;color:#444;line-height:1.7;font-style:italic;">&ldquo;${quote}&rdquo;<br/><span style="font-style:normal;color:#888;font-size:13px;">&mdash; ${b.name} member</span></td></tr></table>
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">Less than the cost of a month of ${lessons}, for a full year of training that actually fits your body.</p>
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">Less than the cost of a month of ${lessons}, for a full year of training matched to your own measurements.</p>
         ${cta(b, "&rarr; Start My Protocol", b.domain + "/signup")}
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0;">Questions or doubts? Just reply. I&rsquo;ll give it to you straight.</p>`;
       return shell(b, email, inner);
