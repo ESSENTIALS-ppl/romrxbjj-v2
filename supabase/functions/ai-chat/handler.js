@@ -497,6 +497,37 @@ async function G(n, l, g, c, o, m) {
   throw new Error(`Unknown provider: ${n}`);
 }
 
+/**
+ * Hidden per-turn note from a client (privacy fix, Oct 4 2026).
+ * The current +Yoga client prepends a note (rules plus the person's pose statuses) to the message text, between the two
+ * markers below. The model should still see it for that turn, but it must never be stored as the chat message, become the
+ * chat title, or stand in for the research search text. A newer client may instead send the note in a separate string field
+ * `turn_context` and keep `message` clean. Both forms work:
+ *   question = what the person actually typed (stored, titled, searched)
+ *   forModel = what the model gets as this turn's user message (note first, then the question)
+ * With no note, forModel is the original message, byte for byte. A start marker with no end marker is left alone.
+ */
+const CLIENT_NOTE_START = "[Background for this answer only. Follow it.]";
+const CLIENT_NOTE_END = "[End of background. The question follows.]";
+const TURN_CONTEXT_MAX = 6000;
+function splitClientNote(message, turnContext) {
+  if (typeof message !== "string") return { question: message, forModel: message };
+  let question = message;
+  let note = "";
+  const t = message.trimStart();
+  if (t.startsWith(CLIENT_NOTE_START)) {
+    const end = t.indexOf(CLIENT_NOTE_END);
+    if (end !== -1) {
+      note = t.slice(0, end + CLIENT_NOTE_END.length);
+      question = t.slice(end + CLIENT_NOTE_END.length).trim();
+    }
+  }
+  const extra = typeof turnContext === "string" ? turnContext.trim().slice(0, TURN_CONTEXT_MAX) : "";
+  if (extra) note = note ? `${note}\n\n${extra}` : extra;
+  return { question, forModel: note ? `${note}\n\n${question}` : message };
+}
+export { splitClientNote };
+
 async function V(n) {
   if (n.method === "OPTIONS") {
     return new Response(null, {
@@ -608,6 +639,14 @@ async function V(n) {
       p = o.provider_key ?? "";
       h = C(y, m);
     }
+    const { question: userQuestion, forModel: modelMessage } = splitClientNote(o.message, o.turn_context);
+    // A chat id from the client is only honored for the caller's own chat (the service client below bypasses row security).
+    // Not found, or someone else's: ignore it and start a new chat for this caller.
+    if (f && u && d) {
+      const { data: own } = await s.from("ai_conversations").select("id").eq("id", u).eq("user_id", d).maybeSingle();
+      if (!own) u = void 0;
+    }
+    const hadChat = Boolean(u);
     let w = [];
     if (f && u) {
       const { data: y } = await s
@@ -635,7 +674,7 @@ async function V(n) {
       if (_) throw _;
       u = y.id;
     }
-    const i = await M(o.message, P);
+    const i = await M(userQuestion, P);
     let e = "";
     if (i) {
       const { data: y } = await s.rpc("search_rombot_knowledge", {
@@ -654,10 +693,10 @@ async function V(n) {
             .join("\n");
       }
     }
-    const { text: t, tokens: b, latency: E } = await G(a, r, p, h + e, w, o.message);
+    const { text: t, tokens: b, latency: E } = await G(a, r, p, h + e, w, modelMessage);
     if (f && u && d) {
       await s.from("ai_messages").insert([
-        { conversation_id: u, user_id: d, role: "user", content: o.message },
+        { conversation_id: u, user_id: d, role: "user", content: userQuestion },
         {
           conversation_id: u,
           user_id: d,
@@ -667,10 +706,10 @@ async function V(n) {
           latency_ms: E,
         },
       ]);
-      if (!o.conversation_id) {
+      if (!hadChat) {
         await s
           .from("ai_conversations")
-          .update({ title: o.message.slice(0, 60) })
+          .update({ title: String(userQuestion).slice(0, 60) })
           .eq("id", u);
       }
     }
