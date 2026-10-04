@@ -51,12 +51,13 @@ async function runHandler(modulePath: string, tables: Record<string, unknown[]>)
   }
 }
 
-function footerChecks(html: string) {
+function footerChecks(html: string, opts: { unsubscribe?: boolean } = {}) {
   assertStringIncludes(html, "6605 Longshore Street, Suite 240, Dublin, OH 43017-2774");
   assertStringIncludes(html, POSTAL_LINE);
   assert(!/Dublin, Ohio/.test(html), "old city-only footer must be gone");
   assert(!html.includes("#244"), "#244 must not appear");
-  assertStringIncludes(html, "unsubscribe");
+  if (opts.unsubscribe === false) assert(!/unsubscribe/i.test(html), "no unsubscribe link or text allowed");
+  else assertStringIncludes(html, "unsubscribe");
 }
 
 const signup = (sport: string) => ({ id: "00000000-0000-0000-0000-000000000001", email: `fixture-${sport}@example.com`, full_name: "Test User", created_at: new Date().toISOString(), active_sport: sport });
@@ -103,18 +104,25 @@ Deno.test("drip conversion (c1/c2/c3, bjj + bodybuilding): full postal address",
   }
 });
 
-Deno.test("renewal reminders (45/30/2 day, bjj + bodybuilding): full postal address, prices unchanged", async () => {
+Deno.test("renewal reminders (45/30/2 day, bjj + bodybuilding): full postal address, NO unsubscribe, opt-out never blocks, prices unchanged", async () => {
   for (const sport of ["bjj", "bodybuilding"]) {
     const u = { id: `00000000-0000-0000-0000-00000000000${sport.length}`, email: `fixture-${sport}@example.com`, full_name: "Test User", subscription_tier: "athlete", subscription_expiry: "2026-12-01T12:00:00Z", active_sport: sport };
     const { mails, status } = await runHandler("../send-renewal-reminders/index.ts", { users: [u] });
     assertEquals(status, 200);
     assertEquals(mails.length, 3);
     for (const m of mails) {
-      footerChecks(m.html);
+      footerChecks(m.html, { unsubscribe: false });
       assertStringIncludes(m.html, "$149/yr");
-      NO_UNSUB_LEAK(m.html, u.email);
+      assert(!/unsubscribe/i.test(m.html) && !m.html.includes("marketing_opt_out"));
     }
     await preview(`5-drip-renewal-45day-${sport}`, mails[0].html);
     await preview(`5-drip-renewal-2day-${sport}`, mails[2].html);
   }
+});
+
+Deno.test("renewal reminders are still sent when the user row says marketing_opt_out = true", async () => {
+  const u = { id: "00000000-0000-0000-0000-000000000009", email: "optout@example.com", full_name: "Opt Out", subscription_tier: "athlete", subscription_expiry: "2026-12-01T12:00:00Z", active_sport: "bjj", marketing_opt_out: true };
+  const { mails, status } = await runHandler("../send-renewal-reminders/index.ts", { users: [u], profiles: [{ marketing_opt_out: true }] });
+  assertEquals(status, 200);
+  assertEquals(mails.length, 3);
 });

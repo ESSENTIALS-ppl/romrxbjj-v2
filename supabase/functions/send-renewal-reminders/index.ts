@@ -81,7 +81,7 @@ function buildEmail(brand: Brand, name: string, plan: string, price: string, day
     <p style="font-size:11px;color:#5a7070;margin-top:24px;line-height:1.6;">To cancel, go to Settings and click Manage Subscription before your renewal date. All sales are final per our <a href="${brand.domain}/legal" style="color:#008080;">Refund Policy</a>.</p>
   </div>
   <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${POSTAL_LINE}<br /><a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
-<p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}. If you don't want to receive these emails from ${brand.name} in the future, please <a href="${brand.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#5a7070;">unsubscribe</a>.</p></div></body></html>`;
+<p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}.</p></div></body></html>`;
 }
 
 async function sendEmail(brand: Brand, to: string, subject: string, html: string): Promise<boolean> {
@@ -131,15 +131,7 @@ Deno.serve(async (_req: Request) => {
         ? `Your ${brand.name} membership renews in ${window.label} - last chance to cancel`
         : `Your ${brand.name} membership renews in ${window.label}`;
 
-      const { data: profile } = await supabase
-          .from('profiles')
-          .select('marketing_opt_out')
-          .eq('email', user.email)
-          .single();
-      if (profile?.marketing_opt_out) {
-        results[window.type].skipped++;
-        continue;
-      }
+      // Renewal reminders are required account notices: no unsubscribe link, and marketing_opt_out never blocks them (Grant, 2026-10-04).
       const sent = await sendEmail(brand, user.email, subject, buildEmail(brand, firstName, `${brand.name}+ ${planLabel}`, price, window.days, expiryFormatted, window.label, user.email));
       if (sent) {
         await supabase.from("renewal_reminders").insert({ user_id: user.id, reminder_type: window.type, subscription_expiry: targetDateStr });
