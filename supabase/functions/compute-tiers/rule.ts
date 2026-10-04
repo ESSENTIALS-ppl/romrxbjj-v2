@@ -47,6 +47,21 @@ export function isNoReferenceBar(joint: string, required: number): boolean {
   return NO_REFERENCE_RANGE_SWITCH && joint === "hip_er" && required >= HIP_ER_NO_REFERENCE_MIN;
 }
 
+// BB UNSOURCED GREY (DRAFT, branch draft/bb-unsourced-grey-20261004; Jim has NOT decided). Quinn's BB peer review (Oct 3): of 499
+// Bodybuilding ROM numbers, 442 have no published support and 7 are contradicted by published values. Those numbers are marked in
+// public.rom_number_source_status (sport, technique_code, joint, app_value, source_status). A requirement whose joint AND number
+// match a mark is GREY with the same reason as above (no_reference_range, "no reference range yet"); a real RED on another joint
+// still wins. The mark only applies while the requirement number equals the marked app_value, so a number that is later sourced or
+// changed is graded normally again. Names / keys only, no personal data.
+//   UNSOURCED_GREY_SWITCH = true  (default): marks are applied.   false: marks are ignored (BB behaves as in PR #74).
+//   UNSOURCED_MARK_BEATS_SLR_OVERRIDE = false (default): hip flexion on a move keeps the Base straight-leg color (sourced norm,
+//                              HIP_FLEX_MOVES_USE_SLR_COLOR) even if the move's hip flexion number is marked. true: the mark wins
+//                              and that joint is GREY. All 7 CONTRADICTS and 99 unsourced numbers are hip flexion, so this matters.
+// SQL mirror: c_unsourced_grey / c_unsourced_beats_slr in recompute_user_eligibility (migration 20261004010000). Change together.
+export const UNSOURCED_GREY_SWITCH = true;
+export const UNSOURCED_MARK_BEATS_SLR_OVERRIDE = false;
+export type SourceMark = { joint: string; app_value: unknown; source_status?: "unsourced" | "contradicted" | string };
+
 const BILATERAL: Record<string, [string, string]> = {
   hip_er: ["hip_er_l", "hip_er_r"],
   hip_ir: ["hip_ir_l", "hip_ir_r"],
@@ -177,7 +192,8 @@ export type Requirement = {
   required: number;
   laterality?: string | null;
   unit_pending?: boolean; // ankle only: requirement has no cm number yet, so it cannot be compared to a cm reading
-  no_reference?: boolean; // hip_er only: bar is far above the healthy average, no reference range yet (NO_REFERENCE_RANGE_SWITCH)
+  no_reference?: boolean; // bar is far above the healthy average (hip_er) or the number is unsourced / contradicted: no reference range yet
+  unsourced?: boolean; // the number is marked in rom_number_source_status (Quinn BB peer review); implies no_reference
 };
 
 // Build the requirement list for one move. matrixRows come from rom_thresholds (documented). techniqueRow is the
@@ -185,6 +201,8 @@ export type Requirement = {
 export function buildRequirements(
   matrixRows: { joint: string; required_value: unknown; laterality_rule?: string | null }[],
   techniqueRow?: Record<string, unknown> | null,
+  sourceMarks?: SourceMark[] | null,
+  marksEnabled: boolean = UNSOURCED_GREY_SWITCH, // tests flip this per call; production uses the constant
 ): Requirement[] {
   const byJoint = new Map<string, Requirement>();
   const ankleCm = new Set<string>(); // joints (only "ankle_df") whose requirement is an explicit cm number
@@ -221,6 +239,13 @@ export function buildRequirements(
   if (ankle && !ankleCm.has("ankle_df") && !ANKLE_LEGACY_REQUIREMENTS_ARE_CM) ankle.unit_pending = true;
   // Legal: a hip rotation bar far above the healthy average has no reference range yet (stricter-row rule already applied).
   for (const q of byJoint.values()) if (isNoReferenceBar(q.joint, q.required)) q.no_reference = true;
+  // Quinn BB peer review: a number marked unsourced / contradicted has no reference range yet (only while the number still matches).
+  if (marksEnabled && sourceMarks?.length) {
+    for (const q of byJoint.values()) {
+      const hit = sourceMarks.some(m => normalizeJoint(m.joint) === q.joint && toNum(m.app_value) === q.required);
+      if (hit) { q.unsourced = true; q.no_reference = true; }
+    }
+  }
   return [...byJoint.values()];
 }
 
@@ -244,14 +269,14 @@ export function classifyJoint(value: number | null, required: number, joint = ""
 
 // Move color (Decision #3): the WORST measured REQUIRED joint wins. A required joint that is not measured, or a move
 // with no rule, is GREY ("Not rated"), never GREEN. A real RED / YELLOW on another joint still beats GREY.
-export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], dominant?: Dominant, overrides?: JointOverrides): MoveResult {
+export function classifyMove(a: Record<string, unknown>, reqs: Requirement[], dominant?: Dominant, overrides?: JointOverrides, markBeatsSlr: boolean = UNSOURCED_MARK_BEATS_SLR_OVERRIDE): MoveResult {
   if (reqs.length === 0) return { tier: "GREY", grey_reason: "no_rule", joint_status: [], limiting: [] };
   const joint_status: JointStatus[] = [];
   const limiting: string[] = [];
   let noRef = false; // some required joint has no reference range yet (hip rotation bar, ankle degree-style bar)
   for (const r of reqs) {
     const ov = overrides?.[r.joint];
-    if (ov) {
+    if (ov && !(r.unsourced && markBeatsSlr)) {
       const st = pickLegStatus(ov.left, ov.right, r.laterality, dominant);
       joint_status.push({ joint: r.joint, status: st, basis: ov.basis });
       if (st === "GREY") limiting.push(`${r.joint}:slr_not_rated`);

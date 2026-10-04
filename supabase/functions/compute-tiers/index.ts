@@ -1,3 +1,4 @@
+// BB unsourced grey (DRAFT, draft/bb-unsourced-grey-20261004): optional rom_number_source_status marks -> GREY no_reference_range (see rule.ts).
 // v43 (DRAFT, not deployed) additions: ./base_norms.ts = Base hip flexion (straight-leg raise, per leg, sex-specific,
 //   Youdas 2005, asymmetry flag) and ankle (knee-to-wall, cm) grades, returned as base_grades (response only, nothing
 //   persisted, no schema change). F-17: ankle cm is never compared to unit-less 10/15/20 requirements (GREY until cm
@@ -18,7 +19,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildRequirements, classifyMove, toNum, type MoveResult } from "./rule.ts";
+import { buildRequirements, classifyMove, toNum, type MoveResult, type SourceMark } from "./rule.ts";
 import { packRatingIfEnabled } from "./pack_rating.ts";
 import { ANKLE_DF_CM_TARGET, HIP_FLEX_MOVES_USE_SLR_COLOR, gradeBaseJoints } from "./base_norms.ts";
 
@@ -185,6 +186,28 @@ Deno.serve(async (req: Request) => {
       matrixByCode.set(code, list);
     }
 
+    // BB unsourced grey (DRAFT, draft/bb-unsourced-grey-20261004): numbers Quinn's peer review found unsourced / contradicted.
+    // Optional lookup: if the table is missing (migration 20261004010000 not applied) or the read fails, nothing is marked and the
+    // run continues exactly as before. Keys and numbers only, no personal data.
+    const marksByCode = new Map<string, SourceMark[]>();
+    try {
+      const { data: marks, error: markErr } = await supa
+        .from("rom_number_source_status")
+        .select("technique_code,joint,app_value,source_status")
+        .eq("sport", sport)
+        .range(0, 4999);
+      if (markErr) console.error("rom_number_source_status read failed (no marks applied):", markErr.message);
+      for (const m of (marks ?? []) as Record<string, unknown>[]) {
+        const code = String(m.technique_code ?? "");
+        if (!code) continue;
+        const list = marksByCode.get(code) ?? [];
+        list.push({ joint: String(m.joint), app_value: m.app_value, source_status: m.source_status as string });
+        marksByCode.set(code, list);
+      }
+    } catch (e) {
+      console.error("rom_number_source_status lookup failed (no marks applied):", String(e));
+    }
+
     // Decision #6: the sheet's dominant-side field decides LEAD / HOOK / TRAIL. athletes.dominant_side ('left' | 'right');
     // missing = worse side. Read only; never blocks the run.
     let dominant: string | null = null;
@@ -208,7 +231,7 @@ Deno.serve(async (req: Request) => {
       : undefined;
 
     for (const t of techniques as Record<string, unknown>[]) {
-      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t), dominant as "left" | "right" | null, overrides);
+      const res = classifyMove(assessment, buildRequirements(matrixByCode.get(String(t.code)) ?? [], t, marksByCode.get(String(t.code))), dominant as "left" | "right" | null, overrides);
       moveResults.push(res);
       counts[res.tier]++;
       rows.push({
