@@ -50,7 +50,7 @@ function json(status: number, body: unknown) {
 
 type JointMap = Record<string, number | null | undefined>;
 
-// Whitelist of accepted joint fields (stored as-is). The /100 + band only score the 13 banded joints in
+// Whitelist of accepted joint fields (stored as-is). The /100 + band only score the 12 banded joints (hip flexion is saved, never scored) in
 // email.ts BAND_JOINTS (targets = app JOINT_SCORE_TARGETS / public.compute_joint_scores()).
 const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 45, hip_er_r: 45, hip_ir_l: 45, hip_ir_r: 45,

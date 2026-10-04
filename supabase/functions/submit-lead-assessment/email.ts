@@ -16,19 +16,15 @@ export type BaseBand = "Needs focus" | "Building" | "Steady";
 type JointMap = Record<string, number | null | undefined>;
 
 /**
- * HIP_FLEX_UNSCORED (Jim closed this, Oct 3 2026): hip flexion (straight-leg raise) is never judged against 120 (unreachable,
- * the average man is about 68). While true it is left out of the band, the per-joint % and the /100, exactly like the app
- * (romrx-io-web mobilityBands.ts HIP_FLEX_UNSCORED_FALLBACK). Set to false to restore the old behavior. Retired when the
- * sex-specific norm engine (romrxbjj-v2 #74) ships.
+ * Hip flexion (straight-leg raise) is NOT a banded joint (Jim closed this, Oct 3 2026; Stacy cleared Oct 4 2026): it is measured and
+ * saved, never scored, so it has no row below, no band, no per-joint %, and is not in the /100. Same as the app
+ * (romrx-io-web mobilityBands.ts HIP_FLEX_UNSCORED_FALLBACK). It has no 120 degree target. The email never mentions it.
  */
-export const HIP_FLEX_UNSCORED = true;
-
 /** Same joints + targets as mobilityBands.ts ASSESSMENT_JOINTS / JOINT_SCORE_TARGETS. */
-const ALL_BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
+const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
   { target: 45, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
   { target: 45, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
   { target: 90, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
-  { target: 120, key: "hip_flex", l: "hip_flex_l", r: "hip_flex_r" },
   { target: 90, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
   { target: 180, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
   { target: 20, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
@@ -39,8 +35,6 @@ const ALL_BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; 
   { target: 50, key: "cervical_flex", single: "cervical_flex" },
   { target: 60, key: "cervical_ext", single: "cervical_ext" },
 ];
-
-const BAND_JOINTS = ALL_BAND_JOINTS.filter(j => !(HIP_FLEX_UNSCORED && j.key === "hip_flex"));
 
 const num = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -116,7 +110,7 @@ const BAND_COPY: Record<1 | 2 | 3, { color: string; intro: string }> = {
   2: { color: "#A16207",
     intro: "Progress needed on key joints. Continue to your dashboard for your individualized plan and stay consistent with it." },
   3: { color: "#1D4ED8",
-    intro: "Solid mobility foundation. Continue to your dashboard to keep training, protect what you have, and retest regularly." },
+    intro: "Solid mobility foundation. Continue to your dashboard to keep training and retest regularly." },
 };
 
 /** Exactly "NN/100 · Band" (U+00B7 middle dot), same as the app's formatScoreBand(). */

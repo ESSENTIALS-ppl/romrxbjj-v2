@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
-import { HIP_FLEX_UNSCORED, jointPercents, mobilityScore, overallBandScore } from "../email.ts";
+import { readFileSync } from "node:fs";
+import { jointPercents, mobilityScore, overallBandScore } from "../email.ts";
 
-assert.equal(HIP_FLEX_UNSCORED, true);   // default ON
+// Stacy (Oct 4): no hip_flex row / 120 target in the email scoring at all, and the band 3 line has no "protect what you have".
+const src = readFileSync(new URL("../email.ts", import.meta.url), "utf8");
+assert.ok(!/key:\s*"hip_flex"/.test(src), "hip_flex row must not exist in BAND_JOINTS");
+assert.ok(!/target:\s*120/.test(src), "no 120 target");
+assert.ok(!/protect what you have/i.test(src));
+assert.ok(src.includes("Solid mobility foundation. Continue to your dashboard to keep training and retest regularly."));
 // Average man: straight-leg raise 68. The old 120 target made it a Needs focus joint (57%) and dragged the /100.
 const base = { hip_er_l: 45, hip_er_r: 45, hip_ir_l: 45, hip_ir_r: 45, hip_abd_l: 90, hip_abd_r: 90, shoulder_er_l: 90, shoulder_er_r: 90 };
 const withHip = { ...base, hip_flex_l: 68, hip_flex_r: 68 };
