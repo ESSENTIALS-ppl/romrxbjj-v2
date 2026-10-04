@@ -1,0 +1,11 @@
+--- color_rules_reference.py	2026-10-03 17:45:09.715166426 -0400
++++ color_rules_reference.py	2026-10-03 17:45:09.731166396 -0400
+@@ -64,7 +64,7 @@
+ def slr_bars(sex, variant='flat10', norms=None):
+     """Hip flexion (straight-leg raise) bars from Youdas 2005. GREEN >= mean-1SD. YELLOW floor: flat10 = GREEN bar - 10;
+     sd = mean-2SD. Returns (green_bar, yellow_floor) as Decimals, or (None, None) if sex is not M/F."""
+-    norms = norms or {'M': {'mean': 68.5, 'sd': 6.8}, 'F': {'mean': 76.3, 'sd': 9.5}}
++    norms = norms or {'M': {'mean': 68.5, 'sd': 6.8}, 'F': {'mean': 76.3, 'sd': 9.5}, None: {'mean': 72.4, 'sd': 9.1}}  # POOLED row for missing sex (PR #74 policy)
+     n = norms.get(sex)
+     if not n: return None, None
+     m, s = D(str(n['mean'])), D(str(n['sd']))
