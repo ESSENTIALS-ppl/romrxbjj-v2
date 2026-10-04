@@ -127,7 +127,7 @@ async function sendGreatJob(sport: string, email: string, firstName: string) {
         <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;"><strong>Jim Scott</strong><br/>Founder, ROMRx LLC<br/><a href="mailto:${c.replyTo}" style="color:${c.accent};">${c.replyTo}</a></p>
       </td></tr>
       <tr><td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
-        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${POSTAL_LINE}<br/>You&rsquo;re receiving this because you completed a ${c.brand} assessment.<br/><a href="${c.unsubDomain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
+        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${POSTAL_LINE}<br/>You&rsquo;re receiving this because you completed a ${c.brand} assessment.</p>
       </td></tr>
     </table>
   </td></tr></table>

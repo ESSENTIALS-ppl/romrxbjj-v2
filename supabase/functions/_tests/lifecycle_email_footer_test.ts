@@ -75,7 +75,7 @@ Deno.test("welcome email: full address + unsubscribe link for general, bjj, body
 });
 
 // ---- 2. assessment done (submit-assessment great_job): drive the real handler with stubs, capture the Resend payload ----
-Deno.test("assessment-done email: full address + existing unsubscribe link", async () => {
+Deno.test("assessment-done email (transactional): full address, NO unsubscribe link or text", async () => {
   Deno.env.set("SUPABASE_URL", "http://stub.local");
   Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "stub-service-key");
   Deno.env.set("SUPABASE_ANON_KEY", "stub-anon-key");
@@ -118,7 +118,10 @@ Deno.test("assessment-done email: full address + existing unsubscribe link", asy
       const m = sent.find((x) => x.to === email);
       assert(m, "assessment-done email sent to stub");
       footerChecks(m!.html);
-      assertStringIncludes(m!.html, `href="${expect[sport]}${encodeURIComponent(email)}"`);
+      // Stacy's ruling (via Grant) 2026-10-04: this email is transactional, so no unsubscribe link or text anywhere.
+      assert(!/unsubscribe/i.test(m!.html), "assessment-done email must not contain 'unsubscribe'");
+      assert(!m!.html.includes(expect[sport]), "no opt-out URL in assessment-done email");
+      assertStringIncludes(m!.html, `${POSTAL_LINE}<br/>You&rsquo;re receiving this because you completed a`);
       await preview(`2-assessment-done-${sport}`, m!.html);
     }
   } finally {
@@ -141,4 +144,10 @@ Deno.test("subscription terms email: full address, cancel steps/link kept, no ma
   }
   assertStringIncludes(ackText("$60"), POSTAL_ADDRESS);
   assertEquals(ackFooter(), `${POSTAL_LINE}. hello@romrx.io. Full terms: https://romrx.io/legal`);
+});
+
+// Shared footer helper is untouched: other functions keep their unsubscribe link (welcome is asserted above; drips in drips_footer_test.ts).
+Deno.test("shared footer helper unchanged: unsubscribeUrl still builds the opt-out link for welcome/drips", () => {
+  assertEquals(unsubscribeUrl("https://romrxbjj.com", "x@y.com"), "https://romrxbjj.com/unsubscribe?email=x%40y.com");
+  assertEquals(POSTAL_LINE, "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774");
 });
