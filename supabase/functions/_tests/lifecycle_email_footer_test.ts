@@ -124,6 +124,23 @@ Deno.test("assessment-done email (transactional): full address, NO unsubscribe l
       assertStringIncludes(m!.html, `${POSTAL_LINE}<br/>You&rsquo;re receiving this because you completed a`);
       await preview(`2-assessment-done-${sport}`, m!.html);
     }
+    // Stacy's ruling 2026-10-04: transactional, so it is sent even when marketing_opt_out=true (opt-out blocks drips only).
+    sent.length = 0;
+    const optOutEmail = "fixture-optout@example.com";
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).__stub = {
+      user: { id: "u2", email: optOutEmail, user_metadata: { full_name: "Opted Out" } },
+      row: { id: "a2", active_sport: "bjj", marketing_opt_out: true, full_name: "Opted Out", assessed_at: "2026-10-04T00:00:00Z", sport: "bjj" },
+    };
+    const res2 = await box.handler!(new Request("http://x", {
+      method: "POST",
+      headers: { Authorization: "Bearer stub", "content-type": "application/json" },
+      body: JSON.stringify({ hip_flex_l: 100 }),
+    }));
+    assertEquals(res2.status, 200);
+    const m2 = sent.find((x) => x.to === optOutEmail);
+    assert(m2, "assessment-done email must be sent to an opted-out user");
+    assert(!/unsubscribe/i.test(m2!.html), "opted-out user's email still has no unsubscribe link/text");
   } finally {
     globalThis.fetch = realFetch;
   }

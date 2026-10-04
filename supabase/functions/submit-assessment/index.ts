@@ -250,17 +250,14 @@ Deno.serve(async (req) => {
     .select("id, assessed_at, sport")
     .single();
   if (error) return json({ error: error.message }, 400);
-  // Great-job email honors users.marketing_opt_out (v31 fix).
+  // Assessment-done (great-job) email is transactional: sent regardless of users.marketing_opt_out.
+  // The opt-out still blocks drips (handled elsewhere).
   try {
-    if (!profile?.marketing_opt_out) {
-      const fullName = (meta.full_name ?? meta.name ?? profile?.full_name ?? "") as string;
-      const firstName = fullName.split(" ")[0] || "there";
-      await sendGreatJob(activeSport, user.email!, firstName);
-      console.log(`Great-job email (${brandSportKey(activeSport)}) sent to ${user.email}`);
-      await logEvent("email_sent", { userId: user.id, sport: brandSportKey(activeSport), props: { email_id: "great_job", stage: "assessment_complete" } });
-    } else {
-      console.log(`Great-job email skipped (opted out): ${user.email}`);
-    }
+    const fullName = (meta.full_name ?? meta.name ?? profile?.full_name ?? "") as string;
+    const firstName = fullName.split(" ")[0] || "there";
+    await sendGreatJob(activeSport, user.email!, firstName);
+    console.log(`Great-job email (${brandSportKey(activeSport)}) sent to ${user.email}`);
+    await logEvent("email_sent", { userId: user.id, sport: brandSportKey(activeSport), props: { email_id: "great_job", stage: "assessment_complete" } });
   } catch (mailErr) {
     console.error("Great-job email error (non-blocking):", mailErr);
   }
