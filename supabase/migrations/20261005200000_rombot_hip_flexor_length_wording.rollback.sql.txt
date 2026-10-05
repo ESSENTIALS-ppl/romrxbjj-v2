@@ -1,0 +1,7 @@
+-- Rollback for 20261005200000_rombot_hip_flexor_length_wording.sql (restores the text read live on 2026-10-05; re-run embed-knowledge {"sport":"bjj"} after).
+UPDATE public.rombot_knowledge
+SET topic = 'Hip Flexor Tightness and Guard Posture',
+    chunk = $chunk$Tight hip flexors, particularly the iliopsoas and rectus femoris, restrict hip extension and alter pelvic positioning in ways that degrade both standing posture and guard-play mechanics in BJJ. Anterior pelvic tilt resulting from hip flexor tightness reduces glute activation during bridging and explosive hip escape movements. A cross-sectional study of BJJ practitioners found that athletes with a positive Thomas test (indicating hip flexor restriction) had significantly weaker hip extension force and less effective bridge-and-roll escapes. Regular hip flexor stretching and posterior chain strengthening are essential components of a BJJ mobility program, especially for practitioners who sit at desks outside of training.$chunk$,
+    embedding = NULL
+WHERE id = '8f559b04-9bd5-4183-8f05-2ac391adf7b9'
+  AND topic = 'Hip Flexor Length and Guard Posture';
