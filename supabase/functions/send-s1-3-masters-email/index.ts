@@ -100,16 +100,6 @@ serve(async (_req) => {
 
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 28px 0;">The <strong>Position Readiness Protocol&trade;</strong> changes that.</p>
 
-              <!-- Testimonial -->
-              <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px;">
-                <tr>
-                  <td style="background-color:#fffbf0;border:1px solid #f0e0a0;padding:20px 24px;border-radius:6px;">
-                    <p style="font-size:15px;color:#444444;line-height:1.7;margin:0 0 10px 0;font-style:italic;">&ldquo;I spent two years trying to fix my guard retention. Turns out my hip ER was 11&deg; below threshold. Two weeks of the right protocol and I was hitting sweeps I&rsquo;d never landed.&rdquo;</p>
-                    <p style="font-size:13px;color:#888888;margin:0;">— ROMRxBJJ user</p>
-                  </td>
-                </tr>
-              </table>
-
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 32px 0;">Your profile is waiting. It&rsquo;ll tell you exactly what&rsquo;s holding your game back &mdash; Masters athlete or not.</p>
 
               <!-- CTA Button -->
