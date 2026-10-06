@@ -6,7 +6,8 @@
 //   cervical_rot 70 (was 80) and cervical_lat 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
 //   shoulder_er 40 (was 90): tucked-elbow test lying on your back, typical range 40-75 (Gill et al. 2020, PMID 33046038).
 //   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are rescaled to these targets by
-//   migration 20261006170000_pack_minimums_rescale.sql (Jim YES Oct 6 12:10 PM; data only, classify() is unchanged).
+//   migration 20261006170000_pack_minimums_rescale.sql (Jim YES Oct 6 12:10 PM; data only, classify() is unchanged; Quinn calls 12:22 PM: SLR 60/120,
+//   shoulder_er 40/90, 4 ankle overrides).
 //   Mirrors romrx-io-web mobilityBands.ts JOINT_SCORE_TARGETS and public.compute_joint_scores().
 // v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)
 // v36: also emits per-joint scores into public.joint_scores via the SQL fn

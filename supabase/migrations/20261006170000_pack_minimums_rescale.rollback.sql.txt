@@ -1,16 +1,17 @@
 -- ROLLBACK for 20261006170000_pack_minimums_rescale.sql (NOT a migration: .txt so the CLI never runs it). Run by hand, in one
 -- transaction, only if the rescale must be undone:
---   1. techniques.*_min: the 7 rescaled columns restored from public._minimums_rescale_20261006_backup (exact old values;
+--   1. techniques.*_min: the 8 rescaled columns (incl. shoulder_er_min and the 4 ankle overrides) restored from public._minimums_rescale_20261006_backup (exact old values;
 --      rows added after the rescale are not in the backup and are left alone).
 --   2. protocol_joint_ranking(): back to the 20261006153000 definition (normal_min hip_er 40, hip_ir 30, hip_flex 100,
---      shoulder_flex 140, ankle_df 10, cervical_rot 70). If 20261006153000 is ALSO being rolled back, run its rollback after this.
+--      shoulder_er 60, shoulder_flex 140, ankle_df 10, cervical_rot 70). If 20261006153000 is ALSO being rolled back, run its rollback after this.
 --   3. Drops the marker + backup tables (so the migration could be re-run).
 -- Then re-run scripts/one-time/20261006_recompute_eligibility_minimums.sql section B to re-save technique_eligibility.
 BEGIN;
 
 UPDATE public.techniques t SET
   hip_er_min = b.hip_er_min, hip_ir_min = b.hip_ir_min, shoulder_flex_min = b.shoulder_flex_min, hip_flex_min = b.hip_flex_min,
-  ankle_df_min = b.ankle_df_min, cervical_rot_min = b.cervical_rot_min, cervical_lat_min = b.cervical_lat_min
+  ankle_df_min = b.ankle_df_min, cervical_rot_min = b.cervical_rot_min, cervical_lat_min = b.cervical_lat_min,
+  shoulder_er_min = b.shoulder_er_min
 FROM public._minimums_rescale_20261006_backup b
 WHERE b.technique_id = t.id;
 
