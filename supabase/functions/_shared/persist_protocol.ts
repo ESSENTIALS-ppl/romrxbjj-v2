@@ -23,11 +23,18 @@ type JointDef = {
 export const HIP_FLEX_UNSCORED = true;
 
 const ALL_JOINTS: JointDef[] = [
-  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 40, riskBelow: 40 },
-  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 30, riskBelow: 30 },
+  // Oct 6 2026 (Quinn): hip ER / IR normalMin + riskBelow lined up under the new Steady targets 29 / 26 (were 40 / 30).
+  // Display / severity thresholds only; no protocol or technique minimum lives in this file. File is still deprecated and not called.
+  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 29, riskBelow: 29 },
+  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 26, riskBelow: 26 },
   { key: "hip_abd", leftKey: "hip_abd_l", rightKey: "hip_abd_r", normalMin: 40, riskBelow: 30 },
-  { key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 100, riskBelow: 100 },
-  { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 60, riskBelow: 60 },
+  // Oct 6 2026: hip_flex normalMin + riskBelow 100 -> 60, the bottom of the approved straight-leg-raise typical range 60-80
+  // (Youdas et al. 2005 / Muyor 2016; Jim closed Oct 6 11:19 AM). Dead code (file not imported; hip_flex is also filtered
+  // out below while HIP_FLEX_UNSCORED), so nothing live changes.
+  { key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 60, riskBelow: 60 },
+  // Oct 6 2026: shoulder_er normalMin + riskBelow 60 -> 40, the new tucked-elbow target (Gill et al. 2020; range 40-75).
+  // Dead code (file not imported), so nothing live changes.
+  { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 40, riskBelow: 40 },
   { key: "shoulder_flex", leftKey: "shoulder_flex_l", rightKey: "shoulder_flex_r", normalMin: 140, riskBelow: 120 },
   { key: "ankle_df", leftKey: "ankle_df_l", rightKey: "ankle_df_r", normalMin: 10, riskBelow: 10 },
   { key: "lumbar_flex", singleKey: "lumbar_flex", normalMin: 40, riskBelow: 40 },
