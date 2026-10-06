@@ -93,7 +93,7 @@ serve(async (_req) => {
               <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px;">
                 <tr>
                   <td style="background-color:#f8f8f8;border-left:4px solid #c8102e;padding:20px 24px;border-radius:0 6px 6px 0;">
-                    <p style="font-size:15px;color:#222222;line-height:1.7;margin:0;">Masters athletes (30&ndash;45) who train without knowing their ROM profile are essentially <strong>guessing</strong>. They work hard on techniques their body isn&rsquo;t structurally ready to execute &mdash; and wonder why they plateau.</p>
+                    <p style="font-size:15px;color:#222222;line-height:1.7;margin:0;">Masters athletes (30&ndash;45) who train without knowing their ROM profile are essentially <strong>guessing</strong>. They work hard on techniques that do not match their current numbers &mdash; and wonder why they plateau.</p>
                   </td>
                 </tr>
               </table>
@@ -125,7 +125,7 @@ serve(async (_req) => {
               </table>
 
               <p style="font-size:14px;color:#555555;line-height:1.6;margin:0 0 4px 0;">&ndash; Jim</p>
-              <p style="font-size:13px;color:#999999;font-style:italic;margin:0;">Evidence-based. BJJ-specific. Built for your body.</p>
+              <p style="font-size:13px;color:#999999;font-style:italic;margin:0;">Evidence-based. BJJ-specific. Built from your own measurements.</p>
             </td>
           </tr>
 
