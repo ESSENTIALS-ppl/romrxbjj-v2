@@ -23,8 +23,10 @@ type JointDef = {
 export const HIP_FLEX_UNSCORED = true;
 
 const ALL_JOINTS: JointDef[] = [
-  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 40, riskBelow: 40 },
-  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 30, riskBelow: 30 },
+  // Oct 6 2026 (Quinn): hip ER / IR normalMin + riskBelow lined up under the new Steady targets 29 / 26 (were 40 / 30).
+  // Display / severity thresholds only; no protocol or technique minimum lives in this file. File is still deprecated and not called.
+  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 29, riskBelow: 29 },
+  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 26, riskBelow: 26 },
   { key: "hip_abd", leftKey: "hip_abd_l", rightKey: "hip_abd_r", normalMin: 40, riskBelow: 30 },
   { key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 100, riskBelow: 100 },
   { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 60, riskBelow: 60 },

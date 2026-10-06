@@ -20,14 +20,18 @@ type JointMap = Record<string, number | null | undefined>;
  * saved, never scored, so it has no row below, no band, no per-joint %, and is not in the /100. Same as the app
  * (romrx-io-web mobilityBands.ts HIP_FLEX_UNSCORED_FALLBACK). It has no 120 degree target. The email never mentions it.
  */
-/** Same joints + targets as mobilityBands.ts ASSESSMENT_JOINTS / JOINT_SCORE_TARGETS. */
+/**
+ * Same joints + targets as mobilityBands.ts ASSESSMENT_JOINTS / JOINT_SCORE_TARGETS.
+ * Steady targets changed by Jim's decisions of Oct 6 2026: hip ER 29 and hip IR 26 (Simoneau et al. 1998; were 45), hip abduction 40
+ * (was 90), shoulder flexion 140 (Gill et al. 2020; was 180), ankle knee-to-wall 6 cm (Konor 2012 / McBride 2026; was 20).
+ */
 const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
-  { target: 45, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
-  { target: 45, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
-  { target: 90, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
+  { target: 29, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
+  { target: 26, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
+  { target: 40, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
   { target: 90, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
-  { target: 180, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
-  { target: 20, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
+  { target: 140, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
+  { target: 6, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
   { target: 80, key: "cervical_rot", l: "cervical_rot_l", r: "cervical_rot_r" },
   { target: 45, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
   { target: 60, key: "lumbar_flex", single: "lumbar_flex" },

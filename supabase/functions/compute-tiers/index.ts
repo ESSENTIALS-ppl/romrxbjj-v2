@@ -1,4 +1,8 @@
-// compute-tiers v38 - readiness engine + Phase A1 protocol persist
+// compute-tiers v39 - readiness engine + Phase A1 protocol persist
+// v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
+//   hip_abd 40 (was 90), shoulder_flex 140 (Gill et al. 2020; was 180), ankle_df 6 cm (Konor 2012 / McBride 2026; was 20).
+//   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are NOT changed.
+//   Mirrors romrx-io-web mobilityBands.ts JOINT_SCORE_TARGETS and public.compute_joint_scores().
 // v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)
 // v36: also emits per-joint scores into public.joint_scores via the SQL fn
 //   public.compute_joint_scores(p_assessment_id). Sport-agnostic, guarded so a
@@ -13,14 +17,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const JOINT_TARGETS: Record<string, number> = {
-  hip_er_l: 45, hip_er_r: 45,
-  hip_ir_l: 45, hip_ir_r: 45,
-  hip_abd_l: 90, hip_abd_r: 90,
+  hip_er_l: 29, hip_er_r: 29,   // Oct 6 2026: was 45
+  hip_ir_l: 26, hip_ir_r: 26,   // Oct 6 2026: was 45
+  hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90
   hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
   shoulder_er_l: 90, shoulder_er_r: 90,
-  shoulder_flex_l: 180, shoulder_flex_r: 180,
-  ankle_df_l: 20, ankle_df_r: 20,
+  shoulder_flex_l: 140, shoulder_flex_r: 140, // Oct 6 2026: was 180
+  ankle_df_l: 6, ankle_df_r: 6,               // Oct 6 2026: was 20 (cm)
   cervical_rot_l: 80, cervical_rot_r: 80,
   cervical_lat_l: 45, cervical_lat_r: 45,
   cervical_flex: 50, cervical_ext: 60,
