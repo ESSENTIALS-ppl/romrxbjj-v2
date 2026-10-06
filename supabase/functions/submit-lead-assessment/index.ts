@@ -58,7 +58,7 @@ const JOINT_TARGETS: Record<string, number> = {
   hip_ext_l: 30, hip_ext_r: 30,
   shoulder_er_l: 90, shoulder_er_r: 90, shoulder_flex_l: 140, shoulder_flex_r: 140,   // Oct 6 2026 (was 180)
   ankle_df_l: 6, ankle_df_r: 6,                                                         // Oct 6 2026 (was 20 cm)
-  cervical_rot_l: 80, cervical_rot_r: 80, cervical_lat_l: 45, cervical_lat_r: 45,
+  cervical_rot_l: 70, cervical_rot_r: 70, cervical_lat_l: 38, cervical_lat_r: 38,   // Oct 6 2026: neck (were 80 / 45; Swinkels 2014)
   cervical_flex: 50, cervical_ext: 60,
   thoracic_rot_l: 45, thoracic_rot_r: 45, thoracic_rot: 45,
   lumbar_flex: 60, lumbar_ext: 25,
