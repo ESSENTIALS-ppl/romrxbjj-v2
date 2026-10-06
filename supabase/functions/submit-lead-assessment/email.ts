@@ -147,7 +147,7 @@ export function renderEmail(
 <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
   <div style="text-align:center;margin-bottom:24px;">
     <div style="font-size:28px;font-weight:800;color:#1D4ED8;letter-spacing:-0.02em;">ROMRx</div>
-    <div style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Personalized Readiness Profile</div>
+    <div style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Personalized Readiness Protocol</div>
   </div>
   <div style="background:#fff;border-radius:16px;padding:28px;border:1px solid #E2E8F0;">
     <div style="text-align:center;">
@@ -158,7 +158,7 @@ export function renderEmail(
     <p style="margin:24px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">Hey there,</p>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">Your ROM score is ${formatScoreBand(score, band)}.</p>
     <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">${intro}</p>
-    <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">This is the start of your Personalized Readiness Profile for longevity, self-care, and mobility. Unlock your dashboard to see ${unlockWhat}.</p>
+    <p style="margin:16px 0 0 0;line-height:1.6;color:#334155;font-size:15px;">This is the start of your Personalized Readiness Protocol for longevity, self-care, and mobility. Unlock your dashboard to see ${unlockWhat}.</p>
     <div style="margin:28px 0;text-align:center;">
       <a href="${unlockUrl}" style="display:inline-block;padding:14px 28px;background:#1D4ED8;color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;">Unlock My Dashboard</a>
       <div style="font-size:11px;color:#64748B;margin-top:10px;">ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.</div>
@@ -166,7 +166,7 @@ export function renderEmail(
     <hr style="border:none;border-top:1px solid #E2E8F0;margin:24px 0;">
     <div style="font-size:12px;color:#64748B;line-height:1.6;">
       <strong style="color:#0F172A;">Why this matters:</strong>
-      Peer-reviewed research links functional mobility to long-term health outcomes. Recent work from the European Journal of Preventive Cardiology shows that low sit-rise scores predict natural and cardiovascular mortality independent of other risk factors. Your ROM profile is a modifiable proxy for that risk.
+      Peer-reviewed research links functional mobility to long-term health outcomes. Recent work from the European Journal of Preventive Cardiology shows that low sit-rise scores predict natural and cardiovascular mortality independent of other risk factors. Your ROM Readiness Protocol is a modifiable proxy for that risk.
       <br><br>
       <a href="${SRT_URL}" style="color:#1D4ED8;">${SRT_CITATION}</a>
     </div>
