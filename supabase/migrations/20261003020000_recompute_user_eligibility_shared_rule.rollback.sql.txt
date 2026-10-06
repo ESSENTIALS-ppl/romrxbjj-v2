@@ -1,0 +1,165 @@
+-- ROLLBACK for 20261003020000_recompute_user_eligibility_shared_rule.sql (DRAFT, not applied).
+-- Restores public.recompute_user_eligibility(uuid) to the LIVE definition captured read-only on 2026-10-03 (v42-era:
+-- worst ratio, 0.90 band, techniques.*_min only, best-effort LEAST of both sides). Then drop the helper functions.
+-- Run order: redeploy compute-tiers v42, run this file, then (optional) DELETE FROM technique_eligibility WHERE tier='GREY' and re-POST the latest assessment.
+CREATE OR REPLACE FUNCTION public.recompute_user_eligibility(p_user_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_assessment   assessments%ROWTYPE;
+  v_sports       text[];
+  v_sport        text;
+  v_now          timestamptz := now();
+  v_result       jsonb := '{}'::jsonb;
+  v_written      int;
+BEGIN
+  SELECT array_remove(COALESCE(sports_enabled, ARRAY['general']::text[]), 'general')
+    INTO v_sports
+    FROM users WHERE id = p_user_id;
+
+  IF v_sports IS NULL OR array_length(v_sports, 1) IS NULL THEN
+    RETURN jsonb_build_object('user_id', p_user_id, 'status', 'no_owned_sports');
+  END IF;
+
+  SELECT * INTO v_assessment
+    FROM assessments
+   WHERE user_id = p_user_id
+   ORDER BY assessed_at DESC NULLS LAST, created_at DESC NULLS LAST
+   LIMIT 1;
+
+  IF v_assessment.id IS NULL THEN
+    RETURN jsonb_build_object('user_id', p_user_id, 'status', 'no_assessment');
+  END IF;
+
+  BEGIN
+    PERFORM public.compute_joint_scores(v_assessment.id);
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  FOREACH v_sport IN ARRAY v_sports LOOP
+    IF v_sport NOT IN ('bjj', 'bodybuilding') THEN
+      v_result := v_result || jsonb_build_object(v_sport, 'skipped_no_catalog');
+      CONTINUE;
+    END IF;
+
+    WITH
+    av AS (
+      SELECT
+        LEAST(v_assessment.hip_er_l,        v_assessment.hip_er_r)        AS hip_er,
+        LEAST(v_assessment.hip_ir_l,        v_assessment.hip_ir_r)        AS hip_ir,
+        LEAST(v_assessment.hip_abd_l,       v_assessment.hip_abd_r)       AS hip_abd,
+        LEAST(v_assessment.hip_flex_l,      v_assessment.hip_flex_r)      AS hip_flex,
+        LEAST(v_assessment.shoulder_er_l,   v_assessment.shoulder_er_r)   AS shoulder_er,
+        LEAST(v_assessment.shoulder_flex_l, v_assessment.shoulder_flex_r) AS shoulder_flex,
+        LEAST(v_assessment.ankle_df_l,      v_assessment.ankle_df_r)      AS ankle_df,
+        LEAST(v_assessment.cervical_rot_l,  v_assessment.cervical_rot_r)  AS cervical_rot,
+        LEAST(v_assessment.cervical_lat_l,  v_assessment.cervical_lat_r)  AS cervical_lat,
+        v_assessment.lumbar_flex   AS lumbar_flex,
+        v_assessment.lumbar_ext    AS lumbar_ext,
+        v_assessment.cervical_flex AS cervical_flex,
+        v_assessment.cervical_ext  AS cervical_ext
+    ),
+    reqs AS (
+      SELECT t.id AS technique_id, t.code AS technique_code,
+             j.joint, j.thresh, j.aval
+      FROM techniques t
+      CROSS JOIN LATERAL (
+        VALUES
+          ('hip_er',        t.hip_er_min,        (SELECT hip_er FROM av)),
+          ('hip_ir',        t.hip_ir_min,        (SELECT hip_ir FROM av)),
+          ('hip_abd',       t.hip_abd_min,       (SELECT hip_abd FROM av)),
+          ('hip_flex',      t.hip_flex_min,      (SELECT hip_flex FROM av)),
+          ('shoulder_er',   t.shoulder_er_min,   (SELECT shoulder_er FROM av)),
+          ('shoulder_flex', t.shoulder_flex_min, (SELECT shoulder_flex FROM av)),
+          ('ankle_df',      t.ankle_df_min,      (SELECT ankle_df FROM av)),
+          ('cervical_rot',  t.cervical_rot_min,  (SELECT cervical_rot FROM av)),
+          ('cervical_lat',  t.cervical_lat_min,  (SELECT cervical_lat FROM av)),
+          ('lumbar_flex',   t.lumbar_flex_min,   (SELECT lumbar_flex FROM av)),
+          ('lumbar_ext',    t.lumbar_ext_min,    (SELECT lumbar_ext FROM av)),
+          ('cervical_flex', t.cervical_flex_min, (SELECT cervical_flex FROM av)),
+          ('cervical_ext',  t.cervical_ext_min,  (SELECT cervical_ext FROM av))
+      ) AS j(joint, thresh, aval)
+      WHERE t.sport = v_sport
+        AND j.thresh IS NOT NULL AND j.thresh <> 0
+    ),
+    per_tech AS (
+      SELECT
+        t.id AS technique_id, t.code AS technique_code,
+        MIN(CASE WHEN r.aval IS NOT NULL THEN r.aval / r.thresh END) AS worst_ratio,
+        BOOL_OR(r.aval IS NULL) AS any_missing,
+        COUNT(r.joint) AS req_count,
+        ARRAY_REMOVE(ARRAY_AGG(
+          CASE WHEN r.aval IS NOT NULL AND r.aval / r.thresh < 0.90
+               THEN r.joint || ':' || fmt_num(r.aval) || ' vs min ' || fmt_num(r.thresh) END
+        ), NULL) AS below_band,
+        ARRAY_REMOVE(ARRAY_AGG(
+          CASE WHEN r.aval IS NOT NULL AND r.aval / r.thresh >= 0.90 AND r.aval / r.thresh < 1.0
+               THEN r.joint || ':' || fmt_num(r.aval) || ' vs min ' || fmt_num(r.thresh) END
+        ), NULL) AS band,
+        ARRAY_REMOVE(ARRAY_AGG(
+          CASE WHEN r.aval IS NULL
+               THEN r.joint || ':not_measured(min ' || fmt_num(r.thresh) || ')' END
+        ), NULL) AS missing
+      FROM techniques t
+      LEFT JOIN reqs r ON r.technique_id = t.id
+      WHERE t.sport = v_sport
+      GROUP BY t.id, t.code
+    ),
+    classified AS (
+      SELECT
+        technique_id, technique_code,
+        CASE
+          WHEN req_count = 0 THEN 'GREEN'
+          WHEN worst_ratio IS NOT NULL AND worst_ratio < 0.90 THEN 'RED'
+          WHEN any_missing OR (worst_ratio IS NOT NULL AND worst_ratio < 1.0) THEN 'YELLOW'
+          ELSE 'GREEN'
+        END AS tier,
+        CASE
+          WHEN req_count = 0 THEN ARRAY[]::text[]
+          WHEN worst_ratio IS NOT NULL AND worst_ratio < 0.90
+               THEN COALESCE(below_band, ARRAY[]::text[])
+          WHEN any_missing OR (worst_ratio IS NOT NULL AND worst_ratio < 1.0)
+               THEN COALESCE(band, ARRAY[]::text[]) || COALESCE(missing, ARRAY[]::text[])
+          ELSE ARRAY[]::text[]
+        END AS limiting_joints
+      FROM per_tech
+    )
+    INSERT INTO technique_eligibility
+      (user_id, athlete_id, assessment_id, technique_id, technique_code, sport, tier, limiting_joints, computed_at)
+    SELECT
+      p_user_id, v_assessment.athlete_id, v_assessment.id, c.technique_id, c.technique_code,
+      v_sport, c.tier, c.limiting_joints, v_now
+    FROM classified c
+    ON CONFLICT (user_id, assessment_id, technique_id)
+    DO UPDATE SET
+      tier = EXCLUDED.tier,
+      limiting_joints = EXCLUDED.limiting_joints,
+      technique_code = EXCLUDED.technique_code,
+      sport = EXCLUDED.sport,
+      athlete_id = EXCLUDED.athlete_id,
+      computed_at = EXCLUDED.computed_at;
+
+    GET DIAGNOSTICS v_written = ROW_COUNT;
+    v_result := v_result || jsonb_build_object(v_sport, v_written);
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'user_id', p_user_id,
+    'assessment_id', v_assessment.id,
+    'status', 'ok',
+    'written', v_result
+  );
+END;
+$function$;
+
+DROP FUNCTION IF EXISTS public.rom_pick_leg_status(text, text, text, text);
+DROP FUNCTION IF EXISTS public.rom_valid_reading(numeric);
+DROP FUNCTION IF EXISTS public.rom_slr_status(text, numeric, numeric);
+DROP FUNCTION IF EXISTS public.rom_slr_leg(text, numeric);
+DROP FUNCTION IF EXISTS public.rom_classify_joint(numeric, numeric, text);
+DROP FUNCTION IF EXISTS public.rom_yellow_tolerance(text);
+DROP FUNCTION IF EXISTS public.rom_norm_joint(text);

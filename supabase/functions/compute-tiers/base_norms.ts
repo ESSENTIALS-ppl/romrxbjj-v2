@@ -1,0 +1,306 @@
+// Base per-joint grading tables (pure, no Deno/Supabase imports so they can be unit tested in node).
+// DRAFT, not deployed. Base only: the sport apps never assess; they apply these Base results to moves.
+//
+// Jim's rules applied here:
+//   - GREEN / YELLOW / RED per joint (here: per leg), unmeasured or not gradable = GREY, never GREEN
+//   - no blended score color; left and right are graded separately and the gap is FLAGGED, not averaged
+//   - ELITE is not defined here and nothing in this file can produce it (GREEN means "at or above the
+//     reference edge", not elite)
+//
+// Hip flexion (Base keeps the STRAIGHT-LEG raise; Jim closed this on 2026-10-03).
+//   Source: Youdas JW, Krause DA, Hollman JH, Harmsen WS, Laskowski E. J Orthop Sports Phys Ther 2005;35(4):246-252,
+//   PMID 15901126, DOI 10.2519/jospt.2005.35.4.246. n=214 healthy adults (106 men, 108 women), age 20-79,
+//   passive SLR as trunk-thigh angle (goniometer). Sex difference 8 degrees (P<.001), no age effect.
+//   Means and SDs below are as relayed in Quinn's file /workspace/quinn-research/grok-heavy-slr-norms-20261003.md.
+//   The public abstract confirms sample, method, the 8 degree sex difference and no age effect; it does NOT print the
+//   means or SDs. The pooled and per-age-band means, SDs and n are ABSTRACT-VERIFIED ONLY (full text is paywalled; they
+//   come via Quinn's Heavy notes and pass an internal n-weighted check). Treat as PARTIAL, not verified against the table.
+//   Youdas measured PASSIVE SLR. Base users move actively, so the grade means "compared with published passive values".
+//   GREEN edge (both modes): mean - 1 SD (Quinn REASONING, not a published cut-off; Youdas published no percentiles).
+//   YELLOW edge depends on ONE switch, HIP_FLEX_GRADING_MODE (PENDING JIM, default flat10):
+//     "flat10"        YELLOW = within 10 degrees below the GREEN edge (Jim's closed rule #4), RED below that
+//     "published_sd"  YELLOW from mean - 2 SD up to mean - 1 SD (Quinn's SD rule), RED below mean - 2 SD
+
+import { YELLOW_TOLERANCE_ANKLE_CM } from "./rule.ts";
+
+export type Status = "GREEN" | "YELLOW" | "RED" | "GREY";
+export type Sex = "male" | "female" | "unknown";
+export type NormSource = "PUBLISHED_MEAN_SD" | "REASONING" | "PROPOSED" | "EXISTING_BASE_CONFIG";
+
+// ---------------------------------------------------------------------------------------------------------------
+// Hip flexion, straight-leg raise, degrees, graded PER LEG, SEX-SPECIFIC
+// ---------------------------------------------------------------------------------------------------------------
+export type HipFlexNormRow = {
+  sex: "male" | "female" | "pooled";
+  mean: number;
+  sd: number;
+  green_min: number;        // mean - 1 SD (both modes)
+  yellow_min: number;       // mean - 2 SD            (mode "published_sd")
+  yellow_flat10_min: number; // green_min - 10         (mode "flat10", default)
+  source: string;
+};
+
+// ONE switch for the hip flexion YELLOW edge. PENDING JIM: (1) flat 10 degrees (his closed rule, default) or
+// (2) the published-norm SD scale. Change ONLY this constant.
+export type HipFlexGradingMode = "flat10" | "published_sd";
+export const HIP_FLEX_GRADING_MODE: HipFlexGradingMode = "flat10"; // PENDING JIM
+export const HIP_FLEX_FLAT_YELLOW_DEG = 10;
+
+// PENDING JIM: does a move whose requirement lists hip flexion take the Base straight-leg COLOR for that joint
+// (flagged "slr_norm")? Quinn assumes yes. The matrix hip flexion numbers (100-125 degrees) cannot be compared to a
+// straight-leg raise reading (the average man reaches about 68), so comparing them would paint nearly everything RED.
+//   true  = hip_flex joint on a move = the straight-leg color (GREY when sex is missing or the leg is unmeasured)
+//   false = old behavior: compare the raw SLR degrees to the matrix number
+export const HIP_FLEX_MOVES_USE_SLR_COLOR = true; // PENDING JIM
+
+export const HIP_FLEX_SLR_NORMS: Record<"male" | "female", HipFlexNormRow> = {
+  male: {
+    sex: "male", mean: 68.5, sd: 6.8, green_min: 61.7, yellow_min: 54.9, yellow_flat10_min: 51.7,
+    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, men n=106, mean 68.5 +/- 6.8 (avg of sides); cut = mean-1SD green; yellow flat10 or mean-2SD (Quinn REASONING); mean/SD abstract-verified only",
+  },
+  female: {
+    sex: "female", mean: 76.3, sd: 9.5, green_min: 66.8, yellow_min: 57.3, yellow_flat10_min: 56.8,
+    source: "Youdas 2005 JOSPT 35(4):246-252 PMID 15901126, women n=108, mean 76.3 +/- 9.5 (avg of sides); cut = mean-1SD green; yellow flat10 or mean-2SD (Quinn REASONING); mean/SD abstract-verified only",
+  },
+};
+
+// POOLED (men + women) row, used when sex is empty / other / prefer_not_to_say and HIP_FLEX_MISSING_SEX_POLICY = "pooled".
+// STATUS: PROPOSED / DERIVED, NOT a published norm. Needs Quinn to confirm. Youdas 2005 printed no combined row, so it is derived
+// transparently from the two published sex rows (n 106 men, 108 women) with the law of total variance:
+//   N = 106 + 108 = 214
+//   mean_pooled = (106 * 68.5 + 108 * 76.3) / 214 = 72.44            -> 72.4
+//   var_pooled  = [ (106-1)*6.8^2 + (108-1)*9.5^2 + 106*(68.5-72.44)^2 + 108*(76.3-72.44)^2 ] / (214-1)
+//   sd_pooled   = sqrt(var_pooled) = 9.13                            -> 9.1   (includes the between-sex spread, as a mixed group must)
+//   GREEN edge  = mean - 1 SD = 63.3   (same rule as the sex rows)
+//   YELLOW edge = flat10: 63.3 - 10 = 53.3 | published_sd: mean - 2 SD = 54.2
+// Cross-check: pooling Quinn's 12 age cells (n 214) gives mean 72.43, SD 9.16 -> GREEN edge 63.3 (same to 0.1).
+// Caveat: this assumes an even men/women mix. The pooled GREEN edge (63.3) sits between the men edge (61.7) and the women edge
+// (66.8): a man at 62 reads YELLOW here, a woman at 65 reads GREEN here (she would be YELLOW on the women's table). Sex-neutral
+// by design (Grant for Jim, Oct 3). Simple fallback if Quinn prefers: midpoint of the two GREEN edges = 64.25.
+export const HIP_FLEX_SLR_POOLED_NORM: HipFlexNormRow = {
+  sex: "pooled", mean: 72.4, sd: 9.1, green_min: 63.3, yellow_min: 54.2, yellow_flat10_min: 53.3,
+  source: "PROPOSED (derived, needs Quinn): n-weighted mean and total SD pooled from Youdas 2005 men (n=106, 68.5 +/- 6.8) and women (n=108, 76.3 +/- 9.5), PMID 15901126; GREEN = mean-1SD; not a published combined norm",
+};
+export const HIP_FLEX_POOLED_SOURCE: NormSource = "PROPOSED";
+export const HIP_FLEX_POOLED_LABEL = "adult norm, men and women combined"; // sex-neutral wording for any text built from a pooled grade
+
+// Age bands from Youdas (mean, SD, n); ABSTRACT-VERIFIED ONLY (paywalled full text, PARTIAL). Quinn: ANOVA found no age effect from 20 to 79, so ONE adult cut-off per sex is
+// used and these are kept as reference only. The 70-79 cells are a little lower and small (10 men, 14 women).
+export const HIP_FLEX_SLR_AGE_BANDS_REFERENCE_ONLY = {
+  male: [
+    ["20-29", 20, 69.4, 4.7], ["30-39", 20, 68.7, 5.4], ["40-49", 19, 67.8, 8.6],
+    ["50-59", 16, 66.6, 7.0], ["60-69", 21, 71.0, 6.4], ["70-79", 10, 65.4, 8.9],
+  ],
+  female: [
+    ["20-29", 23, 78.2, 11.6], ["30-39", 15, 76.5, 8.9], ["40-49", 20, 76.4, 8.1],
+    ["50-59", 17, 76.6, 8.8], ["60-69", 19, 75.2, 9.9], ["70-79", 14, 73.8, 9.7],
+  ],
+} as const;
+export const HIP_FLEX_USE_AGE_BANDS = false; // Quinn: optional, not required
+
+// Quinn suggests widening YELLOW by about 5 degrees past each edge so one noisy self-test reading does not flip
+// GREEN to RED. REASONING, off by default (0). PENDING JIM / Quinn. If set to 5: GREEN edge rises and RED edge falls by 5.
+export const HIP_FLEX_YELLOW_WIDEN_DEG = 0;
+
+// Left/right gap flag. 10 degrees is Quinn's REASONING figure (file: "a gap larger than about 10 degrees, labelled
+// asymmetry, not used as the grade"). Nearest published support is Boyd and Villa, BMC Musculoskelet Disord 2012;13:245
+// (inter-limb gaps under 10.9 / 9.4 degrees in 90% of healthy people) but that is a symptom-onset neurodynamic test,
+// not hamstring end range. So this is NOT a published hamstring cut-off.
+export const HIP_FLEX_ASYMMETRY_FLAG_DEG = 10;
+export const HIP_FLEX_ASYMMETRY_SOURCE: NormSource = "REASONING";
+
+// PENDING JIM: how to treat straight-leg readings over 90 degrees. A straight-knee raise rarely exceeds about 90
+// (Elson 2008: range 30-90 before the pelvis rotates; 50 to 90+ if spine flexion is counted), so a bigger number may
+// mean the pelvis or low back helped, or the knee bent. Jim has a follow-up on this and has NOT decided.
+//   "grade_normally" = grade exactly like any other number (current behavior, so a high number is GREEN)
+//   "grey"           = do not grade, show GREY (reason above_review_limit)
+// Change ONLY this constant (and the limit) once Jim decides. The flag above_review_limit is always reported.
+export const HIP_FLEX_REVIEW_ABOVE_DEG = 90;
+export const HIP_FLEX_ABOVE_REVIEW_HANDLING: "grade_normally" | "grey" = "grade_normally"; // PENDING JIM
+
+// MISSING-SEX POLICY. Fact (Oct 3): users.gender is empty for 31 of 35 users, so this is the COMMON case.
+// DECIDED (Grant, for Jim, Oct 3): "pooled" = ONE sex-neutral norm (HIP_FLEX_SLR_POOLED_NORM) when sex is empty, other or
+// prefer_not_to_say. Not grey, not a stricter edge, avoids a false "low". Sex-specific norms are used ONLY when sex is on file.
+// The pooled row is PROPOSED (derived from the published men and women rows), needs Quinn to confirm.
+//   "pooled"  = DEFAULT. GREEN from 63.3; YELLOW from 53.3 (flat10) or 54.2 (published_sd). Wording: "adult norm, men and women combined".
+//   "grey"    = leg is GREY, reason sex_missing, "Not rated" (no guessed edge). The previous default.
+//   "lenient" = the more lenient (lower) of the men and women edges: GREEN from 61.7, YELLOW from 51.7 (flat10) or 54.9
+//               (published_sd). DERIVED, not published. A woman at 63 reads GREEN here although she is YELLOW on the women's table.
+// Change ONLY this constant. The result always says which policy produced the color (sex_policy).
+export type HipFlexMissingSexPolicy = "pooled" | "grey" | "lenient";
+export const HIP_FLEX_MISSING_SEX_POLICY: HipFlexMissingSexPolicy = "pooled"; // DECIDED by Grant for Jim; pooled row needs Quinn
+
+// users.gender values written by Base CompleteProfile: male, female, other, prefer_not_to_say, or null (optional).
+// Anything that is not clearly male or female is "unknown".
+// Missing/unknown sex fallback: per HIP_FLEX_MISSING_SEX_POLICY (default "pooled" = one sex-neutral norm). Under "grey" the leg
+// is GREY with reason sex_missing and no edge is guessed. The raw value, the asymmetry flag and the above-limit flag are
+// reported either way (they do not need sex).
+export function normalizeSex(raw: unknown): Sex {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "male" || s === "m" || s === "man") return "male";
+  if (s === "female" || s === "f" || s === "woman") return "female";
+  return "unknown";
+}
+
+function num(v: unknown): number | null {
+  if (v == null || v === "" || typeof v === "boolean") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return isFinite(n) && n >= 0 ? n : null; // negative = invalid entry = not measured; 0 is a real value
+}
+
+export type LegGrade = {
+  status: Status;
+  reason: "sex_missing" | "not_measured" | "above_review_limit" | null;
+  above_review_limit: boolean;
+};
+
+// Edges used when sex is missing, per policy. null = no edge (policy "grey").
+export function hipFlexMissingSexEdges(
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+): { green_min: number; yellow_min: number } | null {
+  if (policy === "grey") return null;
+  if (policy === "pooled") {
+    const r = HIP_FLEX_SLR_POOLED_NORM;
+    return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: (mode === "published_sd" ? r.yellow_min : r.yellow_flat10_min) - HIP_FLEX_YELLOW_WIDEN_DEG };
+  }
+  const m = hipFlexEdges("male", mode), f = hipFlexEdges("female", mode); // "lenient"
+  return { green_min: Math.min(m.green_min, f.green_min), yellow_min: Math.min(m.yellow_min, f.yellow_min) };
+}
+
+export function hipFlexEdges(sex: "male" | "female", mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE): { green_min: number; yellow_min: number } {
+  const r = HIP_FLEX_SLR_NORMS[sex];
+  const y = mode === "published_sd" ? r.yellow_min : r.yellow_flat10_min;
+  return { green_min: r.green_min + HIP_FLEX_YELLOW_WIDEN_DEG, yellow_min: y - HIP_FLEX_YELLOW_WIDEN_DEG };
+}
+
+export function gradeHipFlexLeg(
+  sexRaw: unknown, value: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY,
+): LegGrade {
+  const v = num(value);
+  if (v == null) return { status: "GREY", reason: "not_measured", above_review_limit: false };
+  const above = v > HIP_FLEX_REVIEW_ABOVE_DEG;
+  const sex = normalizeSex(sexRaw);
+  const missing = sex === "unknown" ? hipFlexMissingSexEdges(policy, mode) : null;
+  if (sex === "unknown" && !missing) return { status: "GREY", reason: "sex_missing", above_review_limit: above };
+  if (above && HIP_FLEX_ABOVE_REVIEW_HANDLING === "grey") {
+    return { status: "GREY", reason: "above_review_limit", above_review_limit: true };
+  }
+  const e = sex === "unknown" ? missing! : hipFlexEdges(sex, mode);
+  const status: Status = v >= e.green_min ? "GREEN" : v >= e.yellow_min ? "YELLOW" : "RED";
+  return { status, reason: null, above_review_limit: above };
+}
+
+export type Asymmetry = {
+  flag: boolean | null;     // null = cannot tell (one or both legs not measured)
+  diff_deg: number | null;
+  threshold_deg: number;
+  threshold_source: NormSource;
+};
+
+export function hipFlexAsymmetry(left: unknown, right: unknown): Asymmetry {
+  const l = num(left), r = num(right);
+  const base = { threshold_deg: HIP_FLEX_ASYMMETRY_FLAG_DEG, threshold_source: HIP_FLEX_ASYMMETRY_SOURCE };
+  if (l == null || r == null) return { flag: null, diff_deg: null, ...base };
+  const diff = Math.round(Math.abs(l - r) * 10) / 10;
+  return { flag: diff > HIP_FLEX_ASYMMETRY_FLAG_DEG, diff_deg: diff, ...base };
+}
+
+const RANK: Record<Status, number> = { GREEN: 0, YELLOW: 1, RED: 2, GREY: -1 };
+// Joint color = worst MEASURED leg (RED > YELLOW > GREEN). GREY only when no leg could be graded. If one leg is
+// graded and the other is not measured, the graded leg decides and partial=true is reported.
+export function worstOf(statuses: Status[]): Status {
+  const graded = statuses.filter(s => s !== "GREY");
+  if (!graded.length) return "GREY";
+  return graded.reduce((w, s) => (RANK[s] > RANK[w] ? s : w), graded[0]);
+}
+
+export type HipFlexGrade = {
+  joint: "hip_flex";
+  test: "straight_leg_raise";
+  status: Status;           // worst graded leg; not a blend
+  partial: boolean;         // true when only one leg was measured
+  left: LegGrade;
+  right: LegGrade;
+  asymmetry: Asymmetry;
+  above_review_limit_handling: "grade_normally" | "grey"; // PENDING JIM
+  grading_mode: HipFlexGradingMode; // PENDING JIM
+  sex_policy: HipFlexMissingSexPolicy | "sex_on_file"; // which rule produced the color
+  norm_label: string | null; // sex-neutral wording when the pooled norm graded (null otherwise)
+};
+
+export function gradeHipFlexion(
+  sexRaw: unknown, left: unknown, right: unknown, mode: HipFlexGradingMode = HIP_FLEX_GRADING_MODE,
+  policy: HipFlexMissingSexPolicy = HIP_FLEX_MISSING_SEX_POLICY,
+): HipFlexGrade {
+  const l = gradeHipFlexLeg(sexRaw, left, mode, policy);
+  const r = gradeHipFlexLeg(sexRaw, right, mode, policy);
+  const measured = [num(left), num(right)].filter(x => x != null).length;
+  return {
+    joint: "hip_flex",
+    test: "straight_leg_raise",
+    status: worstOf([l.status, r.status]),
+    partial: measured === 1,
+    left: l,
+    right: r,
+    asymmetry: hipFlexAsymmetry(left, right),
+    above_review_limit_handling: HIP_FLEX_ABOVE_REVIEW_HANDLING,
+    grading_mode: mode,
+    sex_policy: normalizeSex(sexRaw) === "unknown" ? policy : "sex_on_file",
+    norm_label: normalizeSex(sexRaw) === "unknown" && policy === "pooled" ? HIP_FLEX_POOLED_LABEL : null,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Ankle dorsiflexion: ONE test, knee-to-wall, CENTIMETERS, Base only (Jim closed this on 2026-10-03).
+// ---------------------------------------------------------------------------------------------------------------
+// There is NO published cm cut-off (Quinn files: Bennell 1998 shows the cm test is reliable, ICC 0.97-0.99; McBride 2026
+// PMID 41723909 abstract gives no cm numbers; the matrix numbers 10/15/20 are degree-authored and are NEVER converted
+// or compared to a cm reading). So everything below that is a cm edge is PROPOSED, not cited:
+//   YELLOW band  2 cm below the GREEN edge. Jim's closed rule (#4: flat 2 cm for the ankle).
+//                Open Jim question: 2 cm sits just above published measurement error (Powden 2015 MDC 1.6 cm inter-rater /
+//                1.9 cm intra-rater, Konor 2012 1.1-1.5 cm, trained raters), so one self-test reading near a line can
+//                flip color from noise alone.
+//   GREEN edge   10 cm = Base's own existing step config (assessmentSteps2.ts normalLow 10, riskBelow 10). That
+//                "normal 10-20 cm" has no source (Quinn review). PROPOSED, change here only.
+//   RED          below the yellow band. PROPOSED.
+export const ANKLE_DF_CM_GREEN_MIN = 10;                     // PROPOSED (uncited)
+export const ANKLE_DF_CM_YELLOW_WIDTH = YELLOW_TOLERANCE_ANKLE_CM; // 2 cm, Jim's closed rule (one constant, in rule.ts)
+export const ANKLE_DF_CM_YELLOW_SOURCE: NormSource = "PROPOSED";
+// One number used wherever the engine needs an ankle "target" in cm for percent-of-target math (rom_total, worst_joints).
+// It replaces the old literal 20, which was a target written for a degree-style scale and applied to cm (F-17).
+export const ANKLE_DF_CM_TARGET = ANKLE_DF_CM_GREEN_MIN; // PROPOSED; mirrors elsewhere must change together (see PR)
+
+export type AnkleLegGrade = { status: Status; reason: "not_measured" | null };
+
+export function gradeAnkleCmLeg(value: unknown): AnkleLegGrade {
+  const v = num(value);
+  if (v == null) return { status: "GREY", reason: "not_measured" };
+  if (v >= ANKLE_DF_CM_GREEN_MIN) return { status: "GREEN", reason: null };
+  if (v >= ANKLE_DF_CM_GREEN_MIN - ANKLE_DF_CM_YELLOW_WIDTH) return { status: "YELLOW", reason: null };
+  return { status: "RED", reason: null };
+}
+
+export type AnkleGrade = {
+  joint: "ankle_df";
+  test: "knee_to_wall";
+  unit: "cm";
+  status: Status;
+  partial: boolean;
+  left: AnkleLegGrade;
+  right: AnkleLegGrade;
+};
+
+export function gradeAnkleDf(left: unknown, right: unknown): AnkleGrade {
+  const l = gradeAnkleCmLeg(left), r = gradeAnkleCmLeg(right);
+  const measured = [num(left), num(right)].filter(x => x != null).length;
+  return { joint: "ankle_df", test: "knee_to_wall", unit: "cm", status: worstOf([l.status, r.status]), partial: measured === 1, left: l, right: r };
+}
+
+// Used by index.ts. Never throws.
+export function gradeBaseJoints(sexRaw: unknown, a: Record<string, unknown>) {
+  return {
+    hip_flex: gradeHipFlexion(sexRaw, a.hip_flex_l, a.hip_flex_r),
+    ankle_df: gradeAnkleDf(a.ankle_df_l, a.ankle_df_r),
+  };
+}

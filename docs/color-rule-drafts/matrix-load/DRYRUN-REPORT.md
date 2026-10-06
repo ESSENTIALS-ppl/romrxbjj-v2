@@ -1,0 +1,8 @@
+# Matrix 397 load: dry-run diff (read-only), Oct 3 2026 ~6:00 PM ET
+DRAFT. Nothing applied. Prod queried with SELECT only (project cqzvqzwwevnflinxgnpp).
+- Source: Quinn missing-397-map-20261003.csv (397 rows, 120 BJJ techniques, 10 joints). Script: gen_matrix_load.py -> matrix_load_397.sql (UPDATEs), matrix_load_397.rollback.sql, matrix_load_397.dryrun.sql (SELECT for anyone to re-run).
+- Result vs live `techniques`: all 120 codes exist (120/120). 397 of 397 target cells are NULL today -> 397 "fill", 0 "same", 0 "DIFFERS", 0 "no_technique". The script only fills NULL cells (never overwrites), so BT3/BT7 cervical lateral (25 vs matrix 40) are not touched.
+- Split by joint: cervical_ext 27, cervical_flex 14, cervical_lat 4, cervical_rot 30, hip_abd 42, hip_ext 26, hip_flex 87, lumbar_ext 51, lumbar_flex 68, shoulder_flex 48. PHASE A = 310 (all but hip flexion), PHASE B = 87 hip flexion (run LAST).
+- Effects to know: hip_ext (26) is not read by compute-tiers or the SQL fn (no Base test), so those moves stay GREY. cervical_rot (30): no Base rotation test, GREY. Ankle already loaded (54, degree-style), never compared to cm (GREY). With the shared-rule migration 20261003020000 + compute-tiers v43 the engine reads rom_thresholds first and techniques.*_min only fills gaps, so this load mostly keeps the two tables in step; with the OLD live SQL function it would change colors immediately (hip flexion 100+ vs a straight-leg raise = RED), hence the order.
+- Order: GREY-tier migration -> compute-tiers v43 -> shared-rule SQL migration -> PHASE A -> PHASE B. 3 tier notes quote ROMBOK (strip before external use, not touched).
+- Rollback: matrix_load_397.rollback.sql sets each cell back to NULL only if it still holds the loaded number.
