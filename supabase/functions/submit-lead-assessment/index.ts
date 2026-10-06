@@ -56,7 +56,7 @@ const JOINT_TARGETS: Record<string, number> = {
   hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26,   // hip targets Oct 6 2026 (were 45 / 45 / 90); whitelist only, values unused here
   hip_abd_l: 40, hip_abd_r: 40, hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
-  shoulder_er_l: 90, shoulder_er_r: 90, shoulder_flex_l: 140, shoulder_flex_r: 140,   // Oct 6 2026 (was 180)
+  shoulder_er_l: 40, shoulder_er_r: 40, shoulder_flex_l: 140,   /* shoulder ER Oct 6 2026: was 90 (tucked elbow) */ shoulder_flex_r: 140,   // Oct 6 2026 (was 180)
   ankle_df_l: 6, ankle_df_r: 6,                                                         // Oct 6 2026 (was 20 cm)
   cervical_rot_l: 70, cervical_rot_r: 70, cervical_lat_l: 38, cervical_lat_r: 38,   // Oct 6 2026: neck (were 80 / 45; Swinkels 2014)
   cervical_flex: 50, cervical_ext: 60,

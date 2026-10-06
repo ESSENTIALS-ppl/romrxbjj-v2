@@ -1,12 +1,14 @@
 -- =====================================================================================================================
 -- ONE-TIME RECOMPUTE: Steady targets (Jim decisions, Oct 6 2026): hip_er 45 -> 29, hip_ir 45 -> 26, hip_abd 90 -> 40,
--- shoulder_flex 180 -> 140, ankle_df 20 -> 6 cm, cervical_rot 80 -> 70, cervical_lat 45 -> 38 (Swinkels 2014).
+-- shoulder_flex 180 -> 140, ankle_df 20 -> 6 cm, cervical_rot 80 -> 70, cervical_lat 45 -> 38 (Swinkels 2014),
+-- shoulder_er 90 -> 40 (tucked elbow, Gill 2020). Existing shoulder ER readings were taken with the goalpost method; they are
+-- re-scored as stored (no history handling; Jim has not decided).
 -- Sources: ledger/ROMRX-ASSESSMENT-STUDY-REFERENCE.md.
 -- NOT a migration on purpose (lives outside supabase/migrations so `supabase db push` never runs it). Run it deliberately,
 -- AFTER 20261006153000_steady_targets_hip_shoulder_ankle.sql is applied and compute-tiers v39 is deployed.
 --
 -- What it rewrites (derived data only):
---   1. public.joint_scores.score for joint_key hip_er / hip_ir / hip_abd / shoulder_flex / ankle_df / cervical_rot / cervical_lat, from the SAME rule as compute_joint_scores()
+--   1. public.joint_scores.score for joint_key hip_er / hip_ir / hip_abd / shoulder_er / shoulder_flex / ankle_df / cervical_rot / cervical_lat, from the SAME rule as compute_joint_scores()
 --      (worse side / target: >= 1.00 -> 3 Steady, >= 0.90 -> 2 Building, else 1 Needs focus).
 --   2. public.assessments.worst_joints + rom_total, from the SAME rule as compute-tiers joint_totals.ts (v39 targets),
 --      because the app's top-3 problem areas read worst_joints first (a now-Steady joint would otherwise stay "#1 Problem area").
@@ -36,7 +38,8 @@ WITH tgt(joint_key, lcol, rcol, old_t, new_t) AS (VALUES
   ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',180,140),
   ('ankle_df','ankle_df_l','ankle_df_r',20,6),
   ('cervical_rot','cervical_rot_l','cervical_rot_r',80,70),
-  ('cervical_lat','cervical_lat_l','cervical_lat_r',45,38)),
+  ('cervical_lat','cervical_lat_l','cervical_lat_r',45,38),
+  ('shoulder_er','shoulder_er_l','shoulder_er_r',90,40)),
 a AS (
   SELECT x.id, x.user_id, to_jsonb(x) j,
          coalesce(public.is_test_account(u.email), false) AS is_test,
@@ -76,7 +79,7 @@ ORDER BY is_test, joint_key NULLS LAST;
 WITH jt(ord, key, old_t, new_t) AS (VALUES
   (1,'hip_er_l',45::numeric,29::numeric),(2,'hip_er_r',45,29),(3,'hip_ir_l',45,26),(4,'hip_ir_r',45,26),
   (5,'hip_abd_l',90,40),(6,'hip_abd_r',90,40),
-  (9,'hip_ext_l',30,30),(10,'hip_ext_r',30,30),(11,'shoulder_er_l',90,90),(12,'shoulder_er_r',90,90),
+  (9,'hip_ext_l',30,30),(10,'hip_ext_r',30,30),(11,'shoulder_er_l',90,40),(12,'shoulder_er_r',90,40),
   (13,'shoulder_flex_l',180,140),(14,'shoulder_flex_r',180,140),(15,'ankle_df_l',20,6),(16,'ankle_df_r',20,6),
   (17,'cervical_rot_l',80,70),(18,'cervical_rot_r',80,70),(19,'cervical_lat_l',45,38),(20,'cervical_lat_r',45,38),
   (21,'cervical_flex',50,50),(22,'cervical_ext',60,60),(23,'thoracic_rot_l',45,45),(24,'thoracic_rot_r',45,45),
@@ -113,7 +116,8 @@ BEGIN
      OR position('(''shoulder_flex'',''shoulder_flex_l'',''shoulder_flex_r'',140)' IN d) = 0
      OR position('(''ankle_df'',''ankle_df_l'',''ankle_df_r'',6)' IN d) = 0
      OR position('(''cervical_rot'',''cervical_rot_l'',''cervical_rot_r'',70)' IN d) = 0
-     OR position('(''cervical_lat'',''cervical_lat_l'',''cervical_lat_r'',38)' IN d) = 0 THEN
+     OR position('(''cervical_lat'',''cervical_lat_l'',''cervical_lat_r'',38)' IN d) = 0
+     OR position('(''shoulder_er'',''shoulder_er_l'',''shoulder_er_r'',40)' IN d) = 0 THEN
     RAISE EXCEPTION 'compute_joint_scores() does not have the Oct 6 targets yet: apply 20261006153000_steady_targets_hip_shoulder_ankle.sql first';
   END IF;
 END
@@ -127,7 +131,8 @@ FROM public.assessments x LEFT JOIN public.users u ON u.id = x.user_id CROSS JOI
 WHERE (x.hip_er_l IS NOT NULL OR x.hip_er_r IS NOT NULL OR x.hip_ir_l IS NOT NULL OR x.hip_ir_r IS NOT NULL
        OR x.hip_abd_l IS NOT NULL OR x.hip_abd_r IS NOT NULL OR x.shoulder_flex_l IS NOT NULL OR x.shoulder_flex_r IS NOT NULL
        OR x.ankle_df_l IS NOT NULL OR x.ankle_df_r IS NOT NULL
-       OR x.cervical_rot_l IS NOT NULL OR x.cervical_rot_r IS NOT NULL OR x.cervical_lat_l IS NOT NULL OR x.cervical_lat_r IS NOT NULL)
+       OR x.cervical_rot_l IS NOT NULL OR x.cervical_rot_r IS NOT NULL OR x.cervical_lat_l IS NOT NULL OR x.cervical_lat_r IS NOT NULL
+       OR x.shoulder_er_l IS NOT NULL OR x.shoulder_er_r IS NOT NULL)
   AND (cfg.include_test_fixtures OR NOT coalesce(public.is_test_account(u.email), false));
 
 -- B2. Fingerprint of every measured angle in scope (must be identical at the end).
@@ -138,7 +143,7 @@ FROM public.assessments x JOIN _st_scope s ON s.assessment_id = x.id;
 -- B3. Backup table (service-only: RLS on, no policies, no grants to anon/authenticated). Keeps the FIRST old value.
 CREATE TABLE IF NOT EXISTS public._recompute_steady_targets_20261006_backup (
   assessment_id uuid NOT NULL,
-  item text NOT NULL,                 -- 'joint_score:<joint_key>' (hip_er, hip_ir, hip_abd, shoulder_flex, ankle_df, cervical_rot, cervical_lat) | 'totals'
+  item text NOT NULL,                 -- 'joint_score:<joint_key>' (hip_er, hip_ir, hip_abd, shoulder_er, shoulder_flex, ankle_df, cervical_rot, cervical_lat) | 'totals'
   old_score smallint, new_score smallint,
   old_worst_joints text[], new_worst_joints text[],
   old_rom_total integer, new_rom_total integer,
@@ -157,7 +162,8 @@ CREATE TEMP TABLE _st_new ON COMMIT DROP AS
 WITH tgt(joint_key, lcol, rcol, t) AS (VALUES
   ('hip_er','hip_er_l','hip_er_r',29::numeric), ('hip_ir','hip_ir_l','hip_ir_r',26), ('hip_abd','hip_abd_l','hip_abd_r',40),
   ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',140), ('ankle_df','ankle_df_l','ankle_df_r',6),
-  ('cervical_rot','cervical_rot_l','cervical_rot_r',70), ('cervical_lat','cervical_lat_l','cervical_lat_r',38)),
+  ('cervical_rot','cervical_rot_l','cervical_rot_r',70), ('cervical_lat','cervical_lat_l','cervical_lat_r',38),
+  ('shoulder_er','shoulder_er_l','shoulder_er_r',40)),
 v AS (
   SELECT s.assessment_id, t.joint_key, t.t, (to_jsonb(x)->>t.lcol)::numeric l, (to_jsonb(x)->>t.rcol)::numeric r
   FROM _st_scope s JOIN public.assessments x ON x.id = s.assessment_id CROSS JOIN tgt t),
@@ -184,7 +190,7 @@ SELECT public.compute_joint_scores(assessment_id) FROM (SELECT DISTINCT assessme
 CREATE TEMP TABLE _st_totals ON COMMIT DROP AS
 WITH jt(ord, key, t) AS (VALUES
   (1,'hip_er_l',29::numeric),(2,'hip_er_r',29),(3,'hip_ir_l',26),(4,'hip_ir_r',26),(5,'hip_abd_l',40),(6,'hip_abd_r',40),
-  (9,'hip_ext_l',30),(10,'hip_ext_r',30),(11,'shoulder_er_l',90),(12,'shoulder_er_r',90),
+  (9,'hip_ext_l',30),(10,'hip_ext_r',30),(11,'shoulder_er_l',40),(12,'shoulder_er_r',40),
   (13,'shoulder_flex_l',140),(14,'shoulder_flex_r',140),(15,'ankle_df_l',6),(16,'ankle_df_r',6),
   (17,'cervical_rot_l',70),(18,'cervical_rot_r',70),(19,'cervical_lat_l',38),(20,'cervical_lat_r',38),
   (21,'cervical_flex',50),(22,'cervical_ext',60),(23,'thoracic_rot_l',45),(24,'thoracic_rot_r',45),

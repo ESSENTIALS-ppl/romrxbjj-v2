@@ -7,15 +7,18 @@
 --   * ankle knee-to-wall: ankle_df target 20 -> 6 cm (mean minus 1 SD, Konor 2012 / McBride 2026; no range shown)
 --   * neck (Jim approved 11:29 AM): cervical_rot 80 -> 70 (mean minus 1 SD, ages 20-49) and cervical_lat 45 -> 38
 --     (20-29 mean minus 1 SD); Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069. cervical_flex 50 / ext 60 unchanged.
+--   * shoulder ER (Jim decided 11:45 AM): Base switches to the tucked-elbow test lying on your back; shoulder_er 90 -> 40
+--     (typical range 40-75, Gill et al. 2020, PMID 33046038). Old goalpost readings are scored against 40 as they are.
 -- Supersedes the compute_joint_scores() / protocol_joint_ranking() bodies of 20261003030000_hip_flex_unscored_scoring.sql
 -- (and 20260929040000_base_protocol_ranking_matches_my_protocol.sql); those files are history and are not edited.
--- 1. public.compute_joint_scores(): only the seven target values change. Body = the live definition read 2026-10-06
+-- 1. public.compute_joint_scores(): only the eight target values change. Body = the live definition read 2026-10-06
 --    (md5 3cb3161a3ad67f7fb23e5fcc4cf00ef8, identical to 20261003030000: no drift).
 -- 2. public.protocol_joint_ranking(): only the same values in the `target` column change (it has no cervical_lat row) (Base ranking: severity =
 --    target minus worse side, the My Protocol tie-break after the top problem areas from worst_joints). Body = the live
 --    definition read 2026-10-06 (md5 91ee8f4611b07a9f1951b4afad1caa6c, identical to 20261003030000: no drift).
 --    NOT changed: the `normal_min` column (sport-pack legacy Protocol severity: hip ER 40, IR 30, abd 40, hip flex 100,
---    shoulder flex 140, ankle 10, neck rotation 70), because Jim's decision keeps Protocol and technique minimums as they are.
+--    shoulder flex 140, ankle 10, neck rotation 70, shoulder ER 60). NOTE: shoulder ER normal_min 60 now sits ABOVE its new
+--    target 40; listed for Jim, deliberately not changed (sport-pack legacy severity only; Base ranks by target), because Jim's decision keeps Protocol and technique minimums as they are.
 --    Ranking order CAN change for Base users: the target feeds severity, and worst_joints (written by compute-tiers v39 or the
 --    one-time recompute) feeds the top problem areas.
 -- NOT changed: techniques.*_min (technique minimums), recompute_user_eligibility(), persist_protocols_for_assessment().
@@ -49,7 +52,7 @@ BEGIN
       ('hip_ir','hip_ir_l','hip_ir_r',26),  -- Oct 6 2026: was 45 (Simoneau 1998)
       ('hip_abd','hip_abd_l','hip_abd_r',40),  -- Oct 6 2026: was 90
       ('hip_flex','hip_flex_l','hip_flex_r',120),
-      ('shoulder_er','shoulder_er_l','shoulder_er_r',90),
+      ('shoulder_er','shoulder_er_l','shoulder_er_r',40),  -- Oct 6 2026: was 90 (tucked elbow, Gill 2020)
       ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',140),  -- Oct 6 2026: was 180 (Gill 2020)
       ('ankle_df','ankle_df_l','ankle_df_r',6),  -- Oct 6 2026: was 20 cm (Konor 2012 / McBride 2026)
       ('cervical_rot','cervical_rot_l','cervical_rot_r',70),  -- Oct 6 2026: was 80 (Swinkels 2014)
@@ -127,7 +130,7 @@ AS $function$
     (2, 'hip_ir', 'hip_ir_l', 'hip_ir_r', NULL, 30, 26),  -- Oct 6 2026: target was 45
     (3, 'hip_abd', 'hip_abd_l', 'hip_abd_r', NULL, 40, 40),  -- Oct 6 2026: target was 90
     (4, 'hip_flex', 'hip_flex_l', 'hip_flex_r', NULL, 100, 120),
-    (5, 'shoulder_er', 'shoulder_er_l', 'shoulder_er_r', NULL, 60, 90),
+    (5, 'shoulder_er', 'shoulder_er_l', 'shoulder_er_r', NULL, 60, 40),  -- Oct 6 2026: target was 90; normal_min 60 kept (above target, see header)
     (6, 'shoulder_flex', 'shoulder_flex_l', 'shoulder_flex_r', NULL, 140, 140),  -- Oct 6 2026: target was 180
     (7, 'ankle_df', 'ankle_df_l', 'ankle_df_r', NULL, 10, 6),  -- Oct 6 2026: target was 20 cm
     (8, 'lumbar_flex', NULL, NULL, 'lumbar_flex', 40, 60),

@@ -1,7 +1,8 @@
 // compute-tiers v39 - readiness engine + Phase A1 protocol persist
 // v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
 //   hip_abd 40 (was 90), shoulder_flex 140 (Gill et al. 2020; was 180), ankle_df 6 cm (Konor 2012 / McBride 2026; was 20),
-//   cervical_rot 70 (was 80) and cervical_lat 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069).
+//   cervical_rot 70 (was 80) and cervical_lat 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
+//   shoulder_er 40 (was 90): tucked-elbow test lying on your back, typical range 40-75 (Gill et al. 2020, PMID 33046038).
 //   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are NOT changed.
 //   Mirrors romrx-io-web mobilityBands.ts JOINT_SCORE_TARGETS and public.compute_joint_scores().
 // v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)
@@ -23,7 +24,7 @@ const JOINT_TARGETS: Record<string, number> = {
   hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90
   hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
-  shoulder_er_l: 90, shoulder_er_r: 90,
+  shoulder_er_l: 40, shoulder_er_r: 40,       // Oct 6 2026: was 90 (tucked elbow, Gill 2020)
   shoulder_flex_l: 140, shoulder_flex_r: 140, // Oct 6 2026: was 180
   ankle_df_l: 6, ankle_df_r: 6,               // Oct 6 2026: was 20 (cm)
   cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Swinkels 2014)

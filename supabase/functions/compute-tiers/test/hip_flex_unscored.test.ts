@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { HIP_FLEX_UNSCORED, isUnscoredJoint, romTotal, worstJointKeys } from "../joint_totals.ts";
 
 // Same shape as JOINT_TARGETS in index.ts (hip_flex_l / hip_flex_r at 120 is the old, unreachable target).
-// Hip ER 29 / abduction 40 = the Oct 6 2026 Steady targets (were 45 / 90).
+// Hip ER 29 / abduction 40 / shoulder ER 40 = the Oct 6 2026 Steady targets (were 45 / 90 / 90).
 const T: Record<string, number> = {
   hip_er_l: 29, hip_er_r: 29, hip_abd_l: 40, hip_abd_r: 40, hip_flex_l: 120, hip_flex_r: 120,
-  shoulder_er_l: 90, shoulder_er_r: 90, lumbar_flex: 60, lumbar_ext: 25,
+  shoulder_er_l: 40, shoulder_er_r: 40, lumbar_flex: 60, lumbar_ext: 25,
 };
 const toNum = (v: unknown): number | null => (v == null ? null : isFinite(Number(v)) ? Number(v) : null);
 
@@ -17,7 +17,7 @@ assert.equal(isUnscoredJoint("hip_abd_l"), false);
 assert.equal(isUnscoredJoint("hip_ext_l"), false);
 
 // An average man: straight-leg raise about 68 deg (57% of 120) would be the single worst joint under the old rule.
-const man: Record<string, number> = { hip_er_l: 26, hip_er_r: 26, hip_abd_l: 36, hip_abd_r: 36, hip_flex_l: 68, hip_flex_r: 68, shoulder_er_l: 85, shoulder_er_r: 85, lumbar_flex: 55, lumbar_ext: 22 };
+const man: Record<string, number> = { hip_er_l: 26, hip_er_r: 26, hip_abd_l: 36, hip_abd_r: 36, hip_flex_l: 68, hip_flex_r: 68, shoulder_er_l: 37.8, shoulder_er_r: 37.8, lumbar_flex: 55, lumbar_ext: 22 };
 const worst = worstJointKeys(man, T, toNum, 5);
 assert.ok(!worst.some(k => k.startsWith("hip_flex")), `hip flexion must never be a weak spot: ${worst}`);
 assert.equal(worst.length, 5);                       // the limit is still filled from scored joints
