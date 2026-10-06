@@ -147,7 +147,7 @@ export function renderEmail(
 <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
   <div style="text-align:center;margin-bottom:24px;">
     <div style="font-size:28px;font-weight:800;color:#1D4ED8;letter-spacing:-0.02em;">ROMRx</div>
-    <div style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Personalized Readiness Protocol</div>
+    <div style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;">Your Assessment Results</div>
   </div>
   <div style="background:#fff;border-radius:16px;padding:28px;border:1px solid #E2E8F0;">
     <div style="text-align:center;">
