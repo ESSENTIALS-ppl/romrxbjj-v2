@@ -22,18 +22,18 @@ const toNum = (v: unknown): number | null => (v == null ? null : isFinite(Number
 assert.deepEqual([T.hip_er_l, T.hip_er_r, T.hip_ir_l, T.hip_ir_r, T.hip_abd_l, T.hip_abd_r], [29, 29, 26, 26, 40, 40]);
 assert.deepEqual([T.shoulder_flex_l, T.shoulder_flex_r, T.ankle_df_l, T.ankle_df_r], [140, 140, 6, 6]);
 assert.deepEqual([T.cervical_rot_l, T.cervical_rot_r, T.cervical_lat_l, T.cervical_lat_r], [70, 70, 38, 38]);
-assert.deepEqual([T.shoulder_er_l, T.shoulder_er_r], [40, 40], "shoulder ER 40 (tucked elbow)");
+assert.deepEqual([T.shoulder_er_l, T.shoulder_er_r], [85, 85], "shoulder ER 85 (standing goal-post, Oct 6 8:19 PM; see shoulder_er_85.test.ts)");
 assert.deepEqual([T.hip_flex_l, T.cervical_flex, T.cervical_ext, T.lumbar_flex, T.lumbar_ext, T.hip_ext_l, T.balance_l],
   [120, 50, 60, 60, 25, 30, 30], "other targets unchanged (neck flexion 50 / extension 60 included)");
 
 // 2. lead email + submit-lead whitelist use the same hip targets
 const email = read("../../submit-lead-assessment/email.ts");
-for (const [k, t] of [["hip_er", 29], ["hip_ir", 26], ["hip_abd", 40], ["shoulder_er", 40], ["shoulder_flex", 140], ["ankle_df", 6], ["cervical_rot", 70], ["cervical_lat", 38]] as const) {
+for (const [k, t] of [["hip_er", 29], ["hip_ir", 26], ["hip_abd", 40], ["shoulder_er", 85], ["shoulder_flex", 140], ["ankle_df", 6], ["cervical_rot", 70], ["cervical_lat", 38]] as const) {
   assert.ok(new RegExp(`\\{ target: ${t}, key: "${k}"`).test(email), `email.ts BAND_JOINTS ${k} = ${t}`);
 }
 const lead = parse(read("../../submit-lead-assessment/index.ts"));
 assert.deepEqual([lead.hip_er_l, lead.hip_ir_l, lead.hip_abd_l, lead.shoulder_flex_l, lead.ankle_df_l, lead.cervical_rot_l, lead.cervical_lat_l], [29, 26, 40, 140, 6, 70, 38]);
-assert.deepEqual([lead.shoulder_er_l, lead.shoulder_er_r], [40, 40]);
+assert.deepEqual([lead.shoulder_er_l, lead.shoulder_er_r], [85, 85]);
 
 // 3. migration: compute_joint_scores() + protocol_joint_ranking(). Rollback holds the VERBATIM live definitions (md5 read
 //    from project cqzvqzwwevnflinxgnpp 2026-10-06); the up migration differs from them only on the marked target values.
@@ -93,7 +93,7 @@ assert.equal(romTotal({ hip_er_l: 14.5, hip_ir_l: 13, hip_abd_l: 20 }, T, toNum)
 // 5. lead email bands: 29 ER / 26 IR / 40 ABD Steady, 28 / 25 / 39 Building
 assert.equal(overallBandScore({ hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26, hip_abd_l: 40, hip_abd_r: 40 }), 3);
 assert.equal(mobilityScore({ hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26, hip_abd_l: 40, hip_abd_r: 40 }), 100);
-for (const [k, steady, under] of [["hip_er", 29, 28], ["hip_ir", 26, 25], ["hip_abd", 40, 39], ["shoulder_er", 40, 39], ["shoulder_flex", 140, 139], ["ankle_df", 6, 5.5], ["cervical_rot", 70, 69], ["cervical_lat", 38, 37]] as const) {
+for (const [k, steady, under] of [["hip_er", 29, 28], ["hip_ir", 26, 25], ["hip_abd", 40, 39], ["shoulder_er", 85, 84], ["shoulder_flex", 140, 139], ["ankle_df", 6, 5.5], ["cervical_rot", 70, 69], ["cervical_lat", 38, 37]] as const) {
   assert.equal(overallBandScore({ [`${k}_l`]: steady, [`${k}_r`]: steady }), 3, `${k} ${steady}`);
   assert.equal(overallBandScore({ [`${k}_l`]: under, [`${k}_r`]: steady }), 2, `${k} ${under}`);
   assert.deepEqual(jointPercents({ [`${k}_l`]: under })[k].band, 2);
@@ -105,12 +105,12 @@ assert.deepEqual(worstJointKeys({ cervical_rot_l: 70, cervical_lat_l: 37, lumbar
 assert.equal(romTotal({ cervical_rot_l: 70, cervical_lat_l: 38, cervical_lat_r: 40 }, T, toNum), 100);
 // persist_protocol.ts (dead code): hip_flex lined up with the SLR typical range 60-80
 assert.ok(/key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 60, riskBelow: 60 \}/.test(read("../../_shared/persist_protocol.ts")));
-// shoulder ER: 40 Steady, 39 / 36 Building (>= 90%), 35.5 Needs focus; a 39 is now a weak spot, an old-target 80 is not
-assert.deepEqual(jointPercents({ shoulder_er_l: 36, shoulder_er_r: 40 }).shoulder_er.band, 2);
-assert.deepEqual(jointPercents({ shoulder_er_l: 35.5, shoulder_er_r: 40 }).shoulder_er.band, 1);
-assert.deepEqual(worstJointKeys({ shoulder_er_l: 39, cervical_rot_l: 70, lumbar_flex: 60 }, T, toNum, 1), ["shoulder_er_l"], "39 shoulder ER is below target");
-assert.equal(romTotal({ shoulder_er_l: 80, shoulder_er_r: 40, lumbar_flex: 60 }, T, toNum), 100);
-assert.equal(romTotal({ shoulder_er_l: 20, shoulder_er_r: 20 }, T, toNum), 50);
-// persist_protocol.ts (dead code): shoulder_er lined up with the new target 40
-assert.ok(/key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 40, riskBelow: 40 \}/.test(read("../../_shared/persist_protocol.ts")));
+// shoulder ER (Oct 6 8:19 PM: 85, standing goal-post): 85 Steady, 84 / 76.5 Building (>= 90%), 76 Needs focus
+assert.deepEqual(jointPercents({ shoulder_er_l: 76.5, shoulder_er_r: 85 }).shoulder_er.band, 2);
+assert.deepEqual(jointPercents({ shoulder_er_l: 76, shoulder_er_r: 85 }).shoulder_er.band, 1);
+assert.deepEqual(worstJointKeys({ shoulder_er_l: 84, cervical_rot_l: 70, lumbar_flex: 60 }, T, toNum, 1), ["shoulder_er_l"], "84 shoulder ER is below target");
+assert.equal(romTotal({ shoulder_er_l: 100, shoulder_er_r: 85, lumbar_flex: 60 }, T, toNum), 100);
+assert.equal(romTotal({ shoulder_er_l: 42.5, shoulder_er_r: 42.5 }, T, toNum), 50);
+// persist_protocol.ts (dead code): shoulder_er normalMin 85 / riskBelow 57 (Quinn)
+assert.ok(/key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 85, riskBelow: 57 \}/.test(read("../../_shared/persist_protocol.ts")));
 console.log("compute-tiers steady_targets tests: ok");

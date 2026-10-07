@@ -32,9 +32,9 @@ const ALL_JOINTS: JointDef[] = [
   // (Youdas et al. 2005 / Muyor 2016; Jim closed Oct 6 11:19 AM). Dead code (file not imported; hip_flex is also filtered
   // out below while HIP_FLEX_UNSCORED), so nothing live changes.
   { key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 60, riskBelow: 60 },
-  // Oct 6 2026: shoulder_er normalMin + riskBelow 60 -> 40, the new tucked-elbow target (Gill et al. 2020; range 40-75).
+  // Oct 6 2026 8:19 PM (Quinn): shoulder_er normalMin 85 / riskBelow 57 for the standing goal-post test (were 40 / 40 tucked elbow).
   // Dead code (file not imported), so nothing live changes.
-  { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 40, riskBelow: 40 },
+  { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 85, riskBelow: 57 },
   { key: "shoulder_flex", leftKey: "shoulder_flex_l", rightKey: "shoulder_flex_r", normalMin: 140, riskBelow: 120 },
   { key: "ankle_df", leftKey: "ankle_df_l", rightKey: "ankle_df_r", normalMin: 10, riskBelow: 10 },
   { key: "lumbar_flex", singleKey: "lumbar_flex", normalMin: 40, riskBelow: 40 },
