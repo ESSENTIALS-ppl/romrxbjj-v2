@@ -10,7 +10,7 @@ assert.ok(!/protect what you have/i.test(src));
 assert.ok(src.includes("Solid mobility foundation. Continue to your dashboard to keep training and retest regularly."));
 // Average man: straight-leg raise 68. The old 120 target made it a Needs focus joint (57%) and dragged the /100.
 // every scored joint exactly at its Steady target (hip ER 29 / IR 26 / abduction 40 since Oct 6 2026; were 45 / 45 / 90)
-const base = { hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26, hip_abd_l: 40, hip_abd_r: 40, shoulder_er_l: 40, shoulder_er_r: 40 };   // shoulder ER 40 since Oct 6 2026 (was 90)
+const base = { hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26, hip_abd_l: 40, hip_abd_r: 40, shoulder_er_l: 85, shoulder_er_r: 85 };   // shoulder ER 85 since Oct 6 2026 8:19 PM (standing goal-post; was 40, 90 before)
 const withHip = { ...base, hip_flex_l: 68, hip_flex_r: 68 };
 
 // no per-joint % or band for hip flexion

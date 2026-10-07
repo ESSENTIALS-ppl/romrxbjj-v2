@@ -25,13 +25,13 @@ type JointMap = Record<string, number | null | undefined>;
  * Steady targets changed by Jim's decisions of Oct 6 2026: hip ER 29 and hip IR 26 (Simoneau et al. 1998; were 45), hip abduction 40
  * (was 90), shoulder flexion 140 (Gill et al. 2020; was 180), ankle knee-to-wall 6 cm (Konor 2012 / McBride 2026; was 20),
  * neck rotation 70 (was 80) and neck side bend 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
- * shoulder ER 40 (was 90; tucked-elbow test, Gill et al. 2020, PMID 33046038).
+ * shoulder ER 85 (Oct 6 8:19 PM: standing goal-post test; was 40 for the lying tucked-elbow test, 90 before).
  */
 const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
   { target: 29, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
   { target: 26, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
   { target: 40, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
-  { target: 40, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
+  { target: 85, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
   { target: 140, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
   { target: 6, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
   { target: 70, key: "cervical_rot", l: "cervical_rot_l", r: "cervical_rot_r" },

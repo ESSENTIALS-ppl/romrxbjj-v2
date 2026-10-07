@@ -1,4 +1,6 @@
-// compute-tiers v39 - readiness engine + Phase A1 protocol persist
+// compute-tiers v40 - readiness engine + Phase A1 protocol persist
+// v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,
+//   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().
 // v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
 //   hip_abd 40 (was 90), shoulder_flex 140 (Gill et al. 2020; was 180), ankle_df 6 cm (Konor 2012 / McBride 2026; was 20),
 //   cervical_rot 70 (was 80) and cervical_lat 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
@@ -24,7 +26,7 @@ const JOINT_TARGETS: Record<string, number> = {
   hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90
   hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
-  shoulder_er_l: 40, shoulder_er_r: 40,       // Oct 6 2026: was 90 (tucked elbow, Gill 2020)
+  shoulder_er_l: 85, shoulder_er_r: 85,       // Oct 6 2026 8:19 PM: standing goal-post (was 40 tucked elbow; 90 before)
   shoulder_flex_l: 140, shoulder_flex_r: 140, // Oct 6 2026: was 180
   ankle_df_l: 6, ankle_df_r: 6,               // Oct 6 2026: was 20 (cm)
   cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Swinkels 2014)
