@@ -1,7 +1,7 @@
 -- =====================================================================================================================
--- ONE-TIME: re-save technique_eligibility after 20261006170000_pack_minimums_rescale.sql (technique minimums rescaled to the
+-- ONE-TIME: re-save technique_eligibility after 20261012220000_pack_minimums_rescale.sql (technique minimums rescaled to the
 -- Oct 6 Steady targets). NOT a migration on purpose (outside supabase/migrations, so `supabase db push` never runs it).
--- Run AFTER 20261006153000 + scripts/one-time/20261006_recompute_steady_targets.sql + 20261006170000 are applied.
+-- Run AFTER 20261012220000 is applied (20261006153000 + 20261006203000 and their recomputes are already live).
 --
 -- What it does: public.recompute_user_eligibility(user) (the same function add_sport_access calls) for every pack owner
 -- (users.sports_enabled has bjj or bodybuilding) who has an assessment. That function re-runs compute_joint_scores on the

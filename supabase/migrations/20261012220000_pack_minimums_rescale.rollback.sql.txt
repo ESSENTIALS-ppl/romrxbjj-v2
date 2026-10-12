@@ -1,9 +1,9 @@
--- ROLLBACK for 20261006170000_pack_minimums_rescale.sql (NOT a migration: .txt so the CLI never runs it). Run by hand, in one
+-- ROLLBACK for 20261012220000_pack_minimums_rescale.sql (NOT a migration: .txt so the CLI never runs it). Run by hand, in one
 -- transaction, only if the rescale must be undone:
 --   1. techniques.*_min: the 8 rescaled columns (incl. shoulder_er_min and the 4 ankle overrides) restored from public._minimums_rescale_20261006_backup (exact old values;
 --      rows added after the rescale are not in the backup and are left alone).
---   2. protocol_joint_ranking(): back to the 20261006153000 definition (normal_min hip_er 40, hip_ir 30, hip_flex 100,
---      shoulder_er 60, shoulder_flex 140, ankle_df 10, cervical_rot 70). If 20261006153000 is ALSO being rolled back, run its rollback after this.
+--   2. protocol_joint_ranking(): back to the LIVE 20261006203000 definition (normal_min hip_er 40, hip_ir 30, hip_flex 100,
+--      shoulder_er 85, shoulder_flex 140, ankle_df 10, cervical_rot 70).
 --   3. Drops the marker + backup tables (so the migration could be re-run).
 -- Then re-run scripts/one-time/20261006_recompute_eligibility_minimums.sql section B to re-save technique_eligibility.
 BEGIN;
@@ -34,7 +34,7 @@ AS $function$
     (2, 'hip_ir', 'hip_ir_l', 'hip_ir_r', NULL, 30, 26),  -- Oct 6 2026: target was 45
     (3, 'hip_abd', 'hip_abd_l', 'hip_abd_r', NULL, 40, 40),  -- Oct 6 2026: target was 90
     (4, 'hip_flex', 'hip_flex_l', 'hip_flex_r', NULL, 100, 120),
-    (5, 'shoulder_er', 'shoulder_er_l', 'shoulder_er_r', NULL, 60, 40),  -- Oct 6 2026: target was 90; normal_min 60 kept (above target, see header)
+    (5, 'shoulder_er', 'shoulder_er_l', 'shoulder_er_r', NULL, 85, 85),  -- Oct 6 2026 8:19 PM: standing goal-post, normal_min 60 -> 85, target 40 -> 85
     (6, 'shoulder_flex', 'shoulder_flex_l', 'shoulder_flex_r', NULL, 140, 140),  -- Oct 6 2026: target was 180
     (7, 'ankle_df', 'ankle_df_l', 'ankle_df_r', NULL, 10, 6),  -- Oct 6 2026: target was 20 cm
     (8, 'lumbar_flex', NULL, NULL, 'lumbar_flex', 40, 60),
