@@ -117,6 +117,34 @@ function formatMobilityBands(jointScores) {
   ].join("\n");
 }
 
+/**
+ * Oct 12 2026 (Jim, Oct 6 6:36 PM): a person's OWN ROM numbers are not proprietary, so ROMBot may share them.
+ * Only the per-technique sport thresholds (techniques.*_min) stay proprietary; they are never put in the prompt.
+ * Lists the scored joints only (hip flexion stays out while HIP_FLEX_UNSCORED). Ankle is in cm, everything else in degrees.
+ */
+function formatMeasurements(jointScores, romTotal) {
+  const lines = [];
+  for (const row of jointScores ?? []) {
+    const key = jointKeyOf(row);
+    if (!key) continue;
+    const unit = String(key).startsWith("ankle_df") ? " cm" : "°";
+    const fmt = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : `${Number(v)}${unit}`);
+    const left = fmt(row?.left ?? row?.left_value);
+    const right = fmt(row?.right ?? row?.right_value);
+    const value = fmt(row?.value);
+    const parts = left || right
+      ? [left ? `left ${left}` : null, right ? `right ${right}` : null].filter(Boolean).join(", ")
+      : value;
+    if (!parts) continue;
+    const band = bandFromScore(row?.score);
+    lines.push(`  ${R(key)}: ${parts}${band ? ` (${band})` : ""}`);
+  }
+  if (lines.length === 0) return "  No measurements on file yet";
+  const total = romTotal == null || romTotal === "" ? null : Number(romTotal);
+  if (total != null && !Number.isNaN(total)) lines.push(`  Overall ROM score: ${total}/100`);
+  return lines.join("\n");
+}
+
 function formatProtocol(protocol) {
   if (protocol && protocol.length > 0) {
     return protocol
@@ -286,6 +314,9 @@ ${bandsBlock}
 Top three problem areas: ${priorityLine}
 ${startLine}
 
+## Your measurements (this person's own numbers; OK to share with them)
+${formatMeasurements(jointScores, n.rom_total)}
+
 ## Priority mobility protocol
 ${formatProtocol(m)}
 
@@ -315,7 +346,8 @@ Use only these band names: Needs focus, Building, Steady. Always say "Needs focu
 
 ## Critical Rules
 - NEVER invent techniques or sport technique tiers. Base has no GREEN/YELLOW/RED technique readiness.
-- NEVER reveal specific degree values or ROM thresholds
+- You may tell this person their own measured numbers and scores from "Your measurements" when they ask. Never invent a number that is not listed there.
+- NEVER reveal technique thresholds or the minimum range any technique needs. Those are proprietary.
 - If joint scores, top three problem areas, or protocol are present, NEVER say the assessment was not completed or is missing
 - When protocol/daily plan rows are present, answer daily-plan questions from them; do not say there is no plan
 - Not medical advice. Never give medical advice, treatment, icing/self-care instructions, diagnosis, or emergency triage beyond directing to emergency services. If asked about injury treatment, icing, or meds, refuse and steer to a clinician or ER.
@@ -393,6 +425,9 @@ Name: ${g} | ${String(l).toLowerCase() === "bodybuilding" ? "" : `Belt: ${c} bel
 Technique readiness: ${o ? `${o.green ?? 0} GREEN, ${o.yellow ?? 0} YELLOW, ${o.red ?? 0} RED` : "No assessment yet"}
 Priority joints to improve: ${h?.map((e) => R(e)).join(", ") ?? "No assessment yet"}
 
+## Your measurements (this athlete's own numbers; OK to share with them)
+${formatMeasurements(scoredOnly(n.joint_scores), n.rom_total)}
+
 ## GREEN techniques - ready to train now
 ${f}
 
@@ -410,10 +445,11 @@ ${i}
 
 ${sportLabelRules(l)}
 ## Critical Rules
-- NEVER reveal specific degree values or ROM thresholds
+- You may tell this athlete their own measured numbers and scores from "Your measurements" when they ask. Never invent a number that is not listed there.
+- NEVER reveal technique thresholds or the minimum range any technique needs. Those are proprietary.
 - NEVER use technique codes - use technique names only
 - Reference restrictions with soft language: "hip IR is restricted"
-- If asked for numbers say: "I can't share exact measurements, but I can tell you how your mobility compares to what each technique needs"
+- If asked what number a technique needs, say: "I can't share the exact number each technique needs, but I can tell you how your mobility compares to it."
 - If assessment data is present (priority joints / latest_assessment_id / protocol), NEVER say the assessment was not completed. If GREEN/YELLOW/RED lists are empty, say technique readiness is pending / sport-pack only — not that assessment is missing.
 - When protocol/daily plan rows are present, answer daily-plan questions from them; do not say there is no plan
 - Never say or imply that ROMRx, the daily plan, or ROMBot prevents or reduces injury, lowers your risk, fixes or treats anything, or guarantees anything.
@@ -715,4 +751,4 @@ async function V(n) {
   }
 }
 
-export { V as handleRequest, CBase, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
+export { V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
