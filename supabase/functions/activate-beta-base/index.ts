@@ -1,9 +1,9 @@
-// activate-beta-base (v2) — TEMP free Unlock gated by ops.feature_flags.free_unlock
-// Jim corrected 2026-09-22: NOT permanent Dec31 free. TEMP for Heavy audit only.
-// After audit cleanup residue 0: SET ops.feature_flags.enabled=false WHERE key='free_unlock'
-// → Unlock falls through to Stripe (paywall = billing + bot/security).
-// base_status only via service_role (never client-side — incident 2026-06-10).
-// Idempotent. Does NOT invent sport entitlements or Stripe IDs.
+// activate-beta-base (v5) — AUDIT-TEMPS ONLY free Unlock (Jim hard lock 2026-09-22 ~3:54 PM ET)
+// Real accounts MUST still hit Stripe. Global free Unlock = REJECTED.
+// Allow if ALL of:
+//   1) ops.feature_flags.free_unlock=true (master kill; set false after cleanup), AND
+//   2) caller email ILIKE jim+romrx-audit-20260922-%  OR  auth uid on Heavy manifest allowlist
+// Else → 402 checkout_required (Stripe). Never set active client-side (incident 2026-06-10).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -17,6 +17,20 @@ const CORS = {
 const RL_LIMIT = 20;
 const RL_WINDOW_MS = 3_600_000;
 const FLAG_KEY = "free_unlock";
+const AUDIT_EMAIL_RE = /^jim\+romrx-audit-20260922-\d{2}@romrx\.io$/i;
+/** Heavy manifest UIDs 20260922 (01–10). Dead after cleanup; keep gated by flag. */
+const AUDIT_UID_ALLOWLIST = new Set<string>([
+  "0e034562-f0c4-47c9-8ce3-a0310fb40391",
+  "591c8d8b-6c54-4deb-830e-534c5bf78434",
+  "1c29432c-a8e3-4a00-b2e2-fb3060b7a12c",
+  "876a268a-d2bd-4419-91e5-ad75af291033",
+  "890e6abd-432c-4c61-b787-4dddc1718f4a",
+  "e48b198f-8e77-41f4-93aa-d1e211421a71",
+  "4ab08cd9-23b7-4228-9ced-c8936c5707c6",
+  "ef8ca63a-3a73-43b8-9a83-d7ab6d963965",
+  "43638983-61de-46bd-954a-b563ac4baea3",
+  "40150fa4-ff3f-4b69-bb6f-ca1bc0409ebe"
+]);
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -47,6 +61,13 @@ async function rateLimitOrNull(identity: string): Promise<Response | null> {
   return null;
 }
 
+function isAuditTemp(email: string | undefined, userId: string): boolean {
+  const em = (email ?? "").trim().toLowerCase();
+  if (AUDIT_EMAIL_RE.test(em)) return true;
+  if (AUDIT_UID_ALLOWLIST.has(userId)) return true;
+  return false;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
@@ -73,18 +94,27 @@ Deno.serve(async (req: Request) => {
     if (limited) return limited;
   }
 
+  // HARD: non-audit callers never get free Unlock — Stripe path.
+  if (!isAuditTemp(user.email, user.id)) {
+    return json(402, {
+      error: "not_audit_temp",
+      checkout_required: true,
+      message: "Free Unlock is audit-temps only. Use Stripe checkout.",
+    });
+  }
+
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
 
-  // TEMP flag: ops.feature_flags.free_unlock must be true. Env FREE_UNLOCK_ENABLED=true also works as override.
+  // Master kill after Heavy cleanup (flag false → even audit temps hit Stripe).
   const envOn = (Deno.env.get("FREE_UNLOCK_ENABLED") ?? "").toLowerCase() === "true";
   let flagOn = envOn;
   if (!flagOn) {
+    // public.feature_flags view → ops.feature_flags (ops schema not exposed to Data API)
     const { data: flagRow } = await admin
-      .schema("ops")
       .from("feature_flags")
       .select("enabled")
       .eq("key", FLAG_KEY)
@@ -96,7 +126,7 @@ Deno.serve(async (req: Request) => {
     return json(402, {
       error: "free_unlock_disabled",
       checkout_required: true,
-      message: "Temporary free Unlock is off. Use Stripe checkout.",
+      message: "Temporary audit Unlock is off. Use Stripe checkout.",
     });
   }
 
@@ -115,12 +145,22 @@ Deno.serve(async (req: Request) => {
 
   if (!before) return json(500, { error: "profile_missing" });
 
+  // Defense in depth: public.users email must also match audit pattern when present.
+  const profileEmail = (before.email ?? user.email ?? "").trim().toLowerCase();
+  if (!AUDIT_EMAIL_RE.test(profileEmail) && !AUDIT_UID_ALLOWLIST.has(user.id)) {
+    return json(402, {
+      error: "not_audit_temp",
+      checkout_required: true,
+      message: "Free Unlock is audit-temps only. Use Stripe checkout.",
+    });
+  }
+
   if (before.base_status === "active") {
     return json(200, {
       ok: true,
       already_active: true,
       base_status: "active",
-      free_unlock: true,
+      audit_temp_only: true,
     });
   }
 
@@ -141,11 +181,11 @@ Deno.serve(async (req: Request) => {
   }
 
   console.log(JSON.stringify({
-    event: "activate_beta_base",
+    event: "activate_beta_base_audit_only",
     user_id: user.id,
+    email: profileEmail,
     from: before.base_status,
     to: "active",
-    flag: FLAG_KEY,
     at: new Date().toISOString(),
   }));
 
@@ -153,6 +193,6 @@ Deno.serve(async (req: Request) => {
     ok: true,
     already_active: false,
     base_status: "active",
-    free_unlock: true,
+    audit_temp_only: true,
   });
 });

@@ -15,6 +15,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { logEvent } from "../_shared/events.ts";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
 const serve = (h: (req: Request) => Promise<Response>) => Deno.serve(h);
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
@@ -37,7 +38,6 @@ async function cronCallerOk(req: Request): Promise<boolean> {
     return false;
   }
 }
-
 
 /** Sep 8 Field plus-alias fixtures land in jim@romrx.io — never drip them. */
 function isAuditFixtureEmail(email: string): boolean {
@@ -73,7 +73,7 @@ function shell(b: Brand, email: string, inner: string): string {
         <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;"><strong>Jim Scott</strong><br/>Founder, ROMRx LLC<br/><a href="mailto:${b.replyTo}" style="color:${b.accent};">${b.replyTo}</a></p>
       </td></tr>
       <tr><td style="background-color:#f9f9f9;padding:24px 40px;border-top:1px solid #eeeeee;">
-        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${b.name} &bull; Dublin, Ohio<br/>You completed a ${b.name} assessment but haven&rsquo;t started your membership yet.<br/><a href="${b.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
+        <p style="font-size:12px;color:#999999;text-align:center;margin:0;line-height:1.6;">${POSTAL_LINE}<br/>You completed a ${b.name} assessment but haven&rsquo;t started your membership yet.<br/><a href="${b.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#999999;">unsubscribe</a></p>
       </td></tr>
     </table>
   </td></tr></table>
@@ -167,7 +167,7 @@ serve(async (_req) => {
     const { data: users, error: uErr } = await supabase
       .from("users").select("id, email, full_name, active_sport, subscription_status, marketing_opt_out, platforms")
       .in("id", userIds)
-      .in("active_sport", ["bjj", "bodybuilding"]);   // v2/v10: Base (general) users are never in this drip
+      .in("active_sport", ["bjj", "bodybuilding"]);
     if (uErr) { errors.push({ stage: stage.id, uErr }); continue; }
 
     const { data: ents } = await supabase
@@ -187,13 +187,11 @@ serve(async (_req) => {
       if (activeEnt.has(`${u.id}:${sport}`)) { skipped.paid++; continue; }
       if ((u.platforms as string[] | null)?.includes(sport)) { skipped.paid++; continue; }
 
-      // Send-once claim BEFORE Resend — blocks hour-apart duplicates across the 2h window.
       const { error: claimErr } = await supabase.from("email_sends").insert({
         user_id: u.id,
         email_id: stage.id,
       });
       if (claimErr) {
-        // unique_violation (23505) or race = already claimed/sent
         skipped.already_sent++;
         continue;
       }
@@ -220,7 +218,6 @@ serve(async (_req) => {
         sent++;
         await logEvent("email_sent", { userId: u.id as string, sport, props: { email_id: stage.id, stage: "conversion_drip" } });
       } else {
-        // Release claim so a later cron can retry a transient Resend failure.
         await supabase.from("email_sends").delete().eq("user_id", u.id as string).eq("email_id", stage.id);
         errors.push({ stage: stage.id, email, err: await res.text() });
       }
