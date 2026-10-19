@@ -1,0 +1,2 @@
+-- Revert (NOT APPLIED). Restores the grant as of Oct 19 2026 (acl was postgres, authenticated, service_role).
+grant execute on function public.is_yoga_tester() to authenticated;
