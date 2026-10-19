@@ -3,14 +3,52 @@
 // Maps the new row into the Notion "Client Feedback" database so triage starts
 // in Notion automatically. One-way sync (Supabase -> Notion).
 //
-// Auth model: invoked server-to-server by the Supabase webhook. We protect it
-// with a shared secret header (WEBHOOK_SECRET) since verify_jwt is false.
-// Requires Supabase secrets: NOTION_API_KEY, NOTION_FEEDBACK_DB_ID, WEBHOOK_SECRET
+// Auth model: invoked server-to-server by the trigger public.client_feedback
+// "feedback-to-notion" -> public.tg_webhook_feedback_to_notion(), which reads the
+// shared secret from Supabase Vault (name: feedback_to_notion_webhook_secret) and
+// sends it as x-webhook-secret. verify_jwt is false, so this header is the gate.
+// v15 (2026-09-29): secret moved out of trigger SQL into Vault and rotated. The
+//   receiver verifies the header against Vault via RPC public.verify_webhook_secret
+//   (service_role only; returns boolean, never the secret). Fails CLOSED.
+// v16 (2026-09-29): legacy env WEBHOOK_SECRET no longer accepted (old secret revoked).
+// Requires Supabase secrets: NOTION_API_KEY, NOTION_FEEDBACK_DB_ID
+//   (+ auto-injected SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). WEBHOOK_SECRET env is
+//   now unused and can be unset.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const NOTION_API_KEY = (Deno.env.get("NOTION_API_KEY") ?? "").trim();
 const NOTION_DB_ID   = (Deno.env.get("NOTION_FEEDBACK_DB_ID") ?? "").trim();
-const WEBHOOK_SECRET = (Deno.env.get("WEBHOOK_SECRET") ?? "").trim();
+const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+const SERVICE_ROLE_KEY = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+const VAULT_SECRET_NAME = "feedback_to_notion_webhook_secret";
+// Transitional flag: true only during the trigger cut-over (v15). v16 = false.
+const ACCEPT_LEGACY_ENV_SECRET = false;
+const LEGACY_WEBHOOK_SECRET = (Deno.env.get("WEBHOOK_SECRET") ?? "").trim();
+
+async function webhookSecretOk(got: string): Promise<boolean> {
+  if (!got) return false;
+  if (SUPABASE_URL && SERVICE_ROLE_KEY) {
+    try {
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data, error } = await admin.rpc("verify_webhook_secret", {
+        p_name: VAULT_SECRET_NAME,
+        p_candidate: got,
+      });
+      if (error) console.error("verify_webhook_secret error:", error.message);
+      else if (data === true) return true;
+    } catch (e) {
+      console.error("verify_webhook_secret threw:", String(e));
+    }
+  }
+  if (ACCEPT_LEGACY_ENV_SECRET && LEGACY_WEBHOOK_SECRET && got === LEGACY_WEBHOOK_SECRET) {
+    console.warn("feedback-to-notion: accepted LEGACY env secret (transitional)");
+    return true;
+  }
+  return false;
+}
 const NOTION_VERSION = "2022-06-28";
 
 // ── Mappings: app values -> Notion option names (must match the DB exactly) ──
@@ -29,9 +67,9 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response("method not allowed", { status: 405 });
   }
-  // Shared-secret gate (header set on the Supabase webhook config)
+  // Shared-secret gate (Vault-backed; fails closed)
   const gotSecret = (req.headers.get("x-webhook-secret") ?? "").trim();
-  if (WEBHOOK_SECRET && gotSecret !== WEBHOOK_SECRET) {
+  if (!(await webhookSecretOk(gotSecret))) {
     return new Response("forbidden", { status: 403 });
   }
 

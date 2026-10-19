@@ -1,3 +1,9 @@
+// v40 (Jim, 2026-10-06 12:32 PM ET): sport pack checkout kill switch. Unless env PACKS_CHECKOUT_OPEN is "true",
+//   mode=unlock and any mode=base request naming a sport (pending_sport/add/sport) or a non-Base price_id returns
+//   403 {error/message:"Sport packs open in January 2027.", code:"packs_closed"} before any auth, lead claim or Stripe
+//   call. Exception (Base must keep working): a lead-email unlock (mode=base WITH lead_token) that names a sport has
+//   the sport dropped and continues as Base-only (Base price, no pending_sport metadata); logged as
+//   checkout_packs_closed_sport_dropped. Plain Base, coach, webhook, portal and existing subscriptions unchanged.
 // v33+ guard: mode=base returns 503 base_checkout_unavailable after Dec 30, 2026 12:00 ET (48h before trial_end); no change before then.
 // v33 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3b + 4D, Jim GO via Grant 2026-09-29):
 //   - Base, Base + sport (combo) and sport unlock sessions now require an UNCHECKED terms consent box
@@ -28,6 +34,7 @@ import {
   ARL_DISCLOSURE_VERSION, ARL_CONSENT_TEXT, SPORT_PACK_NAMES, formatUsd, disclosureBase, disclosureCombo,
   disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
 } from "../_shared/arl_copy.ts";
+import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY      = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -173,6 +180,20 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   const testRequested = body.stripe_test_mode === true;
   const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
+  // v40 sport pack kill switch (default closed). Read per request so a secret change needs no code change.
+  // Lead-email unlock (base + lead_token) naming a sport: sport dropped, continues as Base-only (logged after the claim).
+  let packSportDropped: string | null = null;
+  if (!packsCheckoutOpen(Deno.env.get("PACKS_CHECKOUT_OPEN"))) {
+    const gate = packGateDecision(mode, body, BASE_PRICE_ID);
+    if (gate.action === "block") {
+      await logEvent("checkout_packs_closed", { props: { mode, reason: gate.reason } });
+      return json(PACKS_CLOSED_STATUS, packsClosedBody());
+    }
+    if (gate.action === "drop_sport") {
+      packSportDropped = String(body.pending_sport ?? body.add ?? body.sport ?? "");
+      dropSportFields(body);
+    }
+  }
   if (mode === "base") {
     if (!body.user_id || !body.email) return json(400, { error: "user_id and email required" });
     // v39 (2026-10-01 security audit): the JWT must belong to body.user_id. verify_jwt alone accepts the public anon key,
@@ -189,6 +210,9 @@ Deno.serve(async (req: Request) => {
     if (body.lead_token) {
       const claim = await claimLead(admin, body.lead_token, body.user_id, body.email);
       if (!claim.ok) return json(claim.status, { error: claim.error });
+    }
+    if (packSportDropped !== null) {
+      await logEvent("checkout_packs_closed_sport_dropped", { userId: body.user_id, props: { mode, dropped_sport: packSportDropped.slice(0, 32), lead_token: true } });
     }
     const pendingSport = normalizePendingSport(body.pending_sport ?? body.add);
     const meta: Record<string, string> = { purpose: "base", user_id: body.user_id };
