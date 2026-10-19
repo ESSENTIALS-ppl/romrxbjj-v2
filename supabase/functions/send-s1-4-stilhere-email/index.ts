@@ -87,7 +87,7 @@ serve(async (_req) => {
             <td style="padding:40px 40px 32px 40px;">
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Hey ${firstName},</p>
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 28px 0;">No sales pitch today.</p>
-              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">I just want to make sure you know what you have access to &mdash; right now, for free:</p>
+              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">I just want to make sure you know what you have access to, right now, for free:</p>
 
               <!-- Checklist -->
               <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;background-color:#f8fffe;border:1px solid #d4edda;border-radius:8px;padding:24px;">
@@ -109,7 +109,7 @@ serve(async (_req) => {
               <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;">
                 <tr>
                   <td style="background-color:#fff9f0;border-left:4px solid #f0ad4e;padding:18px 22px;border-radius:0 6px 6px 0;">
-                    <p style="font-size:15px;color:#555555;line-height:1.7;margin:0;">If something&rsquo;s blocking you from starting &mdash; technical issues, time, questions &mdash; just reply to this email. I read every response.</p>
+                    <p style="font-size:15px;color:#555555;line-height:1.7;margin:0;">If technical issues, time or questions are blocking you from starting, just reply to this email. I read every response.</p>
                   </td>
                 </tr>
               </table>
@@ -128,7 +128,7 @@ serve(async (_req) => {
                 </tr>
               </table>
 
-              <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;">&ndash; Jim</p>
+              <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;">Jim</p>
             </td>
           </tr>
 
