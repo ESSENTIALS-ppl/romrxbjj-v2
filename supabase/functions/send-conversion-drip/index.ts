@@ -104,7 +104,7 @@ const STAGES: Stage[] = [
           <tr><td style="padding:6px 0 6px 4px;font-size:15px;color:#333;line-height:1.6;">&#10003;&nbsp; ROMBot to coach you through every session</td></tr>
         </table>
         ${cta(b, "&rarr; Unlock My Protocol", b.domain + "/signup")}
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0;">You&rsquo;ve already done the hard part &mdash; the honest assessment. Let&rsquo;s turn it into progress.</p>`;
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0;">You&rsquo;ve already done the hard part: the honest assessment. Let&rsquo;s turn it into progress.</p>`;
       return shell(b, email, inner);
     },
   },
@@ -118,7 +118,7 @@ const STAGES: Stage[] = [
       const inner = `
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Hey ${n},</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Totally fair to wonder if a ROM program is worth it. So here&rsquo;s the honest math.</p>
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 20px;">Most ${who} spend months &mdash; sometimes years &mdash; drilling things their body isn&rsquo;t structurally ready for, then wonder why they stall. The protocol skips that.</p>
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 20px;">Most ${who} spend months, sometimes years, drilling things their body isn&rsquo;t structurally ready for, then wonder why they stall. The protocol skips that.</p>
         <table cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;"><tr><td style="padding:16px 20px;background:#f7f7f7;border-left:3px solid ${b.accent};font-size:15px;color:#444;line-height:1.7;font-style:italic;">&ldquo;${quote}&rdquo;<br/><span style="font-style:normal;color:#888;font-size:13px;">&mdash; ${b.name} member</span></td></tr></table>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">Less than the cost of a month of ${lessons}, for a full year of training that actually fits your body.</p>
         ${cta(b, "&rarr; Start My Protocol", b.domain + "/signup")}
@@ -133,11 +133,11 @@ const STAGES: Stage[] = [
       const outcome = b.sport === "bodybuilding" ? "turns stalled lifts into PRs" : "makes the techniques you&rsquo;ve been forcing finally click";
       const inner = `
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Hey ${n},</p>
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Your readiness profile is still sitting there, fully mapped &mdash; and right now it&rsquo;s just information.</p>
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Your readiness profile is still sitting there, fully mapped, and right now it&rsquo;s just information.</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 16px;">Here&rsquo;s what it <em>could</em> be: a week-by-week plan that closes your biggest gaps and ${outcome}.</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">Every week you wait is another week training around the problem instead of fixing it.</p>
         ${cta(b, "&rarr; Turn My Profile Into a Plan", b.domain + "/signup")}
-        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">No pressure &mdash; but I&rsquo;d hate for you to leave this on the table. You did the assessment for a reason.</p>
+        <p style="font-size:16px;color:#333;line-height:1.6;margin:0 0 8px;">No pressure, but I&rsquo;d hate for you to leave this on the table. You did the assessment for a reason.</p>
         <p style="font-size:16px;color:#333;line-height:1.6;margin:0;">Last one from me on this. Whenever you&rsquo;re ready, I&rsquo;m here.</p>`;
       return shell(b, email, inner);
     },

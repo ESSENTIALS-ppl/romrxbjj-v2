@@ -88,7 +88,7 @@ serve(async (_req) => {
           <tr>
             <td style="padding:40px 40px 32px 40px;">
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Hey ${firstName},</p>
-              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 8px 0;">Quick one &mdash;</p>
+              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 8px 0;">Quick one:</p>
               <p style="font-size:18px;color:#111111;font-weight:600;line-height:1.6;margin:0 0 24px 0;">Why did you sign up for ROMRxBJJ?</p>
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Most people tell me it&rsquo;s one of these:</p>
 
@@ -106,7 +106,7 @@ serve(async (_req) => {
                 <tr><td style="padding:8px 0 8px 16px;font-size:15px;color:#444444;line-height:1.6;border-left:3px solid #c8102e;">&ldquo;My coach said I need to work on my mobility&rdquo;</td></tr>
               </table>
 
-              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Whatever brought you here &mdash; your answer is inside the assessment.</p>
+              <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">Whatever brought you here, your answer is inside the assessment.</p>
               <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 32px 0;">It literally maps your body to your game. Takes 15 minutes.</p>
 
               <!-- CTA Button -->
@@ -123,7 +123,7 @@ serve(async (_req) => {
 
               <hr style="border:none;border-top:1px solid #eeeeee;margin:0 0 24px 0;" />
 
-              <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;">If you have any questions, please reach out &mdash; I&rsquo;d be happy to help.<br /><strong>Jim Scott</strong><br />Founder, ROMRx LLC<br /><a href="mailto:jim@romrxbjj.com" style="color:#c8102e;">jim@romrxbjj.com</a></p>
+              <p style="font-size:14px;color:#555555;line-height:1.6;margin:0;">If you have any questions, please reach out. I&rsquo;d be happy to help.<br /><strong>Jim Scott</strong><br />Founder, ROMRx LLC<br /><a href="mailto:jim@romrxbjj.com" style="color:#c8102e;">jim@romrxbjj.com</a></p>
             </td>
           </tr>
 
