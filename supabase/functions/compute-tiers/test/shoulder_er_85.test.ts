@@ -46,7 +46,7 @@ assert.ok(!/techniques|recompute_user_eligibility/.test(up.replace(/^--.*$/gm, "
 
 // 2. edge mirrors
 const T = parse(read("../index.ts"));
-assert.match(read("../index.ts"), /^\/\/ compute-tiers v40 /);
+assert.match(read("../index.ts"), /^\/\/ compute-tiers v41 [\s\S]*^\/\/ v40 \(Oct 6 2026, 8:19 PM/m); // v41 = eligibility colour (L128/L129), v40 note kept
 assert.deepEqual([T.shoulder_er_l, T.shoulder_er_r], [85, 85]);
 assert.deepEqual([T.hip_er_l, T.hip_ir_l, T.hip_abd_l, T.shoulder_flex_l, T.ankle_df_l, T.cervical_rot_l, T.cervical_lat_l, T.hip_flex_l, T.cervical_flex, T.cervical_ext, T.lumbar_flex, T.lumbar_ext],
   [29, 26, 40, 140, 6, 70, 38, 120, 50, 60, 60, 25], "every other target unchanged");

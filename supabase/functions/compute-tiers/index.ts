@@ -1,4 +1,7 @@
-// compute-tiers v40 - readiness engine + Phase A1 protocol persist
+// compute-tiers v41 - readiness engine + Phase A1 protocol persist
+// v41 (Jim ledger L128, L129, L135; Oct 3 2026): move colour = worst measured required joint; no rule or a missing joint =
+//   GREY "Not rated" (never GREEN); YELLOW = within a flat 10 deg (ankle 2 cm) of the minimum, not 90%. Rule in move_colour.ts.
+//   Needs migration 20261020180000 (allows tier GREY) applied FIRST. Base bands are unchanged.
 // v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,
 //   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().
 // v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
@@ -39,82 +42,7 @@ const JOINT_TARGETS: Record<string, number> = {
   balance_l: 30, balance_r: 30,
 };
 
-const YELLOW_BAND = 0.90;
-
-const BILATERAL: Record<string, [string, string]> = {
-  hip_er:        ["hip_er_l", "hip_er_r"],
-  hip_ir:        ["hip_ir_l", "hip_ir_r"],
-  hip_abd:       ["hip_abd_l", "hip_abd_r"],
-  hip_flex:      ["hip_flex_l", "hip_flex_r"],
-  shoulder_er:   ["shoulder_er_l", "shoulder_er_r"],
-  shoulder_flex: ["shoulder_flex_l", "shoulder_flex_r"],
-  ankle_df:      ["ankle_df_l", "ankle_df_r"],
-  cervical_rot:  ["cervical_rot_l", "cervical_rot_r"],
-  cervical_lat:  ["cervical_lat_l", "cervical_lat_r"],
-};
-const SINGLE: Record<string, string> = {
-  lumbar_flex:   "lumbar_flex",
-  lumbar_ext:    "lumbar_ext",
-  cervical_flex: "cervical_flex",
-  cervical_ext:  "cervical_ext",
-};
-const EVALUABLE = new Set([...Object.keys(BILATERAL), ...Object.keys(SINGLE)]);
-
-function toNum(v: unknown): number | null {
-  if (v == null) return null;
-  const n = typeof v === "number" ? v : Number(v);
-  return isFinite(n) ? n : null;
-}
-
-function athleteValue(a: Record<string, unknown>, joint: string): number | null {
-  if (joint in BILATERAL) {
-    const [l, r] = BILATERAL[joint];
-    const vs = [toNum(a[l]), toNum(a[r])].filter((x): x is number => x != null);
-    return vs.length ? Math.min(...vs) : null;
-  }
-  if (joint in SINGLE) return toNum(a[SINGLE[joint]]);
-  return null;
-}
-
-type LimitingJoint = { joint: string; value: number | null; min: number; ratio?: number; reason?: string };
-type TierResult = { tier: "GREEN" | "YELLOW" | "RED"; limiting: LimitingJoint[] };
-
-function classify(a: Record<string, unknown>, technique: Record<string, unknown>): TierResult {
-  const required: { joint: string; thresh: number }[] = [];
-  for (const [col, val] of Object.entries(technique)) {
-    if (!col.endsWith("_min")) continue;
-    const thresh = toNum(val);
-    if (thresh == null || thresh === 0) continue;
-    const joint = col.slice(0, -4);
-    if (!EVALUABLE.has(joint)) continue;
-    required.push({ joint, thresh });
-  }
-  if (required.length === 0) return { tier: "GREEN", limiting: [] };
-
-  const limiting: LimitingJoint[] = [];
-  const missing: LimitingJoint[] = [];
-  let worstRatio: number | null = null;
-
-  for (const { joint, thresh } of required) {
-    const av = athleteValue(a, joint);
-    if (av == null) {
-      missing.push({ joint, value: null, min: thresh, reason: "not_measured" });
-      continue;
-    }
-    const ratio = thresh ? av / thresh : 1.0;
-    if (worstRatio == null || ratio < worstRatio) worstRatio = ratio;
-    if (ratio < 1.0) limiting.push({ joint, value: av, min: thresh, ratio: Math.round(ratio * 1000) / 1000 });
-  }
-
-  if (worstRatio != null && worstRatio < YELLOW_BAND) {
-    return { tier: "RED", limiting: limiting.filter(x => (x.ratio ?? 1) < YELLOW_BAND) };
-  }
-  const band = limiting.filter(x => (x.ratio ?? 1) >= YELLOW_BAND && (x.ratio ?? 1) < 1.0);
-  if (band.length || missing.length) {
-    return { tier: "YELLOW", limiting: [...band, ...missing] };
-  }
-  return { tier: "GREEN", limiting: [] };
-}
+import { classify, toNum } from "./move_colour.ts";
 
 function computeWorstJointKeys(a: Record<string, unknown>, limit = 5): string[] {
   // body in ./joint_totals.ts (pure, unit tested); HIP_FLEX_UNSCORED there keeps hip flexion out of weak spots and the /100
@@ -220,7 +148,7 @@ Deno.serve(async (req: Request) => {
 
     const now = new Date().toISOString();
     const rows: Record<string, unknown>[] = [];
-    const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0 };
+    const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0, GREY: 0 };
 
     for (const t of techniques as Record<string, unknown>[]) {
       const res = classify(assessment, t);
