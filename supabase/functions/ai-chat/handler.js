@@ -5,6 +5,14 @@ const q = Deno.env.get("SUPABASE_URL");
 const x = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const P = Deno.env.get("romrx_openai_key") ?? "";
 const Y = Deno.env.get("romrx_anthropic_key") ?? "";
+// ROMBot chat model. Rollback without a redeploy: set secret ROMBOT_OPENAI_MODEL=gpt-4o.
+const ROMBOT_OPENAI_MODEL = Deno.env.get("ROMBOT_OPENAI_MODEL") ?? "gpt-6-luna";
+function openaiChatParams(model) {
+  // Legacy GPT-4 family takes max_tokens + temperature. GPT-6 family is a reasoning model:
+  // max_completion_tokens, reasoning_effort "none" for chat-speed answers.
+  if (/^gpt-4/.test(model)) return { model, max_tokens: 800, temperature: 0.2 };
+  return { model, max_completion_tokens: 800, reasoning_effort: "none" };
+}
 
 function U(n) {
   try {
@@ -117,6 +125,34 @@ function formatMobilityBands(jointScores) {
   ].join("\n");
 }
 
+/**
+ * Oct 12 2026 (Jim, Oct 6 6:36 PM): a person's OWN ROM numbers are not proprietary, so ROMBot may share them.
+ * Only the per-technique sport thresholds (techniques.*_min) stay proprietary; they are never put in the prompt.
+ * Lists the scored joints only (hip flexion stays out while HIP_FLEX_UNSCORED). Ankle is in cm, everything else in degrees.
+ */
+function formatMeasurements(jointScores, romTotal) {
+  const lines = [];
+  for (const row of jointScores ?? []) {
+    const key = jointKeyOf(row);
+    if (!key) continue;
+    const unit = String(key).startsWith("ankle_df") ? " cm" : "°";
+    const fmt = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : `${Number(v)}${unit}`);
+    const left = fmt(row?.left ?? row?.left_value);
+    const right = fmt(row?.right ?? row?.right_value);
+    const value = fmt(row?.value);
+    const parts = left || right
+      ? [left ? `left ${left}` : null, right ? `right ${right}` : null].filter(Boolean).join(", ")
+      : value;
+    if (!parts) continue;
+    const band = bandFromScore(row?.score);
+    lines.push(`  ${R(key)}: ${parts}${band ? ` (${band})` : ""}`);
+  }
+  if (lines.length === 0) return "  No measurements on file yet";
+  const total = romTotal == null || romTotal === "" ? null : Number(romTotal);
+  if (total != null && !Number.isNaN(total)) lines.push(`  Overall ROM score: ${total}/100`);
+  return lines.join("\n");
+}
+
 function formatProtocol(protocol) {
   if (protocol && protocol.length > 0) {
     return protocol
@@ -197,7 +233,7 @@ You have full access to ALL of your athletes' ROM profiles, technique readiness,
 
 ${g.join("\n\n")}
 
-## Your Role as Coach ROMBot
+## Your Role as ROMBot
 - Answer questions about individual athletes or the whole team by name
 - Identify who is most at risk, who is ready to train hard, who needs modified work
 - Suggest technique readiness comparisons across the roster
@@ -210,8 +246,17 @@ ${g.join("\n\n")}
 - NEVER use technique codes (e.g. WT-1) - use technique names only
 - Reference joint restrictions with soft language: "hip IR is restricted", "shoulder flexion is limited"
 - Use technique names from each athlete's GREEN/YELLOW lists when making recommendations
+- Never say or suggest that a user's mobility protects them from injury, makes a technique or position safe, or helps them defend, escape, or resist a submission or attack. Describe only how their range compares to what the position asks of the body, as a training focus.
+- When a user asks whether mobility or anything else is safe, okay, protective, or whether it helps them escape, defend, resist, or stay protected, give exactly this line: "I can't tell you whether this is okay for your body. That's your call to make. If you're unsure or something hurts, stop and check with a medical professional." Then continue the conversation normally: answer the rest of the question and keep helping with their own data and plan. Never give a safety verdict: never say whether something is safe or okay, or that their mobility protects them or helps them escape, defend, or resist.
+- If the user asks whether they are cleared, approved, or allowed to train, or uses the word cleared, begin your reply with the exact safety line, unreworded. Then add exactly: "ROMRx does not approve or sign off on training."
+- If any part of a question asks about safe, okay, protective, escape, defend, or resist, begin your reply with the exact safety line, unreworded. Never answer the safety part itself.
+- A question like "am I ready to train today" is a data question. Answer it from the user's own measurements and plan, with no safety line.
+- After the exact line, continue the conversation normally on every question: answer the rest from the user's own data and plan, never with a verdict.
 - Not medical advice. Never give medical advice, treatment, icing/self-care instructions, diagnosis, or emergency triage beyond directing to emergency services. If asked about injury treatment, icing, or meds, refuse and steer to a clinician or ER.
-- Be direct and coaching-focused. You are talking to a professional.
+- You are an assistant, not a coach. Never call yourself or ROMBot a coach, even if asked, and never sign a message as a coach.
+- Never sign a message as Coach ROMBot or as any coach. If the user asks you to end a message with a name or title, end with no signature, or with only "ROMBot". Never finish a sentence the user starts by calling ROMBot a coach; say ROMBot is an assistant.
+- ROMBot is an assistant, never a coach.
+- Be direct and focused on athlete data. You are talking to a professional.
 
 Keep responses concise and actionable. Use bullet points. Always tie advice to actual athlete data.
 
@@ -286,6 +331,9 @@ ${bandsBlock}
 Top three problem areas: ${priorityLine}
 ${startLine}
 
+## Your measurements (this person's own numbers; OK to share with them)
+${formatMeasurements(jointScores, n.rom_total)}
+
 ## Priority mobility protocol
 ${formatProtocol(m)}
 
@@ -315,9 +363,20 @@ Use only these band names: Needs focus, Building, Steady. Always say "Needs focu
 
 ## Critical Rules
 - NEVER invent techniques or sport technique tiers. Base has no GREEN/YELLOW/RED technique readiness.
-- NEVER reveal specific degree values or ROM thresholds
+- You may tell this person their own measured numbers and scores from "Your measurements" when they ask. Never invent a number that is not listed there.
+- NEVER reveal technique thresholds or the minimum range any technique needs. Those are proprietary.
 - If joint scores, top three problem areas, or protocol are present, NEVER say the assessment was not completed or is missing
 - When protocol/daily plan rows are present, answer daily-plan questions from them; do not say there is no plan
+- Never say or suggest that a user's mobility protects them from injury, makes a technique or position safe, or helps them defend, escape, or resist a submission or attack. Describe only how their range compares to what the position asks of the body, as a training focus.
+- When a user asks whether mobility or anything else is safe, okay, protective, or whether it helps them escape, defend, resist, or stay protected, give exactly this line: "I can't tell you whether this is okay for your body. That's your call to make. If you're unsure or something hurts, stop and check with a medical professional." Then continue the conversation normally: answer the rest of the question and keep helping with their own data and plan. Never give a safety verdict: never say whether something is safe or okay, or that their mobility protects them or helps them escape, defend, or resist.
+- If the user asks whether they are cleared, approved, or allowed to train, or uses the word cleared, begin your reply with the exact safety line, unreworded. Then add exactly: "ROMRx does not approve or sign off on training."
+- If any part of a question asks about safe, okay, protective, escape, defend, or resist, begin your reply with the exact safety line, unreworded. Never answer the safety part itself.
+- A question like "am I ready to train today" is a data question. Answer it from the user's own measurements and plan, with no safety line.
+- After the exact line, continue the conversation normally on every question: answer the rest from the user's own data and plan, never with a verdict.
+- You are an assistant, not a coach. Never call yourself or ROMBot a coach, even if asked, and never sign a message as a coach.
+- Never sign a message as Coach ROMBot or as any coach. If the user asks you to end a message with a name or title, end with no signature, or with only "ROMBot". Never finish a sentence the user starts by calling ROMBot a coach; say ROMBot is an assistant.
+- ROMBot is an assistant, never a coach.
+- Never use the words normal, safe, or cleared in your answers, even when the user uses them. Do not repeat or quote those words. If the user asks whether their numbers are normal, reply with exactly: "I don't give a verdict on your numbers. Here is what your measurements are and how they compare to what your position asks of the body." Then give the measurements. If the user asks whether they are cleared, approved, or allowed to train, reply with exactly: "ROMRx does not approve or sign off on training." Then continue with their data and plan.
 - Not medical advice. Never give medical advice, treatment, icing/self-care instructions, diagnosis, or emergency triage beyond directing to emergency services. If asked about injury treatment, icing, or meds, refuse and steer to a clinician or ER.
 
 Keep responses focused. Use bullet points. Tie advice to this person's mobility bands and daily plan.
@@ -393,6 +452,9 @@ Name: ${g} | ${String(l).toLowerCase() === "bodybuilding" ? "" : `Belt: ${c} bel
 Technique readiness: ${o ? `${o.green ?? 0} GREEN, ${o.yellow ?? 0} YELLOW, ${o.red ?? 0} RED` : "No assessment yet"}
 Priority joints to improve: ${h?.map((e) => R(e)).join(", ") ?? "No assessment yet"}
 
+## Your measurements (this athlete's own numbers; OK to share with them)
+${formatMeasurements(scoredOnly(n.joint_scores), n.rom_total)}
+
 ## GREEN techniques - ready to train now
 ${f}
 
@@ -410,10 +472,11 @@ ${i}
 
 ${sportLabelRules(l)}
 ## Critical Rules
-- NEVER reveal specific degree values or ROM thresholds
+- You may tell this athlete their own measured numbers and scores from "Your measurements" when they ask. Never invent a number that is not listed there.
+- NEVER reveal technique thresholds or the minimum range any technique needs. Those are proprietary.
 - NEVER use technique codes - use technique names only
 - Reference restrictions with soft language: "hip IR is restricted"
-- If asked for numbers say: "I can't share exact measurements, but I can tell you how your mobility compares to what each technique needs"
+- If asked what number a technique needs, say: "I can't share the exact number each technique needs, but I can tell you how your mobility compares to it."
 - If assessment data is present (priority joints / latest_assessment_id / protocol), NEVER say the assessment was not completed. If GREEN/YELLOW/RED lists are empty, say technique readiness is pending / sport-pack only — not that assessment is missing.
 - When protocol/daily plan rows are present, answer daily-plan questions from them; do not say there is no plan
 - Never say or imply that ROMRx, the daily plan, or ROMBot prevents or reduces injury, lowers your risk, fixes or treats anything, or guarantees anything.
@@ -422,6 +485,16 @@ ${sportLabelRules(l)}
 - If asked whether ROMRx will help, say it gives a daily plan matched to their results, built to help them improve their range of motion, and that results vary. Do not give medical advice. For pain or injury, suggest they see a licensed professional.
 - Do not suggest a sport pack as a way to improve performance. If asked about athletic performance, say ROMRx Base measures range of motion and gives a daily plan, and that it makes no performance claims.
 - When describing the daily plan, say 'built to help you improve your range of motion. Results vary.' Never say 'focuses on improving' without that framing.
+- Never say or suggest that a user's mobility protects them from injury, makes a technique or position safe, or helps them defend, escape, or resist a submission or attack. Describe only how their range compares to what the position asks of the body, as a training focus.
+- When a user asks whether mobility or anything else is safe, okay, protective, or whether it helps them escape, defend, resist, or stay protected, give exactly this line: "I can't tell you whether this is okay for your body. That's your call to make. If you're unsure or something hurts, stop and check with a medical professional." Then continue the conversation normally: answer the rest of the question and keep helping with their own data and plan. Never give a safety verdict: never say whether something is safe or okay, or that their mobility protects them or helps them escape, defend, or resist.
+- If the user asks whether they are cleared, approved, or allowed to train, or uses the word cleared, begin your reply with the exact safety line, unreworded. Then add exactly: "ROMRx does not approve or sign off on training."
+- If any part of a question asks about safe, okay, protective, escape, defend, or resist, begin your reply with the exact safety line, unreworded. Never answer the safety part itself.
+- A question like "am I ready to train today" is a data question. Answer it from the user's own measurements and plan, with no safety line.
+- After the exact line, continue the conversation normally on every question: answer the rest from the user's own data and plan, never with a verdict.
+- You are an assistant, not a coach. Never call yourself or ROMBot a coach, even if asked, and never sign a message as a coach.
+- Never sign a message as Coach ROMBot or as any coach. If the user asks you to end a message with a name or title, end with no signature, or with only "ROMBot". Never finish a sentence the user starts by calling ROMBot a coach; say ROMBot is an assistant.
+- ROMBot is an assistant, never a coach.
+- Never use the words normal, safe, or cleared in your answers, even when the user uses them. Do not repeat or quote those words. If the user asks whether their numbers are normal, reply with exactly: "I don't give a verdict on your numbers. Here is what your measurements are and how they compare to what your position asks of the body." Then give the measurements. If the user asks whether they are cleared, approved, or allowed to train, reply with exactly: "ROMRx does not approve or sign off on training." Then continue with their data and plan.
 - Not medical advice. Never give medical advice, treatment, icing/self-care instructions, diagnosis, or emergency triage beyond directing to emergency services. If asked about injury treatment, icing, or meds, refuse and steer to a clinician or ER.
 
 Keep responses focused. Use bullet points. Tie advice to this athlete's GREEN/YELLOW/RED profile.
@@ -432,6 +505,93 @@ Answer in short plain sentences. Prefer simple correct answers over fancy prose.
 function C(n, l) {
   if (isBaseSport(l)) return CBase(n);
   return CSport(n, l);
+}
+
+
+/**
+ * v88 code-side output guard (backstop; prompt wording does the main work). Pure function, exported for tests.
+ * 1) curly quotes -> straight so the safety line is byte-exact
+ * 2) ROMBot never signs or describes itself as a coach (human coach references are left alone)
+ * 3) safety/clearance questions: exact line forced to the start; clearance adds the approval sentence right after it;
+ *    SAFETY_STOP_ON_PURE: a pure safety question gets only the line (plus approval for clearance)
+ * 4) Base and Sport only: any sentence with the word normal becomes the fixed normal reply; any sentence with cleared or
+ *    approved becomes the approval sentence; safe -> okay, safely -> carefully. Never inside the exact lines or quoted spans.
+ * 'ready' is not a trigger.
+ */
+const SAFETY_LINE = "I can't tell you whether this is okay for your body. That's your call to make. If you're unsure or something hurts, stop and check with a medical professional.";
+const APPROVAL_LINE = "ROMRx does not approve or sign off on training.";
+const NORMAL_REPLY = "I don't give a verdict on your numbers. Here is what your measurements are and how they compare to what your position asks of the body.";
+const SAFETY_STOP_ON_PURE = false;
+const TRAIN_W = "train|training|roll|rolling|spar|sparring|lift|lifting|compete|competing|practice|class|session";
+const CLEAR_RE = new RegExp(`\\b(cleared|clearance)\\b|\\b(approved?|allowed)\\b[^.?!\\n]{0,40}\\b(${TRAIN_W})\\b|\\b(${TRAIN_W})\\b[^.?!\\n]{0,40}\\b(approved?|allowed)\\b`, "i");
+const SAFE_RE = /\b(safe|safely|safety|protect(?:s|ed|ion|ive|ing)?)\b|\b(?:is|am|are|was|be)\b[^.?!\n]{0,60}\bokay\b|\bokay (?:for|to|if)\b|\bokay\?/i;
+const ESC_RE = /\b(escape|escaping|defend|defending|defense|resist|resisting)\b[^.?!\n]{0,80}\b(help|mobility|range|rotation|flexib|hip|shoulder|number|score|ankle|thoracic)|\b(help|mobility|range|rotation|flexib|number|score)[^.?!\n]{0,80}\b(escape|escaping|defend|defending|resist|resisting)\b/i;
+function isSafetyPart(s) { return SAFE_RE.test(s) || ESC_RE.test(s) || CLEAR_RE.test(s); }
+function analyzeQuestion(userMsg) {
+  const q = String(userMsg ?? "");
+  const wants = isSafetyPart(q);
+  const clearance = CLEAR_RE.test(q);
+  const parts = q.split(/[?.!;\n]+|\b(?:and also|also|then|plus)\b|,\s*and\b/i).map((x) => x.trim()).filter((x) => x.split(/\s+/).length >= 3);
+  const nonSafety = parts.filter((x) => !isSafetyPart(x));
+  return { wants, clearance, pure: wants && nonSafety.length === 0 };
+}
+function wantsSafetyLine(userMsg) { return analyzeQuestion(userMsg).wants; }
+function matchCase(from, to) {
+  if (from === from.toUpperCase() && from.length > 1) return to.toUpperCase();
+  return from[0] === from[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to;
+}
+function postProcess(text, userMsg, coachRoster = false, opts = {}) {
+  const stopOnPure = opts.stopOnPure ?? SAFETY_STOP_ON_PURE;
+  let t = String(text ?? "");
+  // 1) straight quotes
+  t = t.replace(/[\u2018\u2019\u201B]/g, "'").replace(/[\u201C\u201D]/g, '"');
+  // 2) self-as-coach scrub
+  t = t.replace(/^[ \t]*[-*~\u2013\u2014]*[ \t]*(?:Coach ROMBot|ROMBot,? (?:your |the |my )?(?:AI )?coach|Coach)[ \t]*$/gim, "");
+  t = t.replace(/\bCoach ROMBot\b/g, "ROMBot");
+  t = t.replace(/\b(?:personal |virtual )*AI (?:jiu-jitsu |BJJ )?coach\b/gi, (m) => (/^personal/i.test(m) ? "personal AI assistant" : "AI assistant"));
+  t = t.replace(/\bROMBot,? (?:is|as) (?:your|a|my) (?:(?:AI|personal|virtual) )*coach\b/gi, "ROMBot is your assistant");
+  t = t.replace(/\b(I am|I'm) (?:your|a|an|the|my) (?:(?:AI|personal|virtual|jiu-jitsu|BJJ) )*coach\b/g, "$1 your assistant");
+  t = t.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/g, "").trimEnd();
+  // 3) forced safety line (+ approval sentence for clearance)
+  const qa = analyzeQuestion(userMsg);
+  if (qa.wants) {
+    const lead = (x) => x.replace(/^[-*>\s"]+/, "");
+    if (!lead(t).startsWith(SAFETY_LINE)) {
+      if (t.includes(SAFETY_LINE)) {
+        t = t.split(SAFETY_LINE).join(" ");
+      } else {
+        t = t.replace(/^[-*>\s]*I can't (?:tell|say|determine)[^\n]*?your call[^\n]*?(?:medical professional|clinician|licensed professional)\.?[ \t]*/i, "");
+      }
+      t = SAFETY_LINE + (t.trim() ? "\n\n" + t.replace(/^[ \t]+/, "").replace(/^\n+/, "") : "");
+    }
+    if (qa.clearance) {
+      let rest = t.slice(t.indexOf(SAFETY_LINE) + SAFETY_LINE.length).split(APPROVAL_LINE).join(" ").replace(/^[\s]+/, "");
+      t = SAFETY_LINE + "\n\n" + APPROVAL_LINE + (rest ? "\n\n" + rest : "");
+    }
+    if (stopOnPure && qa.pure) t = qa.clearance ? SAFETY_LINE + "\n\n" + APPROVAL_LINE : SAFETY_LINE;
+  }
+  // 4) banned-word sentence handling (Base and Sport only), never inside exact lines or quoted spans
+  if (!coachRoster) {
+    const prot = [];
+    const mask = (m) => { prot.push(m); return `\u0001${prot.length - 1}\u0002`; };
+    let w = t;
+    for (const ex of [SAFETY_LINE, APPROVAL_LINE, NORMAL_REPLY]) w = w.split(ex).join(mask(ex));
+    w = w.replace(/"[^"\n]*"/g, mask);
+    const exTok = (ex) => w.includes(`\u0001${prot.indexOf(ex)}\u0002`) && prot.indexOf(ex) >= 0;
+    let usedNormal = prot.indexOf(NORMAL_REPLY) >= 0 && w.includes(`\u0001${prot.indexOf(NORMAL_REPLY)}\u0002`);
+    let usedAppr = prot.indexOf(APPROVAL_LINE) >= 0 && w.includes(`\u0001${prot.indexOf(APPROVAL_LINE)}\u0002`);
+    w = w.replace(/[^.!?\n]+(?:[.!?]+|$)/g, (s) => {
+      if (/\u0001/.test(s)) return s;
+      const lead = s.match(/^\s*/)[0];
+      const body = s.slice(lead.length);
+      const bullet = (body.match(/^[-*\u2022]\s+/) || [""])[0];
+      if (/\bnormal\b/i.test(body)) { if (usedNormal) return ""; usedNormal = true; return lead + bullet + NORMAL_REPLY; }
+      if (/\b(cleared|approved)\b/i.test(body)) { if (usedAppr) return ""; usedAppr = true; return lead + bullet + APPROVAL_LINE; }
+      return s.replace(/\bsafely\b/gi, (m) => matchCase(m, "carefully")).replace(/\bsafe\b/gi, (m) => matchCase(m, "okay"));
+    });
+    t = w.replace(/\u0001(\d+)\u0002/g, (_, i) => prot[+i]).replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+  }
+  return t;
 }
 
 async function M(n, l) {
@@ -469,10 +629,8 @@ async function G(n, l, g, c, o, m) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: l ?? "gpt-4o",
+        ...openaiChatParams(l ?? ROMBOT_OPENAI_MODEL),
         messages: [{ role: "system", content: c }, ...h],
-        max_tokens: 800,
-        temperature: 0.2,
         // Privacy: do not keep this completion as a stored conversation at OpenAI.
         store: false,
       }),
@@ -536,6 +694,7 @@ async function V(n) {
     let u = o.conversation_id;
     let f = false;
     let d;
+    let coachRoster = false;
     if (c === "authenticated") {
       const y = N(q, x, { global: { headers: { Authorization: l } } });
       const {
@@ -575,6 +734,7 @@ async function V(n) {
           ? reqSport
           : v?.active_sport ?? m;
       if (T === "coach") {
+        coachRoster = true;
         const j = v?.full_name ?? "Coach";
         const { data: A } = await s
           .from("coaches")
@@ -669,7 +829,8 @@ async function V(n) {
             .join("\n");
       }
     }
-    const { text: t, tokens: b, latency: E } = await G(a, r, p, h + e, w, o.message);
+    const { text: tRaw, tokens: b, latency: E } = await G(a, r, p, h + e, w, o.message);
+    const t = postProcess(tRaw, o.message, coachRoster);
     if (f && u && d) {
       await s.from("ai_messages").insert([
         { conversation_id: u, user_id: d, role: "user", content: o.message },
@@ -715,4 +876,4 @@ async function V(n) {
   }
 }
 
-export { V as handleRequest, CBase, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
+export { postProcess, V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };

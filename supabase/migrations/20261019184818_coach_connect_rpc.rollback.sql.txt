@@ -1,0 +1,2 @@
+-- Revert step 1 (NOT APPLIED).
+DROP FUNCTION IF EXISTS public.connect_coach_by_email(text);
