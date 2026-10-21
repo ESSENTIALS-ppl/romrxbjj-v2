@@ -1,0 +1,22 @@
+-- ROLLBACK for 20261021220000_rescore_saved.sql. NOT APPLIED. Restores the saved scores exactly from the backup tables.
+-- Touches only assessments that are in the backup. Keeps the backup tables (drop them by hand later, after export).
+-- Same trigger guard as the migration: assessments is only UPDATEd, joint_scores / protocols have no triggers.
+DO $guard$
+DECLARE v_bad text;
+BEGIN
+  SELECT string_agg(c.relname || '.' || t.tgname, ', ') INTO v_bad
+  FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND NOT t.tgisinternal AND t.tgenabled <> 'D'
+    AND (c.relname IN ('joint_scores', 'protocols') OR (c.relname = 'assessments' AND (t.tgtype & (8 | 16 | 32)) <> 0));
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'rescore rollback: refusing, trigger present: %', v_bad; END IF;
+END
+$guard$;
+
+UPDATE public.assessments a SET worst_joints = b.worst_joints, rom_total = b.rom_total
+  FROM public.rescore_backup_20261021_assessments b WHERE a.id = b.id;
+
+DELETE FROM public.joint_scores WHERE assessment_id IN (SELECT id FROM public.rescore_backup_20261021_assessments);
+INSERT INTO public.joint_scores SELECT * FROM public.rescore_backup_20261021_joint_scores;
+
+DELETE FROM public.protocols WHERE assessment_id IN (SELECT id FROM public.rescore_backup_20261021_assessments);
+INSERT INTO public.protocols SELECT * FROM public.rescore_backup_20261021_protocols;
