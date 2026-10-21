@@ -111,10 +111,11 @@ for (const [k, s, u, n] of [["cervical_flex", 39, 38, 35], ["cervical_ext", 48, 
 assert.equal(romTotal({ cervical_rot_l: 70, cervical_lat_l: 38, cervical_lat_r: 40 }, T, toNum), 100);
 // persist_protocol.ts (dead code): hip_flex lined up with the SLR typical range 60-80
 assert.ok(/key: "hip_flex", leftKey: "hip_flex_l", rightKey: "hip_flex_r", normalMin: 60, riskBelow: 60 \}/.test(read("../../_shared/persist_protocol.ts")));
-// shoulder ER (Oct 6 8:19 PM: 85, standing goal-post): 85 Steady, 84 / 76.5 Building (>= 90%), 76 Needs focus
-assert.deepEqual(jointPercents({ shoulder_er_l: 76.5, shoulder_er_r: 85 }).shoulder_er.band, 2);
-assert.deepEqual(jointPercents({ shoulder_er_l: 76, shoulder_er_r: 85 }).shoulder_er.band, 1);
-assert.deepEqual(worstJointKeys({ shoulder_er_l: 84, cervical_rot_l: 70, lumbar_flex: 60 }, T, toNum, 1), ["shoulder_er_l"], "84 shoulder ER is below target");
+// shoulder ER (Oct 6 8:19 PM: 85, standing goal-post). T1 option A (E 5): 80 Steady, 79 / 71.5 Building, 71 Needs focus
+assert.deepEqual(jointPercents({ shoulder_er_l: 80, shoulder_er_r: 85 }).shoulder_er.band, 3);
+assert.deepEqual(jointPercents({ shoulder_er_l: 71.5, shoulder_er_r: 85 }).shoulder_er.band, 2);
+assert.deepEqual(jointPercents({ shoulder_er_l: 71, shoulder_er_r: 85 }).shoulder_er.band, 1);
+assert.deepEqual(worstJointKeys({ shoulder_er_l: 79, cervical_rot_l: 70, lumbar_flex: 60 }, T, toNum, 1), ["shoulder_er_l"], "79 shoulder ER is below target plus the T1 buffer");
 assert.equal(romTotal({ shoulder_er_l: 100, shoulder_er_r: 85, lumbar_flex: 60 }, T, toNum), 100);
 assert.equal(romTotal({ shoulder_er_l: 42.5, shoulder_er_r: 42.5 }, T, toNum), 50);
 // persist_protocol.ts (dead code): shoulder_er normalMin 85 / riskBelow 57 (Quinn)

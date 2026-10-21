@@ -56,8 +56,10 @@ assert.deepEqual([lead.shoulder_er_l, lead.shoulder_er_r], [85, 85]);
 
 // 3. behaviour at 85
 assert.equal(overallBandScore({ shoulder_er_l: 85, shoulder_er_r: 90 }), 3);
-assert.equal(overallBandScore({ shoulder_er_l: 76.5, shoulder_er_r: 90 }), 2);
-assert.equal(overallBandScore({ shoulder_er_l: 76, shoulder_er_r: 90 }), 1);
+// T1 option A (Oct 21): shoulder ER buffer 5 deg, so 80 is Steady, 71.5 Building, 71 Needs focus
+assert.equal(overallBandScore({ shoulder_er_l: 80, shoulder_er_r: 90 }), 3);
+assert.equal(overallBandScore({ shoulder_er_l: 71.5, shoulder_er_r: 90 }), 2);
+assert.equal(overallBandScore({ shoulder_er_l: 71, shoulder_er_r: 90 }), 1);
 assert.equal(overallBandScore({ shoulder_er_l: 55, shoulder_er_r: 52 }), 1, "a tucked-elbow-size reading is Needs focus at 85");
 assert.deepEqual(jointPercents({ shoulder_er_l: 42.5 }).shoulder_er, { pct: 50, band: 1 });
 assert.equal(mobilityScore({ shoulder_er_l: 85, shoulder_er_r: 85 }), 100);

@@ -55,10 +55,23 @@ function worseOf(data: JointMap, j: { l?: string; r?: string; single?: string })
   return l != null && r != null ? Math.min(l, r) : (l ?? r);
 }
 
-/** compute_joint_scores() band for one ratio: >= 1.00 Steady, >= 0.90 Building, else Needs focus. */
-function bandFromRatio(worse: number, target: number): 1 | 2 | 3 {
-  const ratio = worse / target;
-  return ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
+// T1 option A (Jim, Oct 21 2026 10:53 AM ET): narrow joints get a buffer E below each cutoff, better color wins.
+// Same table and rule as romrx-io-web mobilityBands.ts, compute-tiers joint_totals.ts and SQL public.t1_joint_band().
+const NARROW_BAND_BUFFER: Readonly<Record<string, number>> = {
+  cervical_rot: 5, cervical_lat: 5, cervical_flex: 5, cervical_ext: 5,
+  hip_er: 5, hip_ir: 5, hip_abd: 5, shoulder_er: 5, ankle_df: 1,
+};
+
+/** compute_joint_scores() band: Steady if worse + E >= target, Building if worse + E >= 0.9 x target, else Needs focus (E = 0 off the list). */
+function bandFromRatio(worse: number, target: number, key = ""): 1 | 2 | 3 {
+  const e = NARROW_BAND_BUFFER[key] ?? 0;
+  if (e === 0) {
+    const ratio = worse / target;
+    return ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
+  }
+  const fx = (n: number) => Math.round(n * 1e6);
+  const adj = fx(worse + e);
+  return adj >= fx(target) ? 3 : adj * 10 >= fx(target) * 9 ? 2 : 1;
 }
 
 /** Same as the app's clampPercentToBand(). */
@@ -74,7 +87,7 @@ export function overallBandScore(data: JointMap): 1 | 2 | 3 | null {
   for (const j of BAND_JOINTS) {
     const worse = worseOf(data, j);
     if (worse == null) continue;
-    const band = bandFromRatio(worse, j.target);
+    const band = bandFromRatio(worse, j.target, j.key);
     if (worst == null || band < worst) worst = band;
   }
   return worst;
@@ -86,7 +99,7 @@ export function jointPercents(data: JointMap): Record<string, { pct: number; ban
   for (const j of BAND_JOINTS) {
     const worse = worseOf(data, j);
     if (worse == null) continue;
-    const band = bandFromRatio(worse, j.target);
+    const band = bandFromRatio(worse, j.target, j.key);
     const raw = Math.min(1, Math.max(0, worse / j.target)) * 100;
     out[j.key] = { pct: clampPercentToBand(Math.floor(raw), band), band };
   }

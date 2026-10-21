@@ -1,4 +1,7 @@
-// compute-tiers v41-range-reset (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist
+// compute-tiers v42-t1-rebased (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist
+// v42 (T1 rebased on the range reset; Jim Oct 21 2026 10:53 AM ET 'T1: A plus C', narrowed 11:47 AM ET, and 4:38 PM ET
+//   'Drop the T1 buffers on the reset moves'): worst_joints ordered by the T1 weighted gap (buffer A on hip_abd, cervical_rot,
+//   shoulder_er only + 0.5 weight until two assessments in a row agree, C). Bands come from SQL compute_joint_scores (same rule).
 // v41-range-reset (Jim Oct 21 2026 4:15 PM ET, proof-20261020/range-proposal.md): Steady target = pooled mean minus 1 SD:
 //   hip ER 23 / IR 24 (Simoneau 1998 PMID 9742472 + Roach 1991 PMID 1881956), shoulder_flex 141 (Gill 2020 PMID 33046038),
 //   ankle_df 6.1 cm (McBride 2026 PMID 41723909, all ages), neck side bend 37 / flexion 39 / extension 48 (pooled WITH Wadhwa 2024:
@@ -121,9 +124,10 @@ function classify(a: Record<string, unknown>, technique: Record<string, unknown>
   return { tier: "GREEN", limiting: [] };
 }
 
-function computeWorstJointKeys(a: Record<string, unknown>, limit = 5): string[] {
+function computeWorstJointKeys(a: Record<string, unknown>, limit = 5, prev: Record<string, unknown> | null = null): string[] {
   // body in ./joint_totals.ts (pure, unit tested); HIP_FLEX_UNSCORED there keeps hip flexion out of weak spots and the /100
-  return worstJointKeys(a, JOINT_TARGETS, toNum, limit);
+  // T1 option C: prev = the user's previous assessment, so narrow-joint gaps get full weight only when two in a row agree
+  return worstJointKeys(a, JOINT_TARGETS, toNum, limit, prev);
 }
 
 function computeRomTotal(a: Record<string, unknown>): number {
@@ -169,7 +173,19 @@ Deno.serve(async (req: Request) => {
     const userId = assessment.user_id as string | undefined;
     const athleteId = (assessment.athlete_id as string | undefined) ?? null;
 
-    const worstJoints = computeWorstJointKeys(assessment, 5);
+    // T1 option C (Oct 21 2026): the user's previous assessment (read only) for the two-in-a-row agreement check.
+    let prevAssessment: Record<string, unknown> | null = null;
+    if (userId && assessment.created_at) {
+      const { data: prevRows } = await supa
+        .from("assessments")
+        .select("*")
+        .eq("user_id", userId)
+        .lt("created_at", assessment.created_at as string)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      prevAssessment = (prevRows && prevRows[0]) ? (prevRows[0] as Record<string, unknown>) : null;
+    }
+    const worstJoints = computeWorstJointKeys(assessment, 5, prevAssessment);
     const romTotal = computeRomTotal(assessment);
     const { error: updErr } = await supa
       .from("assessments")
