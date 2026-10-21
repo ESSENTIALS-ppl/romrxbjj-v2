@@ -1,4 +1,9 @@
-// compute-tiers v40 - readiness engine + Phase A1 protocol persist
+// compute-tiers v41-range-reset (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist
+// v41-range-reset (Jim Oct 21 2026 4:15 PM ET, proof-20261020/range-proposal.md): Steady target = pooled mean minus 1 SD:
+//   hip ER 23 / IR 24 (Simoneau 1998 PMID 9742472 + Roach 1991 PMID 1881956), shoulder_flex 141 (Gill 2020 PMID 33046038),
+//   ankle_df 6.1 cm (McBride 2026 PMID 41723909, all ages), neck side bend 37 / flexion 39 / extension 48 (pooled WITH Wadhwa 2024:
+//   PMIDs 23829201, 32626769, 33868830, 39677250).
+//   hip_abd, hip_flex, shoulder_er, cervical_rot, lumbar unchanged. 90% Building rule unchanged. techniques.*_min NOT rescaled.
 // v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,
 //   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().
 // v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
@@ -23,17 +28,17 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const JOINT_TARGETS: Record<string, number> = {
-  hip_er_l: 29, hip_er_r: 29,   // Oct 6 2026: was 45
-  hip_ir_l: 26, hip_ir_r: 26,   // Oct 6 2026: was 45
+  hip_er_l: 23, hip_er_r: 23,   // Oct 21 2026 range reset: was 29 (PMIDs 9742472, 1881956)
+  hip_ir_l: 24, hip_ir_r: 24,   // Oct 21 2026 range reset: was 26 (PMIDs 9742472, 1881956)
   hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90
   hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
   shoulder_er_l: 85, shoulder_er_r: 85,       // Oct 6 2026 8:19 PM: standing goal-post (was 40 tucked elbow; 90 before)
-  shoulder_flex_l: 140, shoulder_flex_r: 140, // Oct 6 2026: was 180
-  ankle_df_l: 6, ankle_df_r: 6,               // Oct 6 2026: was 20 (cm)
+  shoulder_flex_l: 141, shoulder_flex_r: 141, // Oct 21 2026 range reset: was 140 (PMID 33046038)
+  ankle_df_l: 6.1, ankle_df_r: 6.1,           // Oct 21 2026 range reset: was 6 cm (PMID 41723909)
   cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Swinkels 2014)
-  cervical_lat_l: 38, cervical_lat_r: 38,     // Oct 6 2026: was 45 (Swinkels 2014)
-  cervical_flex: 50, cervical_ext: 60,
+  cervical_lat_l: 37, cervical_lat_r: 37,     // Oct 21 2026 range reset: was 38 (PMIDs 23829201, 32626769, 33868830, 39677250)
+  cervical_flex: 39, cervical_ext: 48,        // Oct 21 2026 range reset: were 50 / 60 (same 4 PMIDs, with Wadhwa 2024)
   thoracic_rot_l: 45, thoracic_rot_r: 45,
   lumbar_flex: 60, lumbar_ext: 25,
   balance_l: 30, balance_r: 30,

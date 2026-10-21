@@ -46,10 +46,10 @@ assert.ok(!/techniques|recompute_user_eligibility/.test(up.replace(/^--.*$/gm, "
 
 // 2. edge mirrors
 const T = parse(read("../index.ts"));
-assert.match(read("../index.ts"), /^\/\/ compute-tiers v40 /);
+assert.match(read("../index.ts"), /^\/\/ compute-tiers v4\d/);
 assert.deepEqual([T.shoulder_er_l, T.shoulder_er_r], [85, 85]);
 assert.deepEqual([T.hip_er_l, T.hip_ir_l, T.hip_abd_l, T.shoulder_flex_l, T.ankle_df_l, T.cervical_rot_l, T.cervical_lat_l, T.hip_flex_l, T.cervical_flex, T.cervical_ext, T.lumbar_flex, T.lumbar_ext],
-  [29, 26, 40, 140, 6, 70, 38, 120, 50, 60, 60, 25], "every other target unchanged");
+  [23, 24, 40, 141, 6.1, 70, 37, 120, 39, 48, 60, 25], "other targets (Oct 21 2026 range reset values)");
 assert.ok(/\{ target: 85, key: "shoulder_er"/.test(read("../../submit-lead-assessment/email.ts")));
 const lead = parse(read("../../submit-lead-assessment/index.ts"));
 assert.deepEqual([lead.shoulder_er_l, lead.shoulder_er_r], [85, 85]);
@@ -61,7 +61,7 @@ assert.equal(overallBandScore({ shoulder_er_l: 76, shoulder_er_r: 90 }), 1);
 assert.equal(overallBandScore({ shoulder_er_l: 55, shoulder_er_r: 52 }), 1, "a tucked-elbow-size reading is Needs focus at 85");
 assert.deepEqual(jointPercents({ shoulder_er_l: 42.5 }).shoulder_er, { pct: 50, band: 1 });
 assert.equal(mobilityScore({ shoulder_er_l: 85, shoulder_er_r: 85 }), 100);
-assert.deepEqual(worstJointKeys({ shoulder_er_l: 84, shoulder_flex_l: 140, cervical_rot_l: 70 }, T, toNum, 1), ["shoulder_er_l"]);
+assert.deepEqual(worstJointKeys({ shoulder_er_l: 84, shoulder_flex_l: 141, cervical_rot_l: 70 }, T, toNum, 1), ["shoulder_er_l"]);
 assert.equal(romTotal({ shoulder_er_l: 110, shoulder_er_r: 85 }, T, toNum), 100);
 
 // 4. recompute script: guarded, backup table, A / B / C, only shoulder_er

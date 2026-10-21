@@ -26,20 +26,23 @@ type JointMap = Record<string, number | null | undefined>;
  * (was 90), shoulder flexion 140 (Gill et al. 2020; was 180), ankle knee-to-wall 6 cm (Konor 2012 / McBride 2026; was 20),
  * neck rotation 70 (was 80) and neck side bend 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
  * shoulder ER 85 (Oct 6 8:19 PM: standing goal-post test; was 40 for the lying tucked-elbow test, 90 before).
+ * Range reset (Jim Oct 21 2026 4:15 PM ET): pooled mean minus 1 SD. hip ER 23 / IR 24 (PMIDs 9742472, 1881956), shoulder
+ * flexion 141 (PMID 33046038), ankle 6.1 cm (PMID 41723909), neck side bend 37 / flexion 39 / extension 48 (PMIDs 23829201,
+ * 32626769, 33868830, 39677250; with Wadhwa 2024).
  */
 const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
-  { target: 29, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
-  { target: 26, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
+  { target: 23, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
+  { target: 24, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
   { target: 40, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
   { target: 85, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
-  { target: 140, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
-  { target: 6, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
+  { target: 141, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
+  { target: 6.1, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
   { target: 70, key: "cervical_rot", l: "cervical_rot_l", r: "cervical_rot_r" },
-  { target: 38, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
+  { target: 37, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
   { target: 60, key: "lumbar_flex", single: "lumbar_flex" },
   { target: 25, key: "lumbar_ext", single: "lumbar_ext" },
-  { target: 50, key: "cervical_flex", single: "cervical_flex" },
-  { target: 60, key: "cervical_ext", single: "cervical_ext" },
+  { target: 39, key: "cervical_flex", single: "cervical_flex" },
+  { target: 48, key: "cervical_ext", single: "cervical_ext" },
 ];
 
 const num = (v: unknown): number | null =>

@@ -53,13 +53,13 @@ type JointMap = Record<string, number | null | undefined>;
 // Whitelist of accepted joint fields (stored as-is). The /100 + band only score the 12 banded joints (hip flexion is saved, never scored) in
 // email.ts BAND_JOINTS (targets = app JOINT_SCORE_TARGETS / public.compute_joint_scores()).
 const JOINT_TARGETS: Record<string, number> = {
-  hip_er_l: 29, hip_er_r: 29, hip_ir_l: 26, hip_ir_r: 26,   // hip targets Oct 6 2026 (were 45 / 45 / 90); whitelist only, values unused here
+  hip_er_l: 23, hip_er_r: 23, hip_ir_l: 24, hip_ir_r: 24,   // Oct 21 2026 range reset (were 29 / 26); whitelist only, values unused here
   hip_abd_l: 40, hip_abd_r: 40, hip_flex_l: 120, hip_flex_r: 120,
   hip_ext_l: 30, hip_ext_r: 30,
-  shoulder_er_l: 85, shoulder_er_r: 85, shoulder_flex_l: 140,   /* shoulder ER Oct 6 8:19 PM: 85 standing goal-post (was 40) */ shoulder_flex_r: 140,   // Oct 6 2026 (was 180)
-  ankle_df_l: 6, ankle_df_r: 6,                                                         // Oct 6 2026 (was 20 cm)
-  cervical_rot_l: 70, cervical_rot_r: 70, cervical_lat_l: 38, cervical_lat_r: 38,   // Oct 6 2026: neck (were 80 / 45; Swinkels 2014)
-  cervical_flex: 50, cervical_ext: 60,
+  shoulder_er_l: 85, shoulder_er_r: 85, shoulder_flex_l: 141,   /* shoulder ER Oct 6 8:19 PM: 85 standing goal-post (was 40) */ shoulder_flex_r: 141,   // Oct 21 2026 range reset (was 140)
+  ankle_df_l: 6.1, ankle_df_r: 6.1,                                                     // Oct 21 2026 range reset (was 6 cm)
+  cervical_rot_l: 70, cervical_rot_r: 70, cervical_lat_l: 37, cervical_lat_r: 37,   // Oct 21 2026 range reset: side bend was 38
+  cervical_flex: 39, cervical_ext: 48,   // Oct 21 2026 range reset: were 50 / 60
   thoracic_rot_l: 45, thoracic_rot_r: 45, thoracic_rot: 45,
   lumbar_flex: 60, lumbar_ext: 25,
   balance_l: 30, balance_r: 30,

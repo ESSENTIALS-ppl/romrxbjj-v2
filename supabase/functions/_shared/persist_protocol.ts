@@ -25,8 +25,9 @@ export const HIP_FLEX_UNSCORED = true;
 const ALL_JOINTS: JointDef[] = [
   // Oct 6 2026 (Quinn): hip ER / IR normalMin + riskBelow lined up under the new Steady targets 29 / 26 (were 40 / 30).
   // Display / severity thresholds only; no protocol or technique minimum lives in this file. File is still deprecated and not called.
-  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 29, riskBelow: 29 },
-  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 26, riskBelow: 26 },
+  // Oct 21 2026 range reset (dead file, mirror only): pooled lines, PMIDs 9742472 + 1881956.
+  { key: "hip_er", leftKey: "hip_er_l", rightKey: "hip_er_r", normalMin: 23, riskBelow: 14 },
+  { key: "hip_ir", leftKey: "hip_ir_l", rightKey: "hip_ir_r", normalMin: 24, riskBelow: 16 },
   { key: "hip_abd", leftKey: "hip_abd_l", rightKey: "hip_abd_r", normalMin: 40, riskBelow: 30 },
   // Oct 6 2026: hip_flex normalMin + riskBelow 100 -> 60, the bottom of the approved straight-leg-raise typical range 60-80
   // (Youdas et al. 2005 / Muyor 2016; Jim closed Oct 6 11:19 AM). Dead code (file not imported; hip_flex is also filtered
@@ -35,8 +36,8 @@ const ALL_JOINTS: JointDef[] = [
   // Oct 6 2026 8:19 PM (Quinn): shoulder_er normalMin 85 / riskBelow 57 for the standing goal-post test (were 40 / 40 tucked elbow).
   // Dead code (file not imported), so nothing live changes.
   { key: "shoulder_er", leftKey: "shoulder_er_l", rightKey: "shoulder_er_r", normalMin: 85, riskBelow: 57 },
-  { key: "shoulder_flex", leftKey: "shoulder_flex_l", rightKey: "shoulder_flex_r", normalMin: 140, riskBelow: 120 },
-  { key: "ankle_df", leftKey: "ankle_df_l", rightKey: "ankle_df_r", normalMin: 10, riskBelow: 10 },
+  { key: "shoulder_flex", leftKey: "shoulder_flex_l", rightKey: "shoulder_flex_r", normalMin: 141, riskBelow: 122 }, // Oct 21 2026 range reset, PMID 33046038
+  { key: "ankle_df", leftKey: "ankle_df_l", rightKey: "ankle_df_r", normalMin: 6.1, riskBelow: 2.6 }, // Oct 21 2026 range reset, PMID 41723909
   { key: "lumbar_flex", singleKey: "lumbar_flex", normalMin: 40, riskBelow: 40 },
   { key: "lumbar_ext", singleKey: "lumbar_ext", normalMin: 20, riskBelow: 15 },
   { key: "cervical_rot", leftKey: "cervical_rot_l", rightKey: "cervical_rot_r", normalMin: 70, riskBelow: 60 },
