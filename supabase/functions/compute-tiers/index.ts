@@ -36,7 +36,7 @@ const JOINT_TARGETS: Record<string, number> = {
   shoulder_er_l: 85, shoulder_er_r: 85,       // Oct 6 2026 8:19 PM: standing goal-post (was 40 tucked elbow; 90 before)
   shoulder_flex_l: 141, shoulder_flex_r: 141, // Oct 21 2026 range reset: was 140 (PMID 33046038)
   ankle_df_l: 6.1, ankle_df_r: 6.1,           // Oct 21 2026 range reset: was 6 cm (PMID 41723909)
-  cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Swinkels 2014)
+  cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Oct 6 value not covered by range-proposal.md)
   cervical_lat_l: 37, cervical_lat_r: 37,     // Oct 21 2026 range reset: was 38 (PMIDs 23829201, 32626769, 33868830, 39677250)
   cervical_flex: 39, cervical_ext: 48,        // Oct 21 2026 range reset: were 50 / 60 (same 4 PMIDs, with Wadhwa 2024)
   thoracic_rot_l: 45, thoracic_rot_r: 45,
