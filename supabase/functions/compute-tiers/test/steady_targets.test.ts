@@ -83,7 +83,7 @@ assert.ok(!/techniques|recompute_user_eligibility/.test(up.replace(/^--.*$/gm, "
 
 // 4. worst_joints + rom_total with the new targets
 const a = { hip_er_l: 29, hip_er_r: 30, hip_ir_l: 26, hip_ir_r: 26, hip_abd_l: 40, hip_abd_r: 41, shoulder_er_l: 80, shoulder_er_r: 85, ankle_df_l: 4, ankle_df_r: 4.5, lumbar_flex: 50, shoulder_flex_l: 140, shoulder_flex_r: 150 };
-assert.deepEqual(worstJointKeys(a, T, toNum, 3), ["ankle_df_l", "ankle_df_r", "shoulder_flex_l"], "Steady hips / shoulder flexion are no longer weak spots");  // lumbar never ranked (Grant Oct 21 2026 7:10 PM); shoulder_flex_l 140 is below the reset target 141
+assert.deepEqual(worstJointKeys(a, T, toNum, 3), ["ankle_df_l", "ankle_df_r", "shoulder_flex_l"], "Ankle 4 / 4.5 below 6.1 ranks first; shoulder_flex_l 140 is below the new 141 target, so it is the third weak spot; Steady hips are not weak spots; lumbar is never ranked");  // lumbar never ranked (Grant Oct 21 2026 7:10 PM); shoulder_flex_l 140 is below the reset target 141
 assert.deepEqual(worstJointKeys({ ankle_df_l: 6.1, shoulder_flex_l: 140 }, T, toNum, 1), ["shoulder_flex_l"], "140 shoulder flexion is below target 141");
 assert.deepEqual(worstJointKeys({ ankle_df_l: 6, shoulder_flex_l: 141 }, T, toNum, 1), ["ankle_df_l"], "6 cm ankle is below target 6.1");
 assert.deepEqual(worstJointKeys({ hip_er_l: 22, hip_ir_l: 24, hip_abd_l: 40 }, T, toNum, 1), ["hip_er_l"], "22 ER is below target 23");
