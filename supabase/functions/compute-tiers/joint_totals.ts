@@ -48,6 +48,7 @@ export function romTotal(a: Record<string, unknown>, targets: Record<string, num
   const pcts: number[] = [];
   for (const [key, target] of Object.entries(targets)) {
     if (isUnscoredJoint(key)) continue;
+    if (isLumbarKey(key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall (rom_total)
     const num = toNum(a[key]);
     if (num == null) continue;
     pcts.push(Math.max(0, Math.min(1, num / target)) * 100);

@@ -75,9 +75,10 @@ AS $fn$
   SELECT
     coalesce((SELECT array_agg(key ORDER BY g DESC, ord) FROM (
       SELECT key, ord, public.t1_weighted_gap(key, val, target, pval) g FROM m
-      WHERE key NOT IN ('lumbar_flex', 'lumbar_ext')   -- lumbar never ranked (Grant Oct 21 7:10 PM; mirrors worstJointKeys); rom_total keeps it
+      WHERE key NOT IN ('lumbar_flex', 'lumbar_ext')   -- lumbar never ranked (Grant Oct 21 7:10 PM; mirrors worstJointKeys); rom_total also skips it (Grant 7:20 PM)
       ORDER BY g DESC, ord LIMIT 5) s), ARRAY[]::text[]),
-    coalesce((SELECT round(avg(least(1, greatest(0, val / target)) * 100))::int FROM m), 0);
+    coalesce((SELECT round(avg(least(1, greatest(0, val / target)) * 100))::int FROM m
+      WHERE key NOT IN ('lumbar_flex', 'lumbar_ext')), 0);   -- Grant Oct 21 2026 7:20 PM: lumbar out of the overall (rom_total; mirrors romTotal)
 $fn$;
 
 DO $rescore$

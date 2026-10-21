@@ -59,6 +59,11 @@ function worseOf(data: JointMap, j: { l?: string; r?: string; single?: string })
 import { bandForJoint, clampPercentToBand, displayPercent, isNarrowJoint } from "../_shared/t1_narrow_bands.ts";
 export { clampPercentToBand };
 
+/** Low back (lumbar) is out of the overall band and the /100 (Grant Oct 21 2026 7:20 PM: lumbar out of the overall); per-joint % still computed for saved values. */
+export function isLumbarKey(key: string): boolean {
+  return key === "lumbar_flex" || key === "lumbar_ext";
+}
+
 function bandFromRatio(worse: number, target: number, key = ""): 1 | 2 | 3 {
   return bandForJoint(key, worse, target);
 }
@@ -67,6 +72,7 @@ function bandFromRatio(worse: number, target: number, key = ""): 1 | 2 | 3 {
 export function overallBandScore(data: JointMap): 1 | 2 | 3 | null {
   let worst: 1 | 2 | 3 | null = null;
   for (const j of BAND_JOINTS) {
+    if (isLumbarKey(j.key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall
     const worse = worseOf(data, j);
     if (worse == null) continue;
     const band = bandFromRatio(worse, j.target, j.key);
@@ -96,6 +102,7 @@ export function mobilityScore(data: JointMap): number | null {
   let sum = 0;
   let n = 0;
   for (const j of BAND_JOINTS) {
+    if (isLumbarKey(j.key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall
     const worse = worseOf(data, j);
     if (worse == null) continue;
     sum += Math.min(1, Math.max(0, worse / j.target)) * 100;
