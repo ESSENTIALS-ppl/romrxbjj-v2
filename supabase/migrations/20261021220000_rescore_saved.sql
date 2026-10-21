@@ -14,6 +14,7 @@
 --   No pg_net / http call, no edge invocation, no email_sends / notification rows are written here.
 -- Rollback: 20261021220000_rescore_saved.rollback.sql.txt (restores the backup rows exactly).
 -- Export the backup before and after apply: scripts/rescore_backup_export_20261021.sh.
+-- Backup tables rescore_backup_20261021_* and lumbar_null_backup_20261021_* must be dropped by Thu Nov 5, 2026 (Stacy condition A), after any export Jim wants; log it in the SSOT.
 
 DO $guard$
 DECLARE v_bad text;

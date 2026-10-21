@@ -11,6 +11,7 @@
 -- technique_eligibility is not touched (no technique has a lumbar minimum in the seeds).
 -- No emails / notifications: UPDATE / DELETE only on tables the guard proves have no firing trigger.
 -- Rollback: 20261021223000_lumbar_null_saved.rollback.sql.txt (run FIRST, before the rescore rollback).
+-- Backup tables rescore_backup_20261021_* and lumbar_null_backup_20261021_* must be dropped by Thu Nov 5, 2026 (Stacy condition A), after any export Jim wants; log it in the SSOT.
 
 DO $guard$
 DECLARE v_bad text; v_n int;
@@ -66,7 +67,17 @@ DO $rev$ BEGIN
   END IF;
 END $rev$;
 
-UPDATE public.assessments SET lumbar_flex = NULL, lumbar_ext = NULL
- WHERE lumbar_flex IS NOT NULL OR lumbar_ext IS NOT NULL;
-DELETE FROM public.joint_scores WHERE joint_key IN ('lumbar_flex', 'lumbar_ext');
-DELETE FROM public.protocols WHERE joint_key IN ('lumbar_flex', 'lumbar_ext');
+DO $lumbar_null$
+DECLARE v_a int; v_j int; v_p int;
+BEGIN
+  UPDATE public.assessments SET lumbar_flex = NULL, lumbar_ext = NULL
+   WHERE lumbar_flex IS NOT NULL OR lumbar_ext IS NOT NULL;
+  GET DIAGNOSTICS v_a = ROW_COUNT;
+  DELETE FROM public.joint_scores WHERE joint_key IN ('lumbar_flex', 'lumbar_ext');
+  GET DIAGNOSTICS v_j = ROW_COUNT;
+  DELETE FROM public.protocols WHERE joint_key IN ('lumbar_flex', 'lumbar_ext');
+  GET DIAGNOSTICS v_p = ROW_COUNT;
+  -- always printed, including 0
+  RAISE NOTICE 'lumbar_null_20261021: assessments lumbar NULLed %, joint_scores lumbar rows deleted %, protocols lumbar rows deleted %', v_a, v_j, v_p;
+END
+$lumbar_null$;
