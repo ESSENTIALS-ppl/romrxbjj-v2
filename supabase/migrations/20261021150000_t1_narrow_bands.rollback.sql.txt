@@ -1,0 +1,89 @@
+-- ROLLBACK for 20261021150000_t1_narrow_bands.sql. Restores the exact live compute_joint_scores body read 2026-10-21 10:58 AM ET
+-- (md5 49f15fc3737b31ddf003342d21d313f1) and drops the T1 helpers. Not applied.
+CREATE OR REPLACE FUNCTION public.compute_joint_scores(p_assessment_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  -- Jim closed the hip flexion rule: the straight-leg raise is never judged against 120 (unreachable, the average man is about 68).
+  -- true = hip flexion is stored on the assessment but gets NO joint_scores row (no band, not in the /100, never a weak spot).
+  -- Set to false to restore the old behavior. Retired when the sex-specific norm engine (romrxbjj-v2 #74) ships.
+  c_hip_flex_unscored constant boolean := true;
+  v_written int := 0;
+  v_a jsonb;
+BEGIN
+  SELECT to_jsonb(a) INTO v_a FROM public.assessments a WHERE a.id = p_assessment_id;
+  IF v_a IS NULL THEN
+    RETURN jsonb_build_object('status','assessment_not_found','assessment_id',p_assessment_id);
+  END IF;
+
+  WITH bilateral(joint_key, lcol, rcol, target) AS (
+    VALUES
+      ('hip_er','hip_er_l','hip_er_r',29::numeric),  -- Oct 6 2026: was 45 (Simoneau 1998)
+      ('hip_ir','hip_ir_l','hip_ir_r',26),  -- Oct 6 2026: was 45 (Simoneau 1998)
+      ('hip_abd','hip_abd_l','hip_abd_r',40),  -- Oct 6 2026: was 90
+      ('hip_flex','hip_flex_l','hip_flex_r',120),
+      ('shoulder_er','shoulder_er_l','shoulder_er_r',85),  -- Oct 6 2026 8:19 PM: standing goal-post test (was 40 tucked elbow; 90 before)
+      ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',140),  -- Oct 6 2026: was 180 (Gill 2020)
+      ('ankle_df','ankle_df_l','ankle_df_r',6),  -- Oct 6 2026: was 20 cm (Konor 2012 / McBride 2026)
+      ('cervical_rot','cervical_rot_l','cervical_rot_r',70),  -- Oct 6 2026: was 80 (Swinkels 2014)
+      ('cervical_lat','cervical_lat_l','cervical_lat_r',38)  -- Oct 6 2026: was 45 (Swinkels 2014)
+  ),
+  single(joint_key, col, target) AS (
+    VALUES
+      ('lumbar_flex','lumbar_flex',60::numeric),
+      ('lumbar_ext','lumbar_ext',25),
+      ('cervical_flex','cervical_flex',50),
+      ('cervical_ext','cervical_ext',60)
+  ),
+  bi AS (
+    SELECT b.joint_key, (v_a ->> b.lcol)::numeric AS left_value, (v_a ->> b.rcol)::numeric AS right_value, b.target FROM bilateral b
+  ),
+  si AS (
+    SELECT s.joint_key, (v_a ->> s.col)::numeric AS left_value, NULL::numeric AS right_value, s.target FROM single s
+  ),
+  u AS (SELECT * FROM bi UNION ALL SELECT * FROM si),
+  scored AS (
+    SELECT joint_key, left_value, right_value, target,
+      CASE WHEN left_value IS NOT NULL AND right_value IS NOT NULL THEN LEAST(left_value, right_value) WHEN left_value IS NOT NULL THEN left_value WHEN right_value IS NOT NULL THEN right_value ELSE NULL END AS worse,
+      CASE WHEN left_value IS NOT NULL AND right_value IS NOT NULL AND GREATEST(left_value,right_value) > 0 THEN ROUND(ABS(left_value - right_value) / GREATEST(left_value, right_value) * 100, 2) ELSE NULL END AS asymmetry_pct
+    FROM u
+  ),
+  final AS (
+    SELECT joint_key, left_value, right_value, asymmetry_pct,
+      CASE WHEN worse/target >= 1.0 THEN 3 WHEN worse/target >= 0.90 THEN 2 ELSE 1 END::smallint AS score
+    FROM scored WHERE worse IS NOT NULL AND NOT (c_hip_flex_unscored AND joint_key = 'hip_flex')
+  ),
+  ins AS (
+    INSERT INTO public.joint_scores (assessment_id, joint_key, score, left_value, right_value, asymmetry_pct, asymmetry_flag)
+    SELECT p_assessment_id, joint_key, score, left_value, right_value, asymmetry_pct, NULL FROM final
+    ON CONFLICT (assessment_id, joint_key) DO UPDATE SET score = EXCLUDED.score, left_value = EXCLUDED.left_value, right_value = EXCLUDED.right_value, asymmetry_pct = EXCLUDED.asymmetry_pct
+    RETURNING 1
+  )
+  SELECT count(*) INTO v_written FROM ins;
+
+  DELETE FROM public.joint_scores js
+  WHERE js.assessment_id = p_assessment_id
+    AND js.joint_key NOT IN (
+      SELECT joint_key FROM (
+        WITH bilateral(joint_key, lcol, rcol) AS (
+          VALUES ('hip_er','hip_er_l','hip_er_r'),('hip_ir','hip_ir_l','hip_ir_r'),('hip_abd','hip_abd_l','hip_abd_r'),('hip_flex','hip_flex_l','hip_flex_r'),('shoulder_er','shoulder_er_l','shoulder_er_r'),('shoulder_flex','shoulder_flex_l','shoulder_flex_r'),('ankle_df','ankle_df_l','ankle_df_r'),('cervical_rot','cervical_rot_l','cervical_rot_r'),('cervical_lat','cervical_lat_l','cervical_lat_r')
+        ),
+        single(joint_key, col) AS (
+          VALUES ('lumbar_flex','lumbar_flex'),('lumbar_ext','lumbar_ext'),('cervical_flex','cervical_flex'),('cervical_ext','cervical_ext')
+        )
+        SELECT joint_key FROM bilateral WHERE ((v_a ->> lcol) IS NOT NULL OR (v_a ->> rcol) IS NOT NULL) AND NOT (c_hip_flex_unscored AND joint_key = 'hip_flex')
+        UNION ALL
+        SELECT joint_key FROM single WHERE (v_a ->> col) IS NOT NULL
+      ) present
+    );
+
+  RETURN jsonb_build_object('status','ok','assessment_id',p_assessment_id,'written',v_written);
+END;
+$function$;
+
+DROP FUNCTION IF EXISTS public.t1_weighted_gap(text, numeric, numeric, numeric);
+DROP FUNCTION IF EXISTS public.t1_joint_band(text, numeric, numeric);
+DROP FUNCTION IF EXISTS public.t1_narrow_buffer(text);
