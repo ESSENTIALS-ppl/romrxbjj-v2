@@ -1,25 +1,18 @@
--- NOT APPLIED. Needs Jim's own typed line before anyone applies it to prod.
--- T1 (Jim, Oct 21 2026 10:53 AM ET, "T1: A plus C"; spec Quinn narrow-bands-options.md, options A and C).
--- A: narrow joints get a buffer E below each cutoff and a reading inside the buffer gets the better color:
---    Steady if worse + steady buffer >= target, Building if worse + building buffer >= 0.90 x target, else Needs focus. Stored values never change.
---    Per-joint buffers (Steady line / Building line): hip_er 1.5/0, hip_ir 1.5/0, hip_abd 2/0, cervical_flex 2.5/0,
---    cervical_lat 2/0 (narrowed, Jim 11:47 AM ET + Quinn 11:47:58 AM ET); cervical_rot 5/5, cervical_ext 5/5, shoulder_er 5/5,
---    ankle_df 1/1 cm. Every other joint keeps the old CASE exactly.
--- C: public.t1_weighted_gap(): Protocol gap (0 when Steady, else 1 - min(1, worse/target)) x 0.5 on narrow joints unless the
---    previous assessment shows the same band, then x 1. compute-tiers v41 orders worst_joints with the same rule, and
---    protocol_joint_ranking() already ranks Base by worst_joints first, so it is NOT redefined here (its live body, md5
---    eb0f00cad6ea6d1cc170b8ce289e0437, carries the Oct 19 neck rows that are not on main; restating it would risk dropping them).
--- No retest step, note or hint anywhere (Jim card 15, ledger L655). No user-visible copy.
--- 1. public.compute_joint_scores(): body = live definition read 2026-10-21 10:58 AM ET (md5 49f15fc3737b31ddf003342d21d313f1,
---    identical to 20261006203000), ONLY the score CASE line changes to call public.t1_joint_band().
--- Mirrors: romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG / bandScoreForJoint / weightedJointGap,
---   compute-tiers joint_totals.ts bandForJoint / weightedGap, submit-lead-assessment email.ts bandFromRatio.
--- Existing joint_scores rows are NOT rewritten here. A recompute would be a separate, deliberate step.
--- Rollback: 20261021150000_t1_narrow_bands.rollback.sql.txt (restores the exact live body, drops the helpers).
+-- NOT APPLIED. LOCAL DRAFT ONLY. Needs Jim's own typed OK before any apply (prod migration).
+-- T1 REBASED on the range reset. Apply ONLY AFTER 20261021203000_range_reset_pooled.sql.
+-- Jim, Oct 21 2026: 10:53 AM ET "T1: A plus C"; 11:47 AM ET narrowed buffers (Quinn t1-quinn-buffers.md);
+--   4:38 PM ET (via Grant 4:56 PM) "Drop the T1 buffers on the reset moves".
+-- Supersedes the never-applied 20261021150000_t1_narrow_bands.sql (old Oct 6 targets; kept only on backup branch
+--   feat/t1-narrow-bands-20261021 at ff6bf0f, NOT in this branch).
+-- A: per-joint buffers now ONLY on joints the reset did not change: hip_abd 2/0, cervical_rot 5/5, shoulder_er 5/5 (deg).
+--    Neck side bend, flexion, extension, hip ER, hip IR, shoulder flexion, ankle: NO buffer, plain 100% / 90% rule on the NEW targets.
+-- C: public.t1_weighted_gap() (0.5 weight on narrow joints until two assessments agree). protocol_joint_ranking NOT redefined
+--    (stays as 20261021203000 left it).
+-- compute_joint_scores body = the post-reset text in 20261021203000_range_reset_pooled.sql (NEW targets: hip_er 23, hip_ir 24,
+--   shoulder_flex 141, ankle_df 6.1, cervical_lat 37, cervical_flex 39, cervical_ext 48); ONLY the score CASE line changes.
+-- Existing joint_scores rows are NOT rewritten. Rollback: 20261021210000_t1_rebased.rollback.sql.txt (restores the post-reset body).
+-- Mirrors: romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG, romrxbjj-v2 functions/_shared/t1_narrow_bands.ts.
 
--- PER-JOINT CONFIG (Jim 11:47 AM ET Oct 21: narrow hip ER/IR/abduction and neck flexion/side bend; values Quinn
--- t1-quinn-buffers.md 11:47:58 AM ET). p_line 'steady' = buffer at the Steady line, 'building' = buffer at the Building line.
--- Same table as romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG and romrxbjj-v2 functions/_shared/t1_narrow_bands.ts.
 CREATE OR REPLACE FUNCTION public.t1_narrow_buffer(p_joint_key text, p_line text)
  RETURNS numeric
  LANGUAGE sql
@@ -29,15 +22,9 @@ AS $function$
   SELECT coalesce((
     SELECT CASE WHEN p_line = 'building' THEN c.building ELSE c.steady END
     FROM (VALUES
-      ('hip_er',        1.5::numeric, 0::numeric),
-      ('hip_ir',        1.5, 0),
-      ('hip_abd',       2,   0),
-      ('cervical_flex', 2.5, 0),
-      ('cervical_lat',  2,   0),
+      ('hip_abd',       2::numeric, 0::numeric),
       ('cervical_rot',  5,   5),
-      ('cervical_ext',  5,   5),
-      ('shoulder_er',   5,   5),
-      ('ankle_df',      1,   1)
+      ('shoulder_er',   5,   5)
     ) AS c(joint_key, steady, building)
     WHERE c.joint_key = regexp_replace(coalesce(p_joint_key, ''), '_(l|r)$', '')
   ), 0);
@@ -105,22 +92,22 @@ BEGIN
 
   WITH bilateral(joint_key, lcol, rcol, target) AS (
     VALUES
-      ('hip_er','hip_er_l','hip_er_r',29::numeric),  -- Oct 6 2026: was 45 (Simoneau 1998)
-      ('hip_ir','hip_ir_l','hip_ir_r',26),  -- Oct 6 2026: was 45 (Simoneau 1998)
+      ('hip_er','hip_er_l','hip_er_r',23::numeric),  -- Oct 21 2026 range reset (PMIDs 9742472, 1881956): was 29
+      ('hip_ir','hip_ir_l','hip_ir_r',24),  -- Oct 21 2026 range reset (PMIDs 9742472, 1881956): was 26
       ('hip_abd','hip_abd_l','hip_abd_r',40),  -- Oct 6 2026: was 90
       ('hip_flex','hip_flex_l','hip_flex_r',120),
       ('shoulder_er','shoulder_er_l','shoulder_er_r',85),  -- Oct 6 2026 8:19 PM: standing goal-post test (was 40 tucked elbow; 90 before)
-      ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',140),  -- Oct 6 2026: was 180 (Gill 2020)
-      ('ankle_df','ankle_df_l','ankle_df_r',6),  -- Oct 6 2026: was 20 cm (Konor 2012 / McBride 2026)
+      ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',141),  -- Oct 21 2026 range reset (PMIDs 33046038): was 140
+      ('ankle_df','ankle_df_l','ankle_df_r',6.1),  -- Oct 21 2026 range reset (PMIDs 41723909): was 6 cm
       ('cervical_rot','cervical_rot_l','cervical_rot_r',70),  -- Oct 6 2026: was 80 (Swinkels 2014)
-      ('cervical_lat','cervical_lat_l','cervical_lat_r',38)  -- Oct 6 2026: was 45 (Swinkels 2014)
+      ('cervical_lat','cervical_lat_l','cervical_lat_r',37)  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 38
   ),
   single(joint_key, col, target) AS (
     VALUES
       ('lumbar_flex','lumbar_flex',60::numeric),
       ('lumbar_ext','lumbar_ext',25),
-      ('cervical_flex','cervical_flex',50),
-      ('cervical_ext','cervical_ext',60)
+      ('cervical_flex','cervical_flex',39),  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 50
+      ('cervical_ext','cervical_ext',48)  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 60
   ),
   bi AS (
     SELECT b.joint_key, (v_a ->> b.lcol)::numeric AS left_value, (v_a ->> b.rcol)::numeric AS right_value, b.target FROM bilateral b
@@ -137,7 +124,7 @@ BEGIN
   ),
   final AS (
     SELECT joint_key, left_value, right_value, asymmetry_pct,
-      public.t1_joint_band(joint_key, worse, target) AS score  -- T1 option A (Oct 21 2026): narrow-joint buffer, better color wins
+      public.t1_joint_band(joint_key, worse, target) AS score  -- T1 option A (rebased Oct 21 2026): buffer on hip_abd, cervical_rot, shoulder_er only
     FROM scored WHERE worse IS NOT NULL AND NOT (c_hip_flex_unscored AND joint_key = 'hip_flex')
   ),
   ins AS (

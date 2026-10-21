@@ -6,16 +6,12 @@
 // C: Protocol gap weight 0.5 on narrow joints until this and the previous assessment show the same band, then 1.
 // Mirrors romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG and SQL public.t1_narrow_buffer(joint, line).
 // No user step, no copy, never a retest hint (ledger L655).
+// Jim 4:38 PM ET Oct 21 (via Grant 4:56 PM): "Drop the T1 buffers on the reset moves". Neck side bend/flexion/extension,
+// hip ER/IR, shoulder flexion and ankle use the range reset targets with NO buffer; only the joints not reset keep one.
 export const NARROW_BAND_CONFIG: Readonly<Record<string, { steady: number; building: number }>> = {
-  hip_er: { steady: 1.5, building: 0 },
-  hip_ir: { steady: 1.5, building: 0 },
   hip_abd: { steady: 2, building: 0 },
-  cervical_flex: { steady: 2.5, building: 0 },
-  cervical_lat: { steady: 2, building: 0 },
   cervical_rot: { steady: 5, building: 5 },
-  cervical_ext: { steady: 5, building: 5 },
   shoulder_er: { steady: 5, building: 5 },
-  ankle_df: { steady: 1, building: 1 },
 };
 export const NARROW_GAP_WEIGHT = 0.5;
 
@@ -30,13 +26,10 @@ export function isNarrowJoint(key: string): boolean {
 
 const fx = (n: number) => Math.round(n * 1e6);
 
-/** Base band 1 | 2 | 3 for one value. Non-narrow joints keep the old ratio rule exactly. */
+/** Base band 1 | 2 | 3 for one value. Non-narrow joints: plain 100% / 90% rule, fixed-point compare. */
 export function bandForJoint(key: string, worse: number, target: number): 1 | 2 | 3 {
   if (!(target > 0) || !Number.isFinite(worse)) return 1;
-  if (!isNarrowJoint(key)) {
-    const r = worse / target;
-    return r >= 1.0 ? 3 : r >= 0.9 ? 2 : 1;
-  }
+  // 90%-edge rounding fix: every joint compares in 6-decimal fixed point (non-narrow = zero buffers) so it matches SQL numeric.
   const b = narrowBuffers(key);
   if (fx(worse + b.steady) >= fx(target)) return 3;
   if (fx(worse + b.building) * 10 >= fx(target) * 9) return 2;

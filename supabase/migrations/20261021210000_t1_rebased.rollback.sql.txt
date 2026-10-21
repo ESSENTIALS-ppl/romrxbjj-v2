@@ -1,5 +1,6 @@
--- ROLLBACK for 20261021150000_t1_narrow_bands.sql. Restores the exact live compute_joint_scores body read 2026-10-21 10:58 AM ET
--- (md5 49f15fc3737b31ddf003342d21d313f1) and drops the T1 helpers. Not applied.
+-- ROLLBACK for 20261021210000_t1_rebased.sql. NOT APPLIED.
+-- Restores compute_joint_scores to the exact post-range-reset body from 20261021203000_range_reset_pooled.sql
+-- (NEW targets kept; does NOT put back the Oct 6 targets) and drops the T1 helpers.
 CREATE OR REPLACE FUNCTION public.compute_joint_scores(p_assessment_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -21,22 +22,22 @@ BEGIN
 
   WITH bilateral(joint_key, lcol, rcol, target) AS (
     VALUES
-      ('hip_er','hip_er_l','hip_er_r',29::numeric),  -- Oct 6 2026: was 45 (Simoneau 1998)
-      ('hip_ir','hip_ir_l','hip_ir_r',26),  -- Oct 6 2026: was 45 (Simoneau 1998)
+      ('hip_er','hip_er_l','hip_er_r',23::numeric),  -- Oct 21 2026 range reset (PMIDs 9742472, 1881956): was 29
+      ('hip_ir','hip_ir_l','hip_ir_r',24),  -- Oct 21 2026 range reset (PMIDs 9742472, 1881956): was 26
       ('hip_abd','hip_abd_l','hip_abd_r',40),  -- Oct 6 2026: was 90
       ('hip_flex','hip_flex_l','hip_flex_r',120),
       ('shoulder_er','shoulder_er_l','shoulder_er_r',85),  -- Oct 6 2026 8:19 PM: standing goal-post test (was 40 tucked elbow; 90 before)
-      ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',140),  -- Oct 6 2026: was 180 (Gill 2020)
-      ('ankle_df','ankle_df_l','ankle_df_r',6),  -- Oct 6 2026: was 20 cm (Konor 2012 / McBride 2026)
+      ('shoulder_flex','shoulder_flex_l','shoulder_flex_r',141),  -- Oct 21 2026 range reset (PMIDs 33046038): was 140
+      ('ankle_df','ankle_df_l','ankle_df_r',6.1),  -- Oct 21 2026 range reset (PMIDs 41723909): was 6 cm
       ('cervical_rot','cervical_rot_l','cervical_rot_r',70),  -- Oct 6 2026: was 80 (Swinkels 2014)
-      ('cervical_lat','cervical_lat_l','cervical_lat_r',38)  -- Oct 6 2026: was 45 (Swinkels 2014)
+      ('cervical_lat','cervical_lat_l','cervical_lat_r',37)  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 38
   ),
   single(joint_key, col, target) AS (
     VALUES
       ('lumbar_flex','lumbar_flex',60::numeric),
       ('lumbar_ext','lumbar_ext',25),
-      ('cervical_flex','cervical_flex',50),
-      ('cervical_ext','cervical_ext',60)
+      ('cervical_flex','cervical_flex',39),  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 50
+      ('cervical_ext','cervical_ext',48)  -- Oct 21 2026 range reset (PMIDs 23829201, 32626769, 33868830, 39677250): was 60
   ),
   bi AS (
     SELECT b.joint_key, (v_a ->> b.lcol)::numeric AS left_value, (v_a ->> b.rcol)::numeric AS right_value, b.target FROM bilateral b
@@ -88,4 +89,3 @@ DROP FUNCTION IF EXISTS public.t1_weighted_gap(text, numeric, numeric, numeric);
 DROP FUNCTION IF EXISTS public.t1_joint_band(text, numeric, numeric);
 DROP FUNCTION IF EXISTS public.t1_is_narrow(text);
 DROP FUNCTION IF EXISTS public.t1_narrow_buffer(text, text);
-DROP FUNCTION IF EXISTS public.t1_narrow_buffer(text);

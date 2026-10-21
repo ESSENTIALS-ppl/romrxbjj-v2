@@ -88,21 +88,22 @@ assert.deepEqual(worstJointKeys({ ankle_df_l: 6.1, shoulder_flex_l: 140 }, T, to
 assert.deepEqual(worstJointKeys({ ankle_df_l: 6, shoulder_flex_l: 141 }, T, toNum, 1), ["ankle_df_l"], "6 cm ankle is below target 6.1");
 assert.deepEqual(worstJointKeys({ hip_er_l: 22, hip_ir_l: 24, hip_abd_l: 40 }, T, toNum, 1), ["hip_er_l"], "22 ER is below target 23");
 assert.deepEqual(worstJointKeys({ hip_er_l: 23, hip_ir_l: 23, hip_abd_l: 40 }, T, toNum, 1), ["hip_ir_l"], "23 IR is below target 24");
-assert.deepEqual(worstJointKeys({ hip_er_l: 23, hip_ir_l: 24, hip_abd_l: 39 }, T, toNum, 1), ["hip_abd_l"], "39 abduction is below target");
+assert.deepEqual(worstJointKeys({ hip_er_l: 23, hip_ir_l: 24, hip_abd_l: 37.5 }, T, toNum, 1), ["hip_abd_l"], "37.5 abduction is below target minus the T1 buffer 2");
 assert.equal(romTotal({ hip_er_l: 23, hip_ir_l: 24, hip_abd_l: 40 }, T, toNum), 100);
 assert.equal(romTotal({ hip_er_l: 11.5, hip_ir_l: 12, hip_abd_l: 20 }, T, toNum), 50);
 
 // 5. lead email bands: 29 ER / 26 IR / 40 ABD Steady, 28 / 25 / 39 Building
 assert.equal(overallBandScore({ hip_er_l: 23, hip_er_r: 23, hip_ir_l: 24, hip_ir_r: 24, hip_abd_l: 40, hip_abd_r: 40 }), 3);
 assert.equal(mobilityScore({ hip_er_l: 23, hip_er_r: 23, hip_ir_l: 24, hip_ir_r: 24, hip_abd_l: 40, hip_abd_r: 40 }), 100);
-for (const [k, steady, under] of [["hip_er", 23, 22], ["hip_ir", 24, 23], ["hip_abd", 40, 39], ["shoulder_er", 85, 84], ["shoulder_flex", 141, 140], ["ankle_df", 6.1, 6], ["cervical_rot", 70, 69], ["cervical_lat", 37, 36]] as const) {
+// T1 rebased: hip abd keeps its 2 deg Steady buffer, shoulder ER its 5 / 5 buffer; reset moves have none
+for (const [k, steady, under] of [["hip_er", 23, 22], ["hip_ir", 24, 23], ["hip_abd", 40, 37.5], ["shoulder_er", 85, 79], ["shoulder_flex", 141, 140], ["ankle_df", 6.1, 6], ["cervical_rot", 70, 64], ["cervical_lat", 37, 36]] as const) {
   assert.equal(overallBandScore({ [`${k}_l`]: steady, [`${k}_r`]: steady }), 3, `${k} ${steady}`);
   assert.equal(overallBandScore({ [`${k}_l`]: under, [`${k}_r`]: steady }), 2, `${k} ${under}`);
   assert.deepEqual(jointPercents({ [`${k}_l`]: under })[k].band, 2);
   assert.ok(jointPercents({ [`${k}_l`]: under })[k].pct < 100);
   assert.deepEqual(jointPercents({ [`${k}_l`]: steady })[k], { pct: 100, band: 3 });
 }
-assert.deepEqual(worstJointKeys({ cervical_rot_l: 69, cervical_lat_l: 38, lumbar_flex: 60 }, T, toNum, 1), ["cervical_rot_l"], "69 neck rotation is below target");
+assert.deepEqual(worstJointKeys({ cervical_rot_l: 64, cervical_lat_l: 38, lumbar_flex: 60 }, T, toNum, 1), ["cervical_rot_l"], "64 neck rotation is below target minus the T1 buffer 5");
 assert.deepEqual(worstJointKeys({ cervical_rot_l: 70, cervical_lat_l: 36, lumbar_flex: 60 }, T, toNum, 1), ["cervical_lat_l"], "36 side bend is below target 37");
 // neck flexion / extension (single fields): 39 / 48 Steady, 38 / 47 Building, 35 / 43 Needs focus
 for (const [k, s, u, n] of [["cervical_flex", 39, 38, 35], ["cervical_ext", 48, 47, 43]] as const) {
