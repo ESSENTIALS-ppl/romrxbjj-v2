@@ -6,10 +6,10 @@
 //   hip_abd, hip_flex, shoulder_er, cervical_rot, lumbar unchanged. 90% Building rule unchanged. techniques.*_min NOT rescaled.
 // v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,
 //   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().
-// v39 (Jim decisions, Oct 6 2026): Steady targets hip_er 29, hip_ir 26 (Simoneau et al. 1998, Quinn option B1; were 45),
-//   hip_abd 40 (was 90), shoulder_flex 140 (Gill et al. 2020; was 180), ankle_df 6 cm (Konor 2012 / McBride 2026; was 20),
-//   cervical_rot 70 (was 80) and cervical_lat 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
-//   shoulder_er 40 (was 90): tucked-elbow test lying on your back, typical range 40-75 (Gill et al. 2020, PMID 33046038).
+// v39 (Jim decisions, Oct 6 2026): earlier Steady targets, superseded by v41 for hip_er, hip_ir, shoulder_flex, ankle_df and
+//   cervical_lat (sources now: PMIDs 9742472, 1881956, 33046038, 41723909, 23829201, 32626769, 33868830, 39677250).
+//   hip_abd 40 and cervical_rot 70 are Oct 6 values not covered by range-proposal.md.
+//   shoulder_er 40 (was 90) was the lying tucked-elbow test, later replaced by v40 (85, standing goal-post test).
 //   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are rescaled to these targets by
 //   migration 20261012220000_pack_minimums_rescale.sql (Jim YES Oct 6 12:10 PM; data only, classify() is unchanged; Quinn calls 12:22 PM: SLR 60/120,
 //   shoulder_er 85/90, 4 ankle overrides).
