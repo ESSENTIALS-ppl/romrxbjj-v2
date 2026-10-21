@@ -55,30 +55,12 @@ function worseOf(data: JointMap, j: { l?: string; r?: string; single?: string })
   return l != null && r != null ? Math.min(l, r) : (l ?? r);
 }
 
-// T1 option A (Jim, Oct 21 2026 10:53 AM ET): narrow joints get a buffer E below each cutoff, better color wins.
-// Same table and rule as romrx-io-web mobilityBands.ts, compute-tiers joint_totals.ts and SQL public.t1_joint_band().
-const NARROW_BAND_BUFFER: Readonly<Record<string, number>> = {
-  cervical_rot: 5, cervical_lat: 5, cervical_flex: 5, cervical_ext: 5,
-  hip_er: 5, hip_ir: 5, hip_abd: 5, shoulder_er: 5, ankle_df: 1,
-};
+// T1 narrow bands (Jim Oct 21 2026): band rule + percent display from the shared per-joint config.
+import { bandForJoint, clampPercentToBand, displayPercent, isNarrowJoint } from "../_shared/t1_narrow_bands.ts";
+export { clampPercentToBand };
 
-/** compute_joint_scores() band: Steady if worse + E >= target, Building if worse + E >= 0.9 x target, else Needs focus (E = 0 off the list). */
 function bandFromRatio(worse: number, target: number, key = ""): 1 | 2 | 3 {
-  const e = NARROW_BAND_BUFFER[key] ?? 0;
-  if (e === 0) {
-    const ratio = worse / target;
-    return ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
-  }
-  const fx = (n: number) => Math.round(n * 1e6);
-  const adj = fx(worse + e);
-  return adj >= fx(target) ? 3 : adj * 10 >= fx(target) * 9 ? 2 : 1;
-}
-
-/** Same as the app's clampPercentToBand(). */
-export function clampPercentToBand(pct: number, band: 1 | 2 | 3): number {
-  if (band === 3) return 100;
-  if (band === 2) return Math.max(90, Math.min(pct, 99));
-  return Math.max(0, Math.min(pct, 89));
+  return bandForJoint(key, worse, target);
 }
 
 /** 1 Needs focus, 2 Building, 3 Steady; null when no banded joint is measured. */
@@ -101,7 +83,7 @@ export function jointPercents(data: JointMap): Record<string, { pct: number; ban
     if (worse == null) continue;
     const band = bandFromRatio(worse, j.target, j.key);
     const raw = Math.min(1, Math.max(0, worse / j.target)) * 100;
-    out[j.key] = { pct: clampPercentToBand(Math.floor(raw), band), band };
+    out[j.key] = { pct: displayPercent(Math.floor(raw), band, isNarrowJoint(j.key)), band };
   }
   return out;
 }
@@ -121,7 +103,7 @@ export function mobilityScore(data: JointMap): number | null {
   }
   if (n === 0) return null;
   const band = overallBandScore(data) ?? 3;
-  return clampPercentToBand(Math.floor(sum / n), band);
+  return displayPercent(Math.floor(sum / n), band);
 }
 
 export const BAND_LABEL: Record<1 | 2 | 3, BaseBand> = { 1: "Needs focus", 2: "Building", 3: "Steady" };

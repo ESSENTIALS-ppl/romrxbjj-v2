@@ -1,9 +1,10 @@
 -- NOT APPLIED. Needs Jim's own typed line before anyone applies it to prod.
 -- T1 (Jim, Oct 21 2026 10:53 AM ET, "T1: A plus C"; spec Quinn narrow-bands-options.md, options A and C).
 -- A: narrow joints get a buffer E below each cutoff and a reading inside the buffer gets the better color:
---    Steady if worse + E >= target, Building if worse + E >= 0.90 x target, else Needs focus. Stored values never change.
---    E: cervical_rot / cervical_lat / cervical_flex / cervical_ext 5 deg, hip_er / hip_ir / hip_abd 5 deg, shoulder_er 5 deg,
---    ankle_df 1 cm. Every other joint keeps the old CASE exactly (E = 0).
+--    Steady if worse + steady buffer >= target, Building if worse + building buffer >= 0.90 x target, else Needs focus. Stored values never change.
+--    Per-joint buffers (Steady line / Building line): hip_er 1.5/0, hip_ir 1.5/0, hip_abd 2/0, cervical_flex 2.5/0,
+--    cervical_lat 2/0 (narrowed, Jim 11:47 AM ET + Quinn 11:47:58 AM ET); cervical_rot 5/5, cervical_ext 5/5, shoulder_er 5/5,
+--    ankle_df 1/1 cm. Every other joint keeps the old CASE exactly.
 -- C: public.t1_weighted_gap(): Protocol gap (0 when Steady, else 1 - min(1, worse/target)) x 0.5 on narrow joints unless the
 --    previous assessment shows the same band, then x 1. compute-tiers v41 orders worst_joints with the same rule, and
 --    protocol_joint_ranking() already ranks Base by worst_joints first, so it is NOT redefined here (its live body, md5
@@ -11,23 +12,44 @@
 -- No retest step, note or hint anywhere (Jim card 15, ledger L655). No user-visible copy.
 -- 1. public.compute_joint_scores(): body = live definition read 2026-10-21 10:58 AM ET (md5 49f15fc3737b31ddf003342d21d313f1,
 --    identical to 20261006203000), ONLY the score CASE line changes to call public.t1_joint_band().
--- Mirrors: romrx-io-web mobilityBands.ts NARROW_BAND_BUFFER / bandScoreForJoint / weightedJointGap,
+-- Mirrors: romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG / bandScoreForJoint / weightedJointGap,
 --   compute-tiers joint_totals.ts bandForJoint / weightedGap, submit-lead-assessment email.ts bandFromRatio.
 -- Existing joint_scores rows are NOT rewritten here. A recompute would be a separate, deliberate step.
 -- Rollback: 20261021150000_t1_narrow_bands.rollback.sql.txt (restores the exact live body, drops the helpers).
 
-CREATE OR REPLACE FUNCTION public.t1_narrow_buffer(p_joint_key text)
+-- PER-JOINT CONFIG (Jim 11:47 AM ET Oct 21: narrow hip ER/IR/abduction and neck flexion/side bend; values Quinn
+-- t1-quinn-buffers.md 11:47:58 AM ET). p_line 'steady' = buffer at the Steady line, 'building' = buffer at the Building line.
+-- Same table as romrx-io-web mobilityBands.ts NARROW_BAND_CONFIG and romrxbjj-v2 functions/_shared/t1_narrow_bands.ts.
+CREATE OR REPLACE FUNCTION public.t1_narrow_buffer(p_joint_key text, p_line text)
  RETURNS numeric
  LANGUAGE sql
  IMMUTABLE
  SET search_path TO 'public'
 AS $function$
-  SELECT CASE regexp_replace(coalesce(p_joint_key, ''), '_(l|r)$', '')
-    WHEN 'cervical_rot' THEN 5 WHEN 'cervical_lat' THEN 5 WHEN 'cervical_flex' THEN 5 WHEN 'cervical_ext' THEN 5
-    WHEN 'hip_er' THEN 5 WHEN 'hip_ir' THEN 5 WHEN 'hip_abd' THEN 5
-    WHEN 'shoulder_er' THEN 5
-    WHEN 'ankle_df' THEN 1
-    ELSE 0 END::numeric;
+  SELECT coalesce((
+    SELECT CASE WHEN p_line = 'building' THEN c.building ELSE c.steady END
+    FROM (VALUES
+      ('hip_er',        1.5::numeric, 0::numeric),
+      ('hip_ir',        1.5, 0),
+      ('hip_abd',       2,   0),
+      ('cervical_flex', 2.5, 0),
+      ('cervical_lat',  2,   0),
+      ('cervical_rot',  5,   5),
+      ('cervical_ext',  5,   5),
+      ('shoulder_er',   5,   5),
+      ('ankle_df',      1,   1)
+    ) AS c(joint_key, steady, building)
+    WHERE c.joint_key = regexp_replace(coalesce(p_joint_key, ''), '_(l|r)$', '')
+  ), 0);
+$function$;
+
+CREATE OR REPLACE FUNCTION public.t1_is_narrow(p_joint_key text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT public.t1_narrow_buffer(p_joint_key, 'steady') > 0 OR public.t1_narrow_buffer(p_joint_key, 'building') > 0;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.t1_joint_band(p_joint_key text, p_worse numeric, p_target numeric)
@@ -38,10 +60,10 @@ CREATE OR REPLACE FUNCTION public.t1_joint_band(p_joint_key text, p_worse numeri
 AS $function$
   SELECT (CASE
     WHEN p_worse IS NULL OR p_target IS NULL OR p_target <= 0 THEN 1
-    WHEN public.t1_narrow_buffer(p_joint_key) = 0 THEN
+    WHEN NOT public.t1_is_narrow(p_joint_key) THEN
       CASE WHEN p_worse/p_target >= 1.0 THEN 3 WHEN p_worse/p_target >= 0.90 THEN 2 ELSE 1 END
-    WHEN p_worse + public.t1_narrow_buffer(p_joint_key) >= p_target THEN 3
-    WHEN p_worse + public.t1_narrow_buffer(p_joint_key) >= 0.90 * p_target THEN 2
+    WHEN p_worse + public.t1_narrow_buffer(p_joint_key, 'steady') >= p_target THEN 3
+    WHEN p_worse + public.t1_narrow_buffer(p_joint_key, 'building') >= 0.90 * p_target THEN 2
     ELSE 1 END)::smallint;
 $function$;
 
@@ -55,7 +77,7 @@ AS $function$
     WHEN p_worse IS NULL OR p_target IS NULL OR p_target <= 0 THEN NULL
     WHEN public.t1_joint_band(p_joint_key, p_worse, p_target) = 3 THEN 0
     ELSE (1 - least(1, greatest(0, p_worse / p_target)))
-      * CASE WHEN public.t1_narrow_buffer(p_joint_key) = 0 THEN 1
+      * CASE WHEN NOT public.t1_is_narrow(p_joint_key) THEN 1
              WHEN p_prev_worse IS NOT NULL
               AND public.t1_joint_band(p_joint_key, p_prev_worse, p_target) = public.t1_joint_band(p_joint_key, p_worse, p_target) THEN 1
              ELSE 0.5 END

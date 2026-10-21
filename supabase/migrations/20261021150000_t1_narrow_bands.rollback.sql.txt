@@ -86,4 +86,6 @@ $function$;
 
 DROP FUNCTION IF EXISTS public.t1_weighted_gap(text, numeric, numeric, numeric);
 DROP FUNCTION IF EXISTS public.t1_joint_band(text, numeric, numeric);
+DROP FUNCTION IF EXISTS public.t1_is_narrow(text);
+DROP FUNCTION IF EXISTS public.t1_narrow_buffer(text, text);
 DROP FUNCTION IF EXISTS public.t1_narrow_buffer(text);
