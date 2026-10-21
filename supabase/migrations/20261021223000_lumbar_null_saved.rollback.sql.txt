@@ -1,0 +1,22 @@
+-- ROLLBACK for 20261021223000_lumbar_null_saved.sql. NOT APPLIED. Run FIRST, before 20261021220000_rescore_saved.rollback.
+-- Restores the lumbar values and lumbar rows exactly from public.lumbar_null_backup_20261021_* (taken by the migration,
+-- after the rescore). The rescore backup (rescore_backup_20261021_*) still holds the pre-rescore lumbar values and is
+-- restored by the rescore rollback. Keeps the backup tables (drop by hand later, after export).
+DO $guard$
+DECLARE v_bad text;
+BEGIN
+  IF to_regclass('public.lumbar_null_backup_20261021_assessments') IS NULL THEN
+    RAISE EXCEPTION 'lumbar_null rollback: backup tables missing';
+  END IF;
+  SELECT string_agg(c.relname || '.' || t.tgname, ', ') INTO v_bad
+  FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND NOT t.tgisinternal AND t.tgenabled <> 'D'
+    AND (c.relname IN ('joint_scores', 'protocols') OR (c.relname = 'assessments' AND (t.tgtype & (8 | 16 | 32)) <> 0));
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'lumbar_null rollback: refusing, trigger present: %', v_bad; END IF;
+END
+$guard$;
+
+UPDATE public.assessments a SET lumbar_flex = b.lumbar_flex, lumbar_ext = b.lumbar_ext
+  FROM public.lumbar_null_backup_20261021_assessments b WHERE a.id = b.id;
+INSERT INTO public.joint_scores SELECT * FROM public.lumbar_null_backup_20261021_joint_scores;
+INSERT INTO public.protocols SELECT * FROM public.lumbar_null_backup_20261021_protocols;
