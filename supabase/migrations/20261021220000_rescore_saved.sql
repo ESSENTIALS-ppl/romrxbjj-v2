@@ -48,7 +48,7 @@ DO $rev$ BEGIN
   END IF;
 END $rev$;
 
--- SQL mirror of compute-tiers v42 (JOINT_TARGETS order + joint_totals.ts worstJointKeys / romTotal). Temporary, dropped below.
+-- Needs 20261021215000_lumbar_never_ranked applied first. SQL mirror of compute-tiers v42 (JOINT_TARGETS order + joint_totals.ts worstJointKeys / romTotal). Temporary, dropped below.
 CREATE FUNCTION public.rescore_20261021_totals(p_id uuid, OUT worst text[], OUT total integer)
  LANGUAGE sql STABLE SET search_path TO 'public'
 AS $fn$
@@ -74,7 +74,9 @@ AS $fn$
   m AS (SELECT * FROM v WHERE val IS NOT NULL)
   SELECT
     coalesce((SELECT array_agg(key ORDER BY g DESC, ord) FROM (
-      SELECT key, ord, public.t1_weighted_gap(key, val, target, pval) g FROM m ORDER BY g DESC, ord LIMIT 5) s), ARRAY[]::text[]),
+      SELECT key, ord, public.t1_weighted_gap(key, val, target, pval) g FROM m
+      WHERE key NOT IN ('lumbar_flex', 'lumbar_ext')   -- lumbar never ranked (Grant Oct 21 7:10 PM; mirrors worstJointKeys); rom_total keeps it
+      ORDER BY g DESC, ord LIMIT 5) s), ARRAY[]::text[]),
     coalesce((SELECT round(avg(least(1, greatest(0, val / target)) * 100))::int FROM m), 0);
 $fn$;
 

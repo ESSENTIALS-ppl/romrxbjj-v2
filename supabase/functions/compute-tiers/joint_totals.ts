@@ -19,6 +19,11 @@ type ToNum = (v: unknown) => number | null;
 import { weightedGap } from "../_shared/t1_narrow_bands.ts";
 export { bandForJoint, isNarrowJoint, NARROW_BAND_CONFIG, NARROW_GAP_WEIGHT, narrowBuffers, weightedGap } from "../_shared/t1_narrow_bands.ts";
 
+/** Lumbar (low back) step removed from Base; saved values are never ranked as weak spots. Mirrors romrx-io-web lumbarFlag.ts. */
+export function isLumbarKey(key: string): boolean {
+  return key === "lumbar_flex" || key === "lumbar_ext";
+}
+
 /** Weak spots, worst first by T1 weighted gap. `prev` = the user's previous assessment (null = first one). */
 export function worstJointKeys(
   a: Record<string, unknown>,
@@ -30,6 +35,7 @@ export function worstJointKeys(
   const rows: { key: string; gap: number }[] = [];
   for (const [key, target] of Object.entries(targets)) {
     if (isUnscoredJoint(key)) continue;
+    if (isLumbarKey(key)) continue; // Grant Oct 21 2026 7:10 PM: low back never ranked (saved values kept; romTotal unchanged)
     const num = toNum(a[key]);
     if (num == null) continue;
     rows.push({ key, gap: weightedGap(key, num, target, prev ? toNum(prev[key]) : null) });
