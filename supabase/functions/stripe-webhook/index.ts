@@ -660,7 +660,7 @@ Deno.serve(async (req: Request) => {
         alsoCancelStripe: true,
         skipSubId: subId,
       });
-      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled — sport packs cascaded: ${userId}`,
+      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled, sport packs cascaded: ${userId}`,
         `<p>Base subscription deleted/paused. Sport entitlements canceled and separate sport Stripe subs canceled when present.</p>
          <p><strong>User ID:</strong> ${userId}<br><strong>Customer:</strong> ${customerId}</p>`);
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
