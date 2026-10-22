@@ -25,6 +25,9 @@ assert.ok(sa.includes("const captureMethods = sanitizeCaptureMethods(body.captur
 assert.ok(sa.includes("if (captureMethods) row.capture_methods = captureMethods;"));
 const sl = readFileSync(new URL("../submit-lead-assessment/index.ts", import.meta.url), "utf8");
 assert.ok(sl.includes("...(captureMethods ? { capture_methods: captureMethods } : {}),"));
-// the anonymous lead path (leads table) does not take it (no column there)
-assert.ok(!/from\("leads"\)\.insert\(\{[^}]*capture_methods/s.test(sl));
+// anonymous lead path: leads insert takes it too, only when valid (Oct 22 2026, leads.capture_methods)
+assert.ok(/from\("leads"\)\.insert\(\{[^}]*\.\.\.\(captureMethods \? \{ capture_methods: captureMethods \} : \{\}\)/s.test(sl));
+assert.equal((sl.match(/\.\.\.\(captureMethods \? \{ capture_methods: captureMethods \} : \{\}\),/g) ?? []).length, 2, "assessments + leads");
+// dry_run path never writes, so it never stores a marker (sanitizer runs, nothing is inserted)
+assert.ok(sl.indexOf("const captureMethods = sanitizeCaptureMethods") < sl.indexOf("if (body.dry_run === true)"));
 console.log("capture_methods: ok");

@@ -145,6 +145,9 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
 
   const { data, count } = sanitize(body.assessment_data);
+  // Optional capture-method marker (Oct 22 2026): only when valid, so older clients insert exactly as before.
+  // Stored on assessments (signed-in) and on leads (anonymous). Never used for score, band or email.
+  const captureMethods = sanitizeCaptureMethods(body.capture_methods, ALLOWED_FIELDS, data);
   const score = computePRS(data);
   const tier  = scoreToTier(score);
   const band  = overallBandScore(data);
@@ -177,8 +180,6 @@ Deno.serve(async (req: Request) => {
 
   if (userId) {
     if (count === 0) return json(400, { error: "At least one ROM measurement is required" });
-    // Optional capture-method marker (Oct 22 2026): only when valid, so older clients insert exactly as before.
-    const captureMethods = sanitizeCaptureMethods(body.capture_methods, ALLOWED_FIELDS, data);
     const { error } = await admin.from("assessments").insert({
       ...data,                 // whitelisted joint fields only
       ...(captureMethods ? { capture_methods: captureMethods } : {}),
@@ -205,6 +206,7 @@ Deno.serve(async (req: Request) => {
     email,
     full_name: body.full_name ? String(body.full_name).slice(0, 120) : null,
     assessment_data: data,
+    ...(captureMethods ? { capture_methods: captureMethods } : {}),
     prs_score: score,
     tier,
     unlock_token: unlockToken,
