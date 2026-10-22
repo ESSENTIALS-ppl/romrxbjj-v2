@@ -103,3 +103,15 @@ Deno.test("consent-error logs are email-redacted", () => {
   assertEquals((src.match(/console\.error\("ARL consent unavailable; no session created", redactEmail\(e\.message\)\);/g) ?? []).length, 3);
   assert(!/no session created", e\.message\)/.test(src));
 });
+
+Deno.test("no client response includes DB or Stripe message text", () => {
+  const code = src.replace(/^\s*\/\/.*$/gm, "");
+  // Every json(...) response and every claimLead error value
+  const responses = code.match(/json\(\s*[\w.]+\s*,[\s\S]*?\)\s*;/g) ?? [];
+  assert(responses.length > 10);
+  for (const r of responses) assert(!/\.message\b|err\.|e\.message|String\(e/.test(r.replace(/CONSENT_UNAVAILABLE_MESSAGE/g, "")), r);
+  const claimErrs = code.match(/error: `[^`]*`/g) ?? [];
+  assertEquals(claimErrs.length, 0);
+  assert(code.includes('return { ok: false, status: 500, error: "lead_lookup_failed" };'));
+  assert(code.includes('console.error("lead lookup failed", redactEmail(leadErr.message));'));
+});

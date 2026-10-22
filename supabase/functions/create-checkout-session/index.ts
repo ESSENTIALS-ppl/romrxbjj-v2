@@ -136,7 +136,10 @@ async function claimLead(
     .select("id, email, assessment_data, prs_score, converted_user_id")
     .eq("unlock_token", leadToken)
     .maybeSingle();
-  if (leadErr) return { ok: false, status: 500, error: `lead_lookup_failed: ${leadErr.message}` };
+  if (leadErr) {
+    console.error("lead lookup failed", redactEmail(leadErr.message));
+    return { ok: false, status: 500, error: "lead_lookup_failed" };
+  }
   if (!lead)   return { ok: false, status: 404, error: "lead_not_found" };
   if (lead.converted_user_id && lead.converted_user_id !== userId) {
     return { ok: false, status: 409, error: "lead_already_claimed" };
