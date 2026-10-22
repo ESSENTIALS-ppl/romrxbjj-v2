@@ -37,7 +37,7 @@ import {
   ARL_DISCLOSURE_VERSION, ARL_CONSENT_TEXT, SPORT_PACK_NAMES, formatUsd, disclosureBase, disclosureCombo,
   disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
 } from "../_shared/arl_copy.ts";
-import { ArlConsentUnavailableError, CONSENT_UNAVAILABLE_MESSAGE, CONSENT_UNAVAILABLE_STATUS, createConsentSession } from "./consent_session.ts";
+import { ArlConsentUnavailableError, COACH_DISCLOSURE, CONSENT_UNAVAILABLE_MESSAGE, CONSENT_UNAVAILABLE_STATUS, createConsentSession } from "./consent_session.ts";
 import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -138,7 +138,7 @@ async function claimLead(
     return { ok: false, status: 409, error: "lead_already_claimed" };
   }
   if (lead.email && userEmail && lead.email.toLowerCase() !== userEmail.toLowerCase()) {
-    console.warn(`lead ${lead.id}: email mismatch lead=${lead.email} caller=${userEmail}`);
+    console.warn(`lead ${lead.id}: email mismatch`);
   }
   const { error: convertErr } = await admin
     .from("leads")
@@ -389,7 +389,7 @@ Deno.serve(async (req: Request) => {
     if (gym) meta.gym = gym;
     if (body.sport) meta.sport = body.sport;
     try {
-      const session = await stripe.checkout.sessions.create({
+      const coachParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         line_items: [{ price: COACH_PRICE_ID, quantity: 1 }],
         allow_promotion_codes: true,
@@ -399,7 +399,18 @@ Deno.serve(async (req: Request) => {
         cancel_url: `${COACH_ORIGIN}/signup/coach?checkout=cancel`,
         metadata: meta,
         subscription_data: { metadata: meta },
-      });
+      };
+      let session: Stripe.Checkout.Session;
+      try {
+        // 2026-10-22: coach checkout also always requires consent and fails closed. COACH_DISCLOSURE is DRAFT copy
+        // pending Stacy; keep COACH_CHECKOUT_OPEN off until she approves it.
+        session = await createConsentSession((p) => stripe.checkout.sessions.create(p), coachParams, COACH_DISCLOSURE, ARL_CONSENT_TEXT);
+      } catch (e) {
+        if (!(e instanceof ArlConsentUnavailableError)) throw e;
+        console.error("ARL consent unavailable; no session created", e.message);
+        await logEvent("checkout_arl_consent_unavailable", { userId, props: { mode: "coach", testmode: false, session_created: false } });
+        return json(CONSENT_UNAVAILABLE_STATUS, { error: "arl_consent_unavailable", message: CONSENT_UNAVAILABLE_MESSAGE });
+      }
       return json(200, { url: session.url });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };

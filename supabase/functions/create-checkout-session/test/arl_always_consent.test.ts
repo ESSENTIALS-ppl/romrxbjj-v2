@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
 import {
-  ARL_CONSENT, ArlConsentUnavailableError, CONSENT_UNAVAILABLE_MESSAGE, CONSENT_UNAVAILABLE_STATUS, createConsentSession,
+  ARL_CONSENT, COACH_DISCLOSURE, ArlConsentUnavailableError, CONSENT_UNAVAILABLE_MESSAGE, CONSENT_UNAVAILABLE_STATUS, createConsentSession,
 } from "../consent_session.ts";
 
 const src = Deno.readTextFileSync(new URL("../index.ts", import.meta.url));
@@ -47,16 +47,32 @@ Deno.test("index.ts: no ARL_LIVE gate, no no-consent paths, no fallback retry", 
   assert(!/ARL_LIVE/.test(src.replace(/^\/\/.*$/gm, "")), "ARL_LIVE referenced in code");
   assert(!src.includes('arl_consent: "unavailable"'), "fallback retry still present");
   assert(!src.includes("v32 (live) behavior"), "legacy no-consent path still present");
-  // Every Base/unlock session goes through createConsentSession; only the coach path calls stripe directly.
+  // Every session (base, unlock, coach) goes through createConsentSession; nothing calls Stripe directly.
   assertEquals((src.match(/createConsentSession\(\(p\) => s\.checkout\.sessions\.create\(p\)/g) ?? []).length, 2);
+  assertEquals((src.match(/createConsentSession\(\(p\) => stripe\.checkout\.sessions\.create\(p\), coachParams, COACH_DISCLOSURE/g) ?? []).length, 1);
   assertEquals((src.match(/\.checkout\.sessions\.create\(/g) ?? []).length, 3);
-  const coachIdx = src.indexOf('if (mode === "coach")');
-  assert(src.lastIndexOf("stripe.checkout.sessions.create(") > coachIdx);
+  assertEquals((src.match(/await (s|stripe|stripeTest!?)\.checkout\.sessions\.create\(/g) ?? []).length, 0);
 });
 
 Deno.test("index.ts: fail-closed handler returns 503 + logs event", () => {
-  assertEquals((src.replace(/^\s*\/\/.*$/gm, "").match(/logEvent\("checkout_arl_consent_unavailable"/g) ?? []).length, 2);
-  assertEquals((src.match(/return json\(CONSENT_UNAVAILABLE_STATUS, \{ error: "arl_consent_unavailable"/g) ?? []).length, 2);
+  assertEquals((src.replace(/^\s*\/\/.*$/gm, "").match(/logEvent\("checkout_arl_consent_unavailable"/g) ?? []).length, 3);
+  assertEquals((src.match(/return json\(CONSENT_UNAVAILABLE_STATUS, \{ error: "arl_consent_unavailable"/g) ?? []).length, 3);
   assertEquals(CONSENT_UNAVAILABLE_STATUS, 503);
   assert(!CONSENT_UNAVAILABLE_MESSAGE.includes("\u2014"));
+});
+
+Deno.test("coach: consent required and fails closed (paused path)", () => {
+  const i = src.indexOf('if (mode === "coach")');
+  const coach = src.slice(i, src.indexOf('return json(400, { error: "Invalid mode" })', i));
+  assert(coach.includes("createConsentSession("));
+  assert(coach.includes('mode: "coach"') && coach.includes("CONSENT_UNAVAILABLE_STATUS"));
+  assert(coach.indexOf("COACH_CHECKOUT_OPEN") < coach.indexOf("createConsentSession("));
+  assert(!COACH_DISCLOSURE.includes("\u2014"));
+});
+
+Deno.test("no email address printed in any log", () => {
+  const logs = src.match(/console\.(log|warn|error|info)\([^;]*;/g) ?? [];
+  assert(logs.length > 0);
+  for (const l of logs) assert(!/email|Email/.test(l.replace(/email mismatch/, "")), l);
+  assert(src.includes("console.warn(`lead ${lead.id}: email mismatch`);"));
 });

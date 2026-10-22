@@ -3,6 +3,8 @@
 export const ARL_CONSENT = { terms_of_service: "required" as const };
 export const CONSENT_UNAVAILABLE_STATUS = 503;
 export const CONSENT_UNAVAILABLE_MESSAGE = "Checkout is temporarily unavailable. Please try again later.";
+// DRAFT for Stacy (coach checkout is paused; COACH_CHECKOUT_OPEN must stay off until she approves this line).
+export const COACH_DISCLOSURE = "Your coach plan renews automatically at the price shown until you cancel. Cancel online anytime in Settings.";
 export class ArlConsentUnavailableError extends Error {}
 export function isMissingTermsUrlError(e: unknown): boolean {
   const msg = String((e as { message?: string })?.message ?? "").toLowerCase();
