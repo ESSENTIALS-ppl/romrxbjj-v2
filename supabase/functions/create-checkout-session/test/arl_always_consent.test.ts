@@ -91,3 +91,15 @@ Deno.test("Stripe message is email-redacted before logging", () => {
   assertEquals(redactEmail(undefined), "");
   assertEquals(redactEmail("no address"), "no address");
 });
+
+Deno.test("Stripe-failure 502s return a generic body with no Stripe text", () => {
+  assertEquals((src.match(/return json\(502, \{ error: "checkout_failed" \}\);/g) ?? []).length, 3);
+  assert(!/message: err\.message/.test(src));
+  assert(!/stripe_type: err\.type/.test(src));
+  assert(!src.includes("Stripe checkout session creation failed"));
+});
+
+Deno.test("consent-error logs are email-redacted", () => {
+  assertEquals((src.match(/console\.error\("ARL consent unavailable; no session created", redactEmail\(e\.message\)\);/g) ?? []).length, 3);
+  assert(!/no session created", e\.message\)/.test(src));
+});

@@ -275,7 +275,7 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         if (!(e instanceof ArlConsentUnavailableError)) throw e;
         // Fail closed (2026-10-22): no session without the consent box.
-        console.error("ARL consent unavailable; no session created", e.message);
+        console.error("ARL consent unavailable; no session created", redactEmail(e.message));
         await logEvent("checkout_arl_consent_unavailable", { userId: body.user_id, props: { mode: "base", testmode: testMode, session_created: false } });
         return json(CONSENT_UNAVAILABLE_STATUS, { error: "arl_consent_unavailable", message: CONSENT_UNAVAILABLE_MESSAGE });
       }
@@ -284,12 +284,7 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
       console.error("stripe base checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
-      return json(502, {
-        error: "stripe_error",
-        stripe_type: err.type ?? null,
-        stripe_code: err.code ?? null,
-        message: err.message ?? "Stripe checkout session creation failed",
-      });
+      return json(502, { error: "checkout_failed" });
     }
   }
   if (mode === "unlock") {
@@ -363,7 +358,7 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         if (!(e instanceof ArlConsentUnavailableError)) throw e;
         // Fail closed (2026-10-22): no session without the consent box.
-        console.error("ARL consent unavailable; no session created", e.message);
+        console.error("ARL consent unavailable; no session created", redactEmail(e.message));
         await logEvent("checkout_arl_consent_unavailable", { userId: userId, props: { mode: "unlock", testmode: testMode, session_created: false } });
         return json(CONSENT_UNAVAILABLE_STATUS, { error: "arl_consent_unavailable", message: CONSENT_UNAVAILABLE_MESSAGE });
       }
@@ -372,12 +367,7 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
       console.error("stripe unlock checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
-      return json(502, {
-        error: "stripe_error",
-        stripe_type: err.type ?? null,
-        stripe_code: err.code ?? null,
-        message: err.message ?? "Stripe checkout session creation failed",
-      });
+      return json(502, { error: "checkout_failed" });
     }
   }
   if (mode === "coach") {
@@ -411,7 +401,7 @@ Deno.serve(async (req: Request) => {
         session = await createConsentSession((p) => stripe.checkout.sessions.create(p), coachParams, COACH_DISCLOSURE, ARL_CONSENT_TEXT);
       } catch (e) {
         if (!(e instanceof ArlConsentUnavailableError)) throw e;
-        console.error("ARL consent unavailable; no session created", e.message);
+        console.error("ARL consent unavailable; no session created", redactEmail(e.message));
         await logEvent("checkout_arl_consent_unavailable", { userId, props: { mode: "coach", testmode: false, session_created: false } });
         return json(CONSENT_UNAVAILABLE_STATUS, { error: "arl_consent_unavailable", message: CONSENT_UNAVAILABLE_MESSAGE });
       }
@@ -419,12 +409,7 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
       console.error("stripe coach checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
-      return json(502, {
-        error: "stripe_error",
-        stripe_type: err.type ?? null,
-        stripe_code: err.code ?? null,
-        message: err.message ?? "Stripe checkout session creation failed",
-      });
+      return json(502, { error: "checkout_failed" });
     }
   }
   return json(400, { error: "Invalid mode" });
