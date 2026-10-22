@@ -73,13 +73,21 @@ Deno.test("coach: consent required and fails closed (paused path)", () => {
 Deno.test("no email address printed in any log", () => {
   const logs = src.match(/console\.(log|warn|error|info)\([^;]*;/g) ?? [];
   assert(logs.length > 0);
-  for (const l of logs) assert(!/email|Email/.test(l.replace(/email mismatch/, "")), l);
+  for (const l of logs) assert(!/email|Email/.test(l.replace(/email mismatch/, "").replace(/redactEmail\(/g, "")), l);
   assert(src.includes("console.warn(`lead ${lead.id}: email mismatch`);"));
 });
 
 Deno.test("Stripe error logs print only code, type and message (never the raw object)", () => {
   assert(!/console\.error\("stripe \w+ checkout failed", err\)/.test(src));
   for (const k of ["base", "unlock", "coach"]) {
-    assert(src.includes(`console.error("stripe ${k} checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });`), k);
+    assert(src.includes(`console.error("stripe ${k} checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });`), k);
   }
+});
+
+Deno.test("Stripe message is email-redacted before logging", () => {
+  assert(src.includes('return (m ?? "").replace(/[^\\s@]+@[^\\s@]+/g, "[email]");'));
+  const redactEmail = (m: string | null | undefined) => (m ?? "").replace(/[^\s@]+@[^\s@]+/g, "[email]");
+  assertEquals(redactEmail("Invalid email: a.b+c@x.co is bad"), "Invalid email: [email] is bad");
+  assertEquals(redactEmail(undefined), "");
+  assertEquals(redactEmail("no address"), "no address");
 });

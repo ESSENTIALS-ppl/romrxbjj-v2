@@ -96,6 +96,10 @@ async function callerIsTestFixture(admin: ReturnType<typeof createClient>, email
   if (error) { console.error("is_test_account rpc failed", error.message); return false; }
   return data === true;
 }
+/** Strip anything that looks like an email address before logging Stripe text. */
+function redactEmail(m: string | null | undefined): string {
+  return (m ?? "").replace(/[^\s@]+@[^\s@]+/g, "[email]");
+}
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -279,7 +283,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url, pending_sport: pendingSport });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe base checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
+      console.error("stripe base checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
@@ -367,7 +371,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe unlock checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
+      console.error("stripe unlock checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
@@ -414,7 +418,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe coach checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
+      console.error("stripe coach checkout failed", { code: err.code ?? null, type: err.type ?? null, message: redactEmail(err.message) });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
