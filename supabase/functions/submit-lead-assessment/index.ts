@@ -28,6 +28,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import { logEvent } from "../_shared/events.ts";
 import { BAND_LABEL, jointPercents, mobilityScore, overallBandScore, renderEmail, renderSubject } from "./email.ts";
+import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
+
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -136,6 +138,7 @@ Deno.serve(async (req: Request) => {
     email?: string;
     full_name?: string;
     assessment_data?: JointMap;
+    capture_methods?: unknown;
     source?: string;
     dry_run?: boolean;
   };
@@ -174,8 +177,11 @@ Deno.serve(async (req: Request) => {
 
   if (userId) {
     if (count === 0) return json(400, { error: "At least one ROM measurement is required" });
+    // Optional capture-method marker (Oct 22 2026): only when valid, so older clients insert exactly as before.
+    const captureMethods = sanitizeCaptureMethods(body.capture_methods, ALLOWED_FIELDS, data);
     const { error } = await admin.from("assessments").insert({
       ...data,                 // whitelisted joint fields only
+      ...(captureMethods ? { capture_methods: captureMethods } : {}),
       user_id: userId,         // server-controlled, cannot be overridden by the client
       sport: "general",
       rom_total: score,        // compute-tiers recomputes this on insert with the same targets

@@ -8,6 +8,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
+import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -244,6 +245,10 @@ Deno.serve(async (req) => {
   }
   const hasAny = NUMERIC_FIELDS.some((f) => row[f] !== null);
   if (!hasAny) return json({ error: "At least one ROM measurement is required" }, 400);
+  // Optional capture-method marker (Oct 22 2026). Absent or invalid = key not sent, so older clients and
+  // rows are unchanged (column stays NULL = unknown). Needs migration 20261022090000 applied first.
+  const captureMethods = sanitizeCaptureMethods(body.capture_methods, NUMERIC_FIELDS, row);
+  if (captureMethods) row.capture_methods = captureMethods;
   const { data: inserted, error } = await admin
     .from("assessments")
     .insert(row)

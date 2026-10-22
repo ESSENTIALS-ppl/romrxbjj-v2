@@ -1,0 +1,14 @@
+-- ROLLBACK for 20261022090000_capture_methods.sql. NOT APPLIED. Run BEFORE the batch 1021 rollbacks (it is the newest).
+-- Drops the CHECK and the column. Refuses while any row holds a marker, so no saved marker is lost silently:
+-- export first (select id, capture_methods from public.assessments where capture_methods is not null), then set
+-- them to NULL by hand with Jim's OK, then run this. Metadata only: no trigger fires, no email.
+DO $guard$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.assessments WHERE capture_methods IS NOT NULL) THEN
+    RAISE EXCEPTION 'capture_methods rollback: % rows still hold markers; export and clear them first',
+      (SELECT count(*) FROM public.assessments WHERE capture_methods IS NOT NULL);
+  END IF;
+END
+$guard$;
+ALTER TABLE public.assessments DROP CONSTRAINT IF EXISTS assessments_capture_methods_check;
+ALTER TABLE public.assessments DROP COLUMN IF EXISTS capture_methods;
