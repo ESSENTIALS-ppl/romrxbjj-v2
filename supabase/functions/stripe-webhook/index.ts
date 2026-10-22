@@ -107,6 +107,10 @@ async function sendArlSportAck(to: string, sessionId: string, sportPrice: string
   return await sendArlMail(to, `arl_ack_sport-${sessionId}`, ackSportSubject(sportPack),
     ackSportHtml(sportPrice, sportPack, freePeriod, true), ackSportText(sportPrice, sportPack, freePeriod, true), "arl_ack_sport");
 }
+/** Strip anything that looks like an email address before logging provider text. */
+function redactEmail(m: string | null | undefined): string {
+  return (m ?? "").replace(/[^\s@]+@[^\s@]+/g, "[email]");
+}
 async function sendArlMail(to: string, key: string, subject: string, html: string, text: string, emailId: string): Promise<string | null> {
   if (!RESEND_KEY) return null;
   const res = await fetch("https://api.resend.com/emails", {
@@ -120,7 +124,11 @@ async function sendArlMail(to: string, key: string, subject: string, html: strin
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) { console.error("ARL ack Resend error", res.status, JSON.stringify(data)); return null; }
+  if (!res.ok) {
+    const msg = String((data as { message?: unknown })?.message ?? "");
+    console.error("ARL ack Resend error", { status: res.status, message: redactEmail(msg) });
+    return null;
+  }
   return (data as { id?: string }).id ?? null;
 }
 
@@ -393,6 +401,8 @@ Deno.serve(async (req: Request) => {
           props: { email_id: "arl_ack", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
       } else if (consentAckOn && email) {
         console.error("ARL ack not sent: no price amounts for session", obj.id);
+        await logEvent("arl_ack_skipped_amounts_unavailable", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
+          props: { email_id: "arl_ack", checkout_session: obj.id, testmode: testEvent } });
       }
 
       if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
@@ -448,6 +458,8 @@ Deno.serve(async (req: Request) => {
           props: { email_id: "arl_ack_sport", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
       } else if (consentAckOn && email) {
         console.error("ARL sport ack not sent: missing amount or pack name", obj.id);
+        await logEvent("arl_ack_skipped_amounts_unavailable", { userId: meta.user_id, sport: meta.sport, source: "stripe",
+          props: { email_id: "arl_ack_sport", checkout_session: obj.id, testmode: testEvent, reason: sportAmounts.length ? "pack_name_missing" : "amounts_unavailable" } });
       }
 
       if (alertJim) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
