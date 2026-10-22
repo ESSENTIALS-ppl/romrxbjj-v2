@@ -76,3 +76,10 @@ Deno.test("no email address printed in any log", () => {
   for (const l of logs) assert(!/email|Email/.test(l.replace(/email mismatch/, "")), l);
   assert(src.includes("console.warn(`lead ${lead.id}: email mismatch`);"));
 });
+
+Deno.test("Stripe error logs print only code, type and message (never the raw object)", () => {
+  assert(!/console\.error\("stripe \w+ checkout failed", err\)/.test(src));
+  for (const k of ["base", "unlock", "coach"]) {
+    assert(src.includes(`console.error("stripe ${k} checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });`), k);
+  }
+});

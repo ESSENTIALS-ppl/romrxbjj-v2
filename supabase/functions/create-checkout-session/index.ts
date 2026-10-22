@@ -279,7 +279,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url, pending_sport: pendingSport });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe base checkout failed", err);
+      console.error("stripe base checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
@@ -367,7 +367,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe unlock checkout failed", err);
+      console.error("stripe unlock checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
@@ -414,7 +414,7 @@ Deno.serve(async (req: Request) => {
       return json(200, { url: session.url });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };
-      console.error("stripe coach checkout failed", err);
+      console.error("stripe coach checkout failed", { code: err.code ?? null, type: err.type ?? null, message: err.message ?? null });
       return json(502, {
         error: "stripe_error",
         stripe_type: err.type ?? null,
