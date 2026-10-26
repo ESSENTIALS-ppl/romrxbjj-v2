@@ -22,24 +22,27 @@ type JointMap = Record<string, number | null | undefined>;
  */
 /**
  * Same joints + targets as mobilityBands.ts ASSESSMENT_JOINTS / JOINT_SCORE_TARGETS.
- * Steady targets changed by Jim's decisions of Oct 6 2026: hip ER 29 and hip IR 26 (Simoneau et al. 1998; were 45), hip abduction 40
- * (was 90), shoulder flexion 140 (Gill et al. 2020; was 180), ankle knee-to-wall 6 cm (Konor 2012 / McBride 2026; was 20),
- * neck rotation 70 (was 80) and neck side bend 38 (was 45) (Swinkels & Swinkels-Meewisse 2014, Spine, PMID 24573069),
- * shoulder ER 85 (Oct 6 8:19 PM: standing goal-post test; was 40 for the lying tucked-elbow test, 90 before).
+ * Sources (range-proposal.md, Oct 21 2026): hip ER / IR PMIDs 9742472, 1881956; shoulder flexion PMID 33046038;
+ * ankle PMID 41723909; neck side bend / flexion / extension PMIDs 23829201, 32626769, 33868830, 39677250.
+ * Hip abduction 40 and neck rotation 70 are Oct 6 values not covered by range-proposal.md.
+ * Shoulder ER 85 (Oct 6 8:19 PM: standing goal-post test; was 40 for the lying tucked-elbow test, 90 before).
+ * Range reset (Jim Oct 21 2026 4:15 PM ET): pooled mean minus 1 SD. hip ER 23 / IR 24 (PMIDs 9742472, 1881956), shoulder
+ * flexion 141 (PMID 33046038), ankle 6.1 cm (PMID 41723909), neck side bend 37 / flexion 39 / extension 48 (PMIDs 23829201,
+ * 32626769, 33868830, 39677250; with Wadhwa 2024).
  */
 const BAND_JOINTS: ReadonlyArray<{ key: string; target: number; l?: string; r?: string; single?: string }> = [
-  { target: 29, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
-  { target: 26, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
+  { target: 23, key: "hip_er", l: "hip_er_l", r: "hip_er_r" },
+  { target: 24, key: "hip_ir", l: "hip_ir_l", r: "hip_ir_r" },
   { target: 40, key: "hip_abd", l: "hip_abd_l", r: "hip_abd_r" },
   { target: 85, key: "shoulder_er", l: "shoulder_er_l", r: "shoulder_er_r" },
-  { target: 140, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
-  { target: 6, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
+  { target: 141, key: "shoulder_flex", l: "shoulder_flex_l", r: "shoulder_flex_r" },
+  { target: 6.1, key: "ankle_df", l: "ankle_df_l", r: "ankle_df_r" },
   { target: 70, key: "cervical_rot", l: "cervical_rot_l", r: "cervical_rot_r" },
-  { target: 38, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
+  { target: 37, key: "cervical_lat", l: "cervical_lat_l", r: "cervical_lat_r" },
   { target: 60, key: "lumbar_flex", single: "lumbar_flex" },
   { target: 25, key: "lumbar_ext", single: "lumbar_ext" },
-  { target: 50, key: "cervical_flex", single: "cervical_flex" },
-  { target: 60, key: "cervical_ext", single: "cervical_ext" },
+  { target: 39, key: "cervical_flex", single: "cervical_flex" },
+  { target: 48, key: "cervical_ext", single: "cervical_ext" },
 ];
 
 const num = (v: unknown): number | null =>
@@ -52,26 +55,27 @@ function worseOf(data: JointMap, j: { l?: string; r?: string; single?: string })
   return l != null && r != null ? Math.min(l, r) : (l ?? r);
 }
 
-/** compute_joint_scores() band for one ratio: >= 1.00 Steady, >= 0.90 Building, else Needs focus. */
-function bandFromRatio(worse: number, target: number): 1 | 2 | 3 {
-  const ratio = worse / target;
-  return ratio >= 1.0 ? 3 : ratio >= 0.9 ? 2 : 1;
+// T1 narrow bands (Jim Oct 21 2026): band rule + percent display from the shared per-joint config.
+import { bandForJoint, clampPercentToBand, displayPercent, isNarrowJoint } from "../_shared/t1_narrow_bands.ts";
+export { clampPercentToBand };
+
+/** Low back (lumbar) is out of the overall band and the /100 (Grant Oct 21 2026 7:20 PM: lumbar out of the overall); per-joint % still computed for saved values. */
+export function isLumbarKey(key: string): boolean {
+  return key === "lumbar_flex" || key === "lumbar_ext";
 }
 
-/** Same as the app's clampPercentToBand(). */
-export function clampPercentToBand(pct: number, band: 1 | 2 | 3): number {
-  if (band === 3) return 100;
-  if (band === 2) return Math.max(90, Math.min(pct, 99));
-  return Math.max(0, Math.min(pct, 89));
+function bandFromRatio(worse: number, target: number, key = ""): 1 | 2 | 3 {
+  return bandForJoint(key, worse, target);
 }
 
 /** 1 Needs focus, 2 Building, 3 Steady; null when no banded joint is measured. */
 export function overallBandScore(data: JointMap): 1 | 2 | 3 | null {
   let worst: 1 | 2 | 3 | null = null;
   for (const j of BAND_JOINTS) {
+    if (isLumbarKey(j.key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall
     const worse = worseOf(data, j);
     if (worse == null) continue;
-    const band = bandFromRatio(worse, j.target);
+    const band = bandFromRatio(worse, j.target, j.key);
     if (worst == null || band < worst) worst = band;
   }
   return worst;
@@ -83,9 +87,9 @@ export function jointPercents(data: JointMap): Record<string, { pct: number; ban
   for (const j of BAND_JOINTS) {
     const worse = worseOf(data, j);
     if (worse == null) continue;
-    const band = bandFromRatio(worse, j.target);
+    const band = bandFromRatio(worse, j.target, j.key);
     const raw = Math.min(1, Math.max(0, worse / j.target)) * 100;
-    out[j.key] = { pct: clampPercentToBand(Math.floor(raw), band), band };
+    out[j.key] = { pct: displayPercent(Math.floor(raw), band, isNarrowJoint(j.key)), band };
   }
   return out;
 }
@@ -98,6 +102,7 @@ export function mobilityScore(data: JointMap): number | null {
   let sum = 0;
   let n = 0;
   for (const j of BAND_JOINTS) {
+    if (isLumbarKey(j.key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall
     const worse = worseOf(data, j);
     if (worse == null) continue;
     sum += Math.min(1, Math.max(0, worse / j.target)) * 100;
@@ -105,7 +110,7 @@ export function mobilityScore(data: JointMap): number | null {
   }
   if (n === 0) return null;
   const band = overallBandScore(data) ?? 3;
-  return clampPercentToBand(Math.floor(sum / n), band);
+  return displayPercent(Math.floor(sum / n), band);
 }
 
 export const BAND_LABEL: Record<1 | 2 | 3, BaseBand> = { 1: "Needs focus", 2: "Building", 3: "Steady" };

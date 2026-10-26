@@ -1,0 +1,12 @@
+-- ROLLBACK for 20261022091000_leads_capture_methods.sql. NOT APPLIED. Run FIRST (newest), before 20261022090000 rollback.
+-- Refuses while any lead holds a marker (export first, clear with Jim's OK). Metadata only: no trigger, no email.
+DO $guard$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.leads WHERE capture_methods IS NOT NULL) THEN
+    RAISE EXCEPTION 'leads capture_methods rollback: % rows still hold markers; export and clear them first',
+      (SELECT count(*) FROM public.leads WHERE capture_methods IS NOT NULL);
+  END IF;
+END
+$guard$;
+ALTER TABLE public.leads DROP CONSTRAINT IF EXISTS leads_capture_methods_check;
+ALTER TABLE public.leads DROP COLUMN IF EXISTS capture_methods;

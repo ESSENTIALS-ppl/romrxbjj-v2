@@ -34,7 +34,10 @@ for (const v of [0, 30, 68, 120, 150, null]) {
 // only hip flexion measured: nothing scored (0, no weak spots), never a fake score from the 120 target
 assert.equal(romTotal({ hip_flex_l: 68, hip_flex_r: 68 }, T, toNum), 0);
 assert.deepEqual(worstJointKeys({ hip_flex_l: 68, hip_flex_r: 68 }, T, toNum), []);
-// other joints behave exactly as before (worst first, ratio capped at 1)
-assert.deepEqual(worstJointKeys({ hip_er_l: 10, hip_abd_l: 40, lumbar_flex: 30 }, T, toNum, 2), ["hip_er_l", "lumbar_flex"]);
+// other joints: worst first by gap. T1 option C (rebased Oct 21): shoulder ER is still narrow, so its gap (10 / 40 in this local table: 0.75) counts x0.5 on a
+// first assessment (0.375) and the full-weight lumbar gap (0.5) ranks first. Hip ER is a reset move: full weight (10 / 29 here: gap 0.655, full weight).
+assert.deepEqual(worstJointKeys({ shoulder_er_l: 10, hip_abd_l: 40, lumbar_flex: 30 }, T, toNum, 2), ["shoulder_er_l", "hip_abd_l"]);  // lumbar never ranked (Grant Oct 21 2026 7:10 PM)
+assert.deepEqual(worstJointKeys({ shoulder_er_l: 10, hip_abd_l: 40, lumbar_flex: 30 }, T, toNum, 2, { shoulder_er_l: 11 }), ["shoulder_er_l", "hip_abd_l"]);  // lumbar never ranked (Grant Oct 21 2026 7:10 PM)
+assert.deepEqual(worstJointKeys({ hip_er_l: 10, hip_abd_l: 40, lumbar_flex: 30 }, T, toNum, 2), ["hip_er_l", "hip_abd_l"]);  // lumbar never ranked (Grant Oct 21 2026 7:10 PM)
 assert.equal(romTotal({ hip_er_l: 29, hip_abd_l: 20 }, T, toNum), 75);
 console.log("compute-tiers hip_flex_unscored tests: ok");

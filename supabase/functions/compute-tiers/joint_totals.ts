@@ -15,15 +15,32 @@ export function isUnscoredJoint(key: string): boolean {
 
 type ToNum = (v: unknown) => number | null;
 
-export function worstJointKeys(a: Record<string, unknown>, targets: Record<string, number>, toNum: ToNum, limit = 5): string[] {
-  const rows: { key: string; pct: number }[] = [];
+// T1 narrow bands (A buffer + C weighting): the per-joint config and rules live in ../_shared/t1_narrow_bands.ts.
+import { weightedGap } from "../_shared/t1_narrow_bands.ts";
+export { bandForJoint, isNarrowJoint, NARROW_BAND_CONFIG, NARROW_GAP_WEIGHT, narrowBuffers, weightedGap } from "../_shared/t1_narrow_bands.ts";
+
+/** Lumbar (low back) step removed from Base; saved values are never ranked as weak spots. Mirrors romrx-io-web lumbarFlag.ts. */
+export function isLumbarKey(key: string): boolean {
+  return key === "lumbar_flex" || key === "lumbar_ext";
+}
+
+/** Weak spots, worst first by T1 weighted gap. `prev` = the user's previous assessment (null = first one). */
+export function worstJointKeys(
+  a: Record<string, unknown>,
+  targets: Record<string, number>,
+  toNum: ToNum,
+  limit = 5,
+  prev: Record<string, unknown> | null = null,
+): string[] {
+  const rows: { key: string; gap: number }[] = [];
   for (const [key, target] of Object.entries(targets)) {
     if (isUnscoredJoint(key)) continue;
+    if (isLumbarKey(key)) continue; // Grant Oct 21 2026 7:10 PM: low back never ranked (saved values kept; romTotal unchanged)
     const num = toNum(a[key]);
     if (num == null) continue;
-    rows.push({ key, pct: Math.max(0, Math.min(1, num / target)) });
+    rows.push({ key, gap: weightedGap(key, num, target, prev ? toNum(prev[key]) : null) });
   }
-  rows.sort((x, y) => x.pct - y.pct);
+  rows.sort((x, y) => y.gap - x.gap);
   return rows.slice(0, limit).map(r => r.key);
 }
 
@@ -31,6 +48,7 @@ export function romTotal(a: Record<string, unknown>, targets: Record<string, num
   const pcts: number[] = [];
   for (const [key, target] of Object.entries(targets)) {
     if (isUnscoredJoint(key)) continue;
+    if (isLumbarKey(key)) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall (rom_total)
     const num = toNum(a[key]);
     if (num == null) continue;
     pcts.push(Math.max(0, Math.min(1, num / target)) * 100);

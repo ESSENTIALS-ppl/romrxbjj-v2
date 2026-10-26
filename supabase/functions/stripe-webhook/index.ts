@@ -1,3 +1,5 @@
+// 2026-10-22 (fix/webhook-arl-narrow-1022, HELD): billing_consents write and 3c/3c-2 acknowledgment are unconditional
+//   (old v41 live emails removed). Cancel handling still reads ARL_LIVE_ENABLED exactly as live v45.
 // v43: signature verification uses constructEventAsync (Deno/SubtleCrypto is async-only) + failure diagnostics (no secrets logged).
 // v42 = v40 ARL work + release gate (ARL_LIVE_ENABLED): live-signed events behave exactly like v41 until it is "true".
 // v40 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3c + 4A.4 + 4C, Jim GO via Grant 2026-09-29):
@@ -105,6 +107,10 @@ async function sendArlSportAck(to: string, sessionId: string, sportPrice: string
   return await sendArlMail(to, `arl_ack_sport-${sessionId}`, ackSportSubject(sportPack),
     ackSportHtml(sportPrice, sportPack, freePeriod, true), ackSportText(sportPrice, sportPack, freePeriod, true), "arl_ack_sport");
 }
+/** Strip anything that looks like an email address before logging provider text. */
+function redactEmail(m: string | null | undefined): string {
+  return (m ?? "").replace(/[^\s@]+@[^\s@]+/g, "[email]");
+}
 async function sendArlMail(to: string, key: string, subject: string, html: string, text: string, emailId: string): Promise<string | null> {
   if (!RESEND_KEY) return null;
   const res = await fetch("https://api.resend.com/emails", {
@@ -118,7 +124,11 @@ async function sendArlMail(to: string, key: string, subject: string, html: strin
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) { console.error("ARL ack Resend error", res.status, JSON.stringify(data)); return null; }
+  if (!res.ok) {
+    const msg = String((data as { message?: unknown })?.message ?? "");
+    console.error("ARL ack Resend error", { status: res.status, message: redactEmail(msg) });
+    return null;
+  }
   return (data as { id?: string }).id ?? null;
 }
 
@@ -349,7 +359,9 @@ Deno.serve(async (req: Request) => {
     CURRENT_CANCEL_KEY = STRIPE_TEST_SECRET;
   }
   const alertJim = !testEvent; // no internal PAID alerts for fixture test events
-  const arlOn = testEvent || ARL_LIVE;
+  const arlOn = testEvent || ARL_LIVE; // cancel handling only (unchanged from live v45)
+  // 2026-10-22: consent record + 3c/3c-2 acknowledgment are unconditional for live and test checkouts.
+  const consentAckOn = true;
 
   if (type === "checkout.session.completed") {
     const meta       = (obj.metadata ?? {}) as Record<string, string>;
@@ -378,23 +390,19 @@ Deno.serve(async (req: Request) => {
         ? meta.pending_sport
         : null;
 
-      if (!arlOn) {
-        // v41 (live) behavior, unchanged.
-        if (email) {
-          await sendEmail(BRAND_HQ, email, `You didn't buy a subscription. You made an investment.`, `<p>Hey ${firstName}, your ROMRx Base is active. <a href="${BRAND_HQ.dashboard}">Dashboard</a></p>`);
-        }
-      }
       // v40: consent record + 3c acknowledgment (replaces "You didn't buy a subscription...").
-      const amounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
-      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
-      if (arlOn && email && amounts.length) {
+      const amounts = consentAckOn ? await arlAmounts(stripe, meta, subId) : [];
+      if (consentAckOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
+      if (consentAckOn && email && amounts.length) {
         const sportPack = pendingSport && amounts.length > 1 ? SPORT_PACK_NAMES[pendingSport] : null;
         const sportPrice = sportPack ? formatUsd(amounts[1]) : null;
         const resendId = await sendArlAck(email, obj.id as string, formatUsd(amounts[0]), sportPack, sportPrice);
         await logEvent("email_sent", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
           props: { email_id: "arl_ack", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
-      } else if (arlOn && email) {
+      } else if (consentAckOn && email) {
         console.error("ARL ack not sent: no price amounts for session", obj.id);
+        await logEvent("arl_ack_skipped_amounts_unavailable", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
+          props: { email_id: "arl_ack", checkout_session: obj.id, testmode: testEvent } });
       }
 
       if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
@@ -438,24 +446,20 @@ Deno.serve(async (req: Request) => {
       const firstName = String(sportName).split(" ")[0] || "there";
       const brand = brandFor(meta.sport);
 
-      if (!arlOn) {
-        // v41 (live) behavior, unchanged.
-        if (email) {
-          await sendEmail(brand, email, `Your ${meta.sport} pack is unlocked`, `<p>Hey ${firstName}, your ${meta.sport} pack is unlocked. <a href="${brand.dashboard}">Dashboard</a></p>`);
-        }
-      }
       // v40: consent record for sport unlock sessions too.
-      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
+      if (consentAckOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
 
       // v40: 3c-2 acknowledgment replaces "Your {sport} pack is unlocked" (Legal: the old email alone does not comply).
-      const sportAmounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
+      const sportAmounts = consentAckOn ? await arlAmounts(stripe, meta, subId) : [];
       const sportPack = SPORT_PACK_NAMES[meta.sport] ?? null;
-      if (arlOn && email && sportAmounts.length && sportPack) {
+      if (consentAckOn && email && sportAmounts.length && sportPack) {
         const resendId = await sendArlSportAck(email, obj.id as string, formatUsd(sportAmounts[0]), sportPack, meta.arl_period !== "paid");
         await logEvent("email_sent", { userId: meta.user_id, sport: meta.sport, source: "stripe",
           props: { email_id: "arl_ack_sport", template_version: ARL_ACK_VERSION, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
-      } else if (arlOn && email) {
+      } else if (consentAckOn && email) {
         console.error("ARL sport ack not sent: missing amount or pack name", obj.id);
+        await logEvent("arl_ack_skipped_amounts_unavailable", { userId: meta.user_id, sport: meta.sport, source: "stripe",
+          props: { email_id: "arl_ack_sport", checkout_session: obj.id, testmode: testEvent, reason: sportAmounts.length ? "pack_name_missing" : "amounts_unavailable" } });
       }
 
       if (alertJim) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
@@ -668,7 +672,7 @@ Deno.serve(async (req: Request) => {
         alsoCancelStripe: true,
         skipSubId: subId,
       });
-      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled — sport packs cascaded: ${userId}`,
+      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `Base canceled, sport packs cascaded: ${userId}`,
         `<p>Base subscription deleted/paused. Sport entitlements canceled and separate sport Stripe subs canceled when present.</p>
          <p><strong>User ID:</strong> ${userId}<br><strong>Customer:</strong> ${customerId}</p>`);
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });

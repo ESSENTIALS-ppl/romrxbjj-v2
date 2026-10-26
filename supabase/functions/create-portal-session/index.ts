@@ -1,3 +1,5 @@
+// 2026-10-22 (fix/portal-generic-errors-1022, HELD): Stripe failures return { error: "billing_failed" } (500) with no
+//   Stripe text; logs carry only code, type and an email-redacted message.
 // create-portal-session v13 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 section 4B, Jim GO via Grant 2026-09-29)
 //   - body { action: "cancel_status" }: DB-only state for Settings > Subscription: Base state
 //     (active | canceled | none), each sport pack's state, and which subscriptions the signed-in user can cancel.
@@ -39,6 +41,16 @@ const CANCELABLE = new Set(["active", "trialing", "past_due"]);
 
 type Candidate = { subscription_id: string; kind: "base" | "sport"; sport?: string };
 
+/** Strip anything that looks like an email address before logging provider text. */
+function redactEmail(m: string | null | undefined): string {
+  return (m ?? "").replace(/[^\s@]+@[^\s@]+/g, "[email]");
+}
+/** Log only code, type and a redacted message from a Stripe error body. Never sent to the client. */
+function stripeErrLog(body: unknown): { code: string | null; type: string | null; message: string } {
+  const e = (body as { error?: { code?: string; type?: string; message?: string } } | null)?.error;
+  return { code: e?.code ?? null, type: e?.type ?? null, message: redactEmail(e?.message) };
+}
+
 async function stripeGet(key: string, path: string) {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${key}` } });
   return { ok: res.ok, body: await res.json() };
@@ -74,7 +86,7 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   let userRow = first.data as Row | null;
   if (first.error) {
-    console.error("users select (cancel cols) failed, falling back", first.error.message);
+    console.error("users select (cancel cols) failed, falling back", redactEmail(first.error.message));
     const fb = await admin.from("users")
       .select("stripe_customer_id, base_status, base_stripe_subscription_id, base_expiry")
       .eq("id", user.id)
@@ -141,7 +153,7 @@ Deno.serve(async (req: Request) => {
       : candidates;
     for (const c of picked) {
       const { ok, body: sub } = await stripeGet(stripeKey, `subscriptions/${encodeURIComponent(c.subscription_id)}`);
-      if (!ok) { console.error("subscription lookup failed", c.subscription_id, sub?.error?.message); continue; }
+      if (!ok) { console.error("subscription lookup failed", c.subscription_id, stripeErrLog(sub)); continue; }
       if (sub.customer !== userRow?.stripe_customer_id) { console.error("subscription/customer mismatch", c.subscription_id); continue; }
       if (!CANCELABLE.has(sub.status) || sub.cancel_at_period_end || sub.cancel_at) continue;
 
@@ -162,8 +174,8 @@ Deno.serve(async (req: Request) => {
       });
       const session = await res.json();
       if (!res.ok) {
-        console.error("portal cancel flow failed", session?.error?.message);
-        return json({ error: session.error?.message ?? "Stripe error" }, 500);
+        console.error("portal cancel flow failed", stripeErrLog(session));
+        return json({ error: "billing_failed" }, 500);
       }
       return json({ url: session.url, kind: c.kind });
     }
@@ -189,6 +201,9 @@ Deno.serve(async (req: Request) => {
   });
 
   const session = await res.json();
-  if (!res.ok) return json({ error: session.error?.message ?? "Stripe error" }, 500);
+  if (!res.ok) {
+    console.error("portal session failed", stripeErrLog(session));
+    return json({ error: "billing_failed" }, 500);
+  }
   return json({ url: session.url });
 });

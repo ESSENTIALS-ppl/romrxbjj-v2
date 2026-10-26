@@ -94,6 +94,7 @@ function scoreNumFromJoint(score) {
 function overallBandFromJointScores(jointScores) {
   let worst = null;
   for (const row of jointScores ?? []) {
+    if (/^lumbar_(flex|ext)$/.test(String(jointKeyOf(row)))) continue; // Grant Oct 21 2026 7:20 PM: lumbar out of the overall band (saved rows kept)
     const n = scoreNumFromJoint(row?.score);
     if (n == null) continue;
     if (worst == null || n < worst) worst = n;
