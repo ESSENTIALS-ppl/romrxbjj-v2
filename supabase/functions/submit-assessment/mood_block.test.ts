@@ -37,6 +37,16 @@ Deno.test("block: Stacy text verbatim, numbers only, no words, omitted at 0", ()
   assert(!/\u2014/.test(h), "no em dashes");
 });
 
+// Singular for 1, plural otherwise (Jim 8:56 PM): "1 time", "2 times".
+Deno.test("block: count 1 reads '1 time', 2 reads '2 times'", () => {
+  const one = renderMoodBlock({ count: 1, energyAvg: 40, pleasantAvg: 70 });
+  assert(one.includes("You checked in 1 time since your last assessment."));
+  assert(!one.includes("1 times"));
+  const two = renderMoodBlock({ count: 2, energyAvg: 40, pleasantAvg: 70 });
+  assert(two.includes("You checked in 2 times since your last assessment."));
+  assert(!two.includes("2 time since"));
+});
+
 // Minimal fake of the service-role client, records every filter so user scoping can be asserted.
 function fakeAdmin(data: Record<string, unknown>, calls: string[] = []) {
   // deno-lint-ignore no-explicit-any
