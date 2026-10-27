@@ -32,7 +32,7 @@ Deno.test("block: Stacy text verbatim, numbers only, no words, omitted at 0", ()
   const h = renderMoodBlock({ count: 3, energyAvg: 55, pleasantAvg: 62 });
   assert(h.includes("Your mood check-ins"));
   assert(h.includes("You checked in 3 times since your last assessment. Your average energy was 55 and your average pleasantness was 62. For your own reflection. Not medical advice. See all your check-ins in My Body."));
-  assert(h.includes("Having a really hard time? In the US, call or text 988. In the UK or Ireland, call Samaritans on 116 123. If you are in danger, call your local emergency number."));
+  assert(h.includes("ROMRx is not a crisis service and does not monitor your check-ins. Having a really hard time? In the US, call or text 988. In the UK or Ireland, call Samaritans on 116 123. If you are in danger, call your local emergency number."));
   assert(!/href=/.test(h), "no links or URLs in the block");
   assert(!/\u2014/.test(h), "no em dashes");
 });

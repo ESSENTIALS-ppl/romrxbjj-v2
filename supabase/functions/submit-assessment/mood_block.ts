@@ -39,7 +39,7 @@ export function renderMoodBlock(m: MoodSummary | null): string {
         <table cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 28px 0;border:1px solid #eeeeee;border-radius:6px;" data-romood-block="1"><tr><td style="padding:16px 20px;">
           <p style="font-size:16px;color:#111111;font-weight:600;line-height:1.6;margin:0 0 8px 0;">Your mood check-ins</p>
           <p style="font-size:15px;color:#333333;line-height:1.6;margin:0 0 12px 0;">You checked in ${n} ${n === 1 ? "time" : "times"} since your last assessment. Your average energy was ${e} and your average pleasantness was ${p}. For your own reflection. Not medical advice. See all your check-ins in My Body.</p>
-          <p style="font-size:13px;color:#555555;line-height:1.6;margin:0;">Having a really hard time? In the US, call or text 988. In the UK or Ireland, call Samaritans on 116 123. If you are in danger, call your local emergency number.</p>
+          <p style="font-size:13px;color:#555555;line-height:1.6;margin:0;">ROMRx is not a crisis service and does not monitor your check-ins. Having a really hard time? In the US, call or text 988. In the UK or Ireland, call Samaritans on 116 123. If you are in danger, call your local emergency number.</p>
         </td></tr></table>`;
 }
 
