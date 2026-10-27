@@ -9,6 +9,7 @@ import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
+import { buildMoodBlockForUser } from "./mood_block.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -98,11 +99,11 @@ function greatJobConfig(sport: string) {
     betaLine: "ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.",
   };
 }
-async function sendGreatJob(sport: string, email: string, firstName: string) {
-  if (!RESEND_API_KEY) return;
+// moodBlock: averages-and-count HTML from mood_block.ts, or "" (omitted). Never in subject, tags or URLs.
+function greatJobHtml(sport: string, firstName: string, moodBlock = ""): string {
   const c = greatJobConfig(sport);
   const profileUrl = `${c.domain}${c.ctaPath}`;
-  const html = `
+  return `
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Great job</title></head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:40px 0;"><tr><td align="center">
@@ -118,6 +119,7 @@ async function sendGreatJob(sport: string, email: string, firstName: string) {
         <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 16px 0;">${c.what}</p>
         <p style="font-size:16px;color:#111111;font-weight:600;line-height:1.6;margin:0 0 8px 0;">Your profile is live.</p>
         <p style="font-size:16px;color:#333333;line-height:1.6;margin:0 0 28px 0;">${c.live}</p>
+        ${moodBlock}
         <table cellpadding="0" cellspacing="0" width="100%"><tr><td align="center" style="padding-bottom:28px;">
           <a href="${profileUrl}" style="display:inline-block;background-color:${c.accent};color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:16px 36px;border-radius:6px;letter-spacing:0.5px;">${c.cta}</a>
         </td></tr></table>
@@ -133,6 +135,11 @@ async function sendGreatJob(sport: string, email: string, firstName: string) {
     </table>
   </td></tr></table>
 </body></html>`;
+}
+async function sendGreatJob(sport: string, email: string, firstName: string, moodBlock = "") {
+  if (!RESEND_API_KEY) return;
+  const c = greatJobConfig(sport);
+  const html = greatJobHtml(sport, firstName, moodBlock);
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
@@ -260,7 +267,8 @@ Deno.serve(async (req) => {
   try {
     const fullName = (meta.full_name ?? meta.name ?? profile?.full_name ?? "") as string;
     const firstName = fullName.split(" ")[0] || "there";
-    await sendGreatJob(activeSport, user.email!, firstName);
+    const moodBlock = await buildMoodBlockForUser(admin, user.id, inserted.assessed_at as string, Deno.env.get("ROMOOD_EMAIL_MOOD"));
+    await sendGreatJob(activeSport, user.email!, firstName, moodBlock);
     console.log(`Great-job email (${brandSportKey(activeSport)}) sent to ${user.email}`);
     await logEvent("email_sent", { userId: user.id, sport: brandSportKey(activeSport), props: { email_id: "great_job", stage: "assessment_complete" } });
   } catch (mailErr) {
