@@ -4,6 +4,8 @@
 // checks the file's sha256 and re-reads every string from the file itself.
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import { BRANCH_COPY, EMAIL_OPENER, FOOTER, NO_NAME_OPENER, REMAINING_WORD, render, SUBJECT_NAME_SUFFIX, SUBJECTS } from "../source/copy.ts";
+import { buildCheckinEmail } from "../source/email.ts";
+import { AREA_BY_FAMILY, todayArea } from "../source/logic.ts";
 
 const STACY_SHA256 = "6fd272b642b33c817e51208b7f55567e3acdff338c6ad9cfa3bec6064a1a8ec3";
 const STACY = {
@@ -72,6 +74,43 @@ Deno.test("footer strings are the live lifecycle-emails ones (no new footer word
   const lapsed = le.copyFor({ kind: "lapsed", user_id: "u", email: "user@example.com", first_name: "x", active_sport: null, email_id: "x", local_date: "2026-11-16" } as never);
   assertEquals(FOOTER.why, lapsed.why);
   assertEquals(FOOTER.off, lapsed.off);
+});
+
+// Stacy (Nov 16): Branch A's email drops the "ROMBot here." opener (line 1 already says it); B and C keep it.
+const LINKS = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https://romrx.io/app/unsubscribe?t=a", oneClick: "https://x.test/u?t=k&b=base" };
+const count = (hay: string, needle: string) => hay.split(needle).length - 1;
+Deno.test("email opener: Branch A says \"ROMBot here.\" exactly once (text and html, named and no-name); B and C open with it", () => {
+  for (const first_name of ["Sam", null]) {
+    const A = buildCheckinEmail(render("A", { first_name, today_area: "hips", n: 0, next_check_date: null }), "user@example.com", LINKS, "P");
+    assertEquals([count(A.text, "ROMBot here."), count(A.html, "ROMBot here.")], [1, 1], String(first_name));
+    assert(A.text.startsWith(first_name ? "Hey Sam, ROMBot here." : "Hey there, ROMBot here."));
+    for (const [b, n, nc] of [["B", 1, null], ["C", 3, "Monday, Dec 28"]] as const) {
+      const E = buildCheckinEmail(render(b, { first_name, today_area: "hips", n, next_check_date: nc }), "user@example.com", LINKS, "P");
+      assert(E.text.startsWith("ROMBot here.\n\n"), b);
+      assert(E.html.includes(">ROMBot here.</p>"), b);
+      assertEquals([count(E.text, "ROMBot here."), count(E.html, "ROMBot here.")], [1, 1], b);
+    }
+  }
+});
+
+// Stacy (Nov 16): hips, shoulders, neck and ankles are approved. Every area word the code can emit must be plain everyday
+// words: no clinical terms, no degrees, no band names. Keys = every joint key found in src/ and supabase/functions/.
+const AREA_WORDS = ["hips", "shoulders", "neck", "ankles"] as const;
+const KEYS = ["hip_er_l", "shoulder_er_l", "shoulder_er", "hip_abd_l", "hip_flex", "shoulder_er_r", "hip_flex_l", "hip_er_r", "ankle_df", "lumbar_flex", "ankle_df_l", "hip_ir_l", "hip_abd", "hip_flex_r", "hip_er", "lumbar_ext", "ankle_df_r", "hip_ir", "cervical_flex", "cervical_ext", "shoulder_flex_l", "hip_abd_r", "shoulder_flex", "hip_ir_r", "cervical_rot", "cervical_rot_l", "cervical_lat_l", "shoulder_flex_r", "cervical_lat", "cervical_lat_r", "cervical_rot_r", "shoulder_er_min", "shoulder_flex_min", "hip_flex_min", "hip_flex_unscored", "hip_er_min", "ankle_df_min", "cervical_lat_min", "hip_ext_l", "hip_ir_min", "thoracic_rot", "knee_flex", "wrist_ext", "", "x"];
+const CLINICAL = /lumbar|thoracic|cervical|spine|spinal|flexion|extension|rotation|abduction|adduction|dorsiflexion|plantar|lateral|internal|external|\bROM\b|°|\d|deg|needs focus|building|steady/i;
+Deno.test("area words: everything the code can emit is one of hips, shoulders, neck, ankles (plain words, no clinical terms, degrees or bands)", () => {
+  assertEquals(Object.values(AREA_BY_FAMILY).sort(), [...AREA_WORDS].sort());
+  const emitted = new Set<string>();
+  for (const k of KEYS) for (const k2 of KEYS.slice(0, 8)) for (let dow = 0; dow < 7; dow++) {
+    const a = todayArea([k, k2, k], dow);
+    if (a !== null) emitted.add(a);
+  }
+  for (const w of [...emitted, ...Object.values(AREA_BY_FAMILY)]) {
+    assert((AREA_WORDS as readonly string[]).includes(w), w);
+    assert(/^[a-z]+$/.test(w) && !CLINICAL.test(w), w);
+  }
+  assertEquals([...emitted].sort(), [...AREA_WORDS].sort());
+  for (const k of ["lumbar_flex", "lumbar_ext", "thoracic_rot", "knee_flex"]) assertEquals(todayArea([k], 1), null, k); // no message, never a clinical word
 });
 
 const file = Deno.env.get("STACY_WORDS_FILE");

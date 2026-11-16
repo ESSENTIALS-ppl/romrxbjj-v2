@@ -4,6 +4,9 @@
 // timezone (the client saves the device zone there), else America/New_York. The email fallback goes out ONLY on a plan day,
 // at the reminder time, ONLY to P1-01 opt-ins (the same consent and opt-out settings lifecycle-emails honors); otherwise the
 // email is skipped and the in-app note is kept. Replies go to ai-chat, whose crisis route (live v96) is unchanged here.
+// Grant Q3 (Nov 16, 9:49 AM ET): the email is never in the note's run; it goes in the first run at least 24 h after the note,
+// at the same send hour, on a plan day, only with no app activity since the note (planEmails). Q4: the note itself goes to
+// every eligible Base user whatever their email opt-in (plan).
 import { type Branch, type Fill, render, type Rendered } from "./copy.ts";
 
 /** P1-17 default send hour (Grant 9:28 AM ET Nov 16, overriding the spec's 7:00). Used ONLY when reminder_time is empty or unreadable. */
@@ -105,6 +108,9 @@ export interface Pref {
   reminder_time: string | null; timezone: string | null;
   email_reminders: boolean | null; protocol_opt_in_at: string | null;
 }
+/** The user's check-in note already written by an earlier run: the ai_conversations row with context_snapshot.kind
+ *  "checkin_d3" (created_at = when the note was written). Existing data only; no new table or column. */
+export interface NoteRecord { assessment_id: string; branch: Branch | null; at: string; }
 export interface Candidate {
   user_id: string;
   email: string | null;
@@ -121,10 +127,17 @@ export interface Candidate {
   ranked_joint_keys: string[];
   /** protocol_sessions.logged_at values at or after the assessment. */
   sessions_since: string[];
-  /** Newest ai_messages.created_at with role 'user', or null. */
+  /** Newest ai_messages.created_at with role 'user' (any chat), or null. */
   last_user_message_at: string | null;
   /** user_mobility_schedule.next_check_at (P1-07), or null when the row or table is absent. */
   next_check_at: string | null;
+  /** Email phase only (optional so note-phase callers need not set them). */
+  note?: NoteRecord | null;
+  /** email_sends already has checkin-d3-email-<assessment id> for this note. */
+  email_already?: boolean;
+  /** Newest protocol_sessions.logged_at (any), and newest assessments.assessed_at of ANY kind (full or quick). */
+  last_session_at?: string | null;
+  last_any_assessment_at?: string | null;
 }
 
 export type SkipReason =
@@ -132,17 +145,29 @@ export type SkipReason =
   | "red_flag" | "no_plan" | "outside_send_window" | "not_day3" | "recent_rombot_message" | "branch_c_recent_session"
   | "no_next_check";
 export type EmailSkip =
-  | "not_opted_in" | "marketing_opt_out" | "no_email" | "not_plan_day" | "not_base_brand";
+  // permanent (this note never gets an email)
+  | "not_opted_in" | "marketing_opt_out" | "no_email" | "not_base_brand" | "email_already" | "note_stale" | "email_expired"
+  | "activity_session" | "activity_assessment" | "activity_rombot_message" | "branch_changed"
+  | "not_audience" | "not_base_active" | "test_account" | "deletion_requested" | "red_flag" | "no_plan" | "no_next_check"
+  // wait (a later run may send it)
+  | "too_soon" | "outside_send_window" | "not_plan_day";
 
-export interface Planned {
+/** One note per assessment, ever (claim checkin-d3-<assessment id> in email_sends). */
+export interface PlannedNote {
   user_id: string; assessment_id: string; branch: Branch; rendered: Rendered;
-  /** Claim ids in email_sends (unique on user_id, email_id). One in-app note and at most one email per assessment, ever. */
-  note_id: string; email_id: string;
-  /** null = the email fallback goes out with the note; otherwise why it is skipped (the in-app note is kept). */
-  email_skip: EmailSkip | null;
-  email: string | null;
-  local_date: string; send: SendTime;
+  note_id: string; local_date: string; send: SendTime;
 }
+/** At most one email per note (claim checkin-d3-email-<assessment id>). */
+export interface PlannedEmail {
+  user_id: string; assessment_id: string; branch: Branch; rendered: Rendered;
+  email_id: string; email: string; local_date: string; send: SendTime; note_age_hours: number;
+}
+
+/** Q3 (Grant, Nov 16): the email waits at least this long after the in-app note. */
+export const EMAIL_MIN_WAIT_HOURS = 24;
+/** Last moment an email may follow its note. 72 h after a day-3 note is local day 6, before the day-7 check (P1-08), so the
+ *  fallback never lands on top of the next check email. After this the note stays in-app only. */
+export const EMAIL_MAX_WAIT_HOURS = 72;
 
 /** P1-01 consent: the Plan day reminders toggle is on AND carries the explicit opt-in marker (set only by set_reminder_opt_in).
  *  Same rule as lifecycle-emails explicitOn(pref, "protocol"); a test pins the two equal. */
@@ -154,16 +179,44 @@ export function protocolOptedIn(p: Pref | null): boolean {
 export function isPlanDay(dow: number, days: readonly number[] = PLAN_DAYS): boolean { return days.includes(dow); }
 export function isBaseBrand(sport: string | null | undefined): boolean { return sport !== "bjj" && sport !== "bodybuilding"; }
 
-export function plan(now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string>; planDays?: readonly number[] }) {
-  const due: Planned[] = [];
+type Opts = { all: boolean; canary: ReadonlySet<string>; planDays?: readonly number[] };
+type Gate = SkipReason & EmailSkip;
+function commonGate(c: Candidate, opts: Opts): Gate | null {
+  if (!opts.all && !opts.canary.has(c.user_id.toLowerCase())) return "not_audience";
+  if (c.base_status !== "active") return "not_base_active";
+  if (c.is_test) return "test_account";
+  if (c.deletion_requested) return "deletion_requested";
+  return null;
+}
+/** Branch and words for `now`: n = sessions since the assessment; {today_area} for the user's local weekday now. */
+function renderFor(c: Candidate, now: Date, st: SendTime, lp: { date: string; dow: number }, assessedAt: number):
+  { branch: Branch; rendered: Rendered; newestSession: number } | "no_plan" | "no_next_check" {
+  const area = todayArea(c.ranked_joint_keys, lp.dow);
+  if (!area) return "no_plan";
+  const sessions = c.sessions_since.filter((s) => Number.isFinite(Date.parse(s)) && Date.parse(s) >= assessedAt);
+  const n = sessions.length;
+  const branch = branchFor(n);
+  let nextCheck: string | null = null;
+  if (branch === "C") {
+    // One source with lifecycle-emails (W1): next_check_at only, no 7-day or 42-day math. Never a past date.
+    const nc = c.next_check_at && Number.isFinite(Date.parse(c.next_check_at)) ? c.next_check_at : null;
+    if (!nc || localParts(new Date(Date.parse(nc)), st.tz).date <= lp.date) return "no_next_check";
+    nextCheck = shortDate(nc, st.tz);
+    if (!nextCheck) return "no_next_check";
+  }
+  const f: Fill = { first_name: firstName(c.full_name), today_area: area, n, next_check_date: nextCheck };
+  return { branch, rendered: render(branch, f), newestSession: n ? Math.max(...sessions.map((s) => Date.parse(s))) : NaN };
+}
+
+/** Note phase: the in-app note goes to EVERY eligible Base user on local day 3 at their send hour, whatever their email
+ *  opt-in (Grant Q4, Nov 16). No email is sent in this phase. */
+export function plan(now: Date, cands: Candidate[], opts: Opts) {
+  const due: PlannedNote[] = [];
   const skipped: Partial<Record<SkipReason, number>> = {};
-  const emailSkipped: Partial<Record<EmailSkip, number>> = {};
   const skip = (r: SkipReason) => { skipped[r] = (skipped[r] ?? 0) + 1; };
   for (const c of cands) {
-    if (!opts.all && !opts.canary.has(c.user_id.toLowerCase())) { skip("not_audience"); continue; }
-    if (c.base_status !== "active") { skip("not_base_active"); continue; }
-    if (c.is_test) { skip("test_account"); continue; }
-    if (c.deletion_requested) { skip("deletion_requested"); continue; }
+    const g = commonGate(c, opts);
+    if (g) { skip(g); continue; }
     const a = c.full_assessments[0];
     if (!a) { skip("no_assessment"); continue; }
     if (c.full_assessments.length !== 1) { skip("not_first_assessment"); continue; }
@@ -174,39 +227,59 @@ export function plan(now: Date, cands: Candidate[], opts: { all: boolean; canary
     if (!Number.isFinite(at)) { skip("no_assessment"); continue; }
     if (lp.date !== ymdAdd(localParts(new Date(at), st.tz).date, CHECKIN_DAY)) { skip("not_day3"); continue; }
     if (!inWindow(lp.hour, st.hour)) { skip("outside_send_window"); continue; }
-    const area = todayArea(c.ranked_joint_keys, lp.dow);
-    if (!area) { skip("no_plan"); continue; }
     const lastMsg = c.last_user_message_at ? Date.parse(c.last_user_message_at) : NaN;
     if (Number.isFinite(lastMsg) && now.getTime() - lastMsg < RECENT_ROMBOT_MESSAGE_HOURS * 3600000) { skip("recent_rombot_message"); continue; }
-    const sessions = c.sessions_since.filter((s) => Number.isFinite(Date.parse(s)) && Date.parse(s) >= at);
-    const n = sessions.length;
-    const branch = branchFor(n);
-    let nextCheck: string | null = null;
-    if (branch === "C") {
-      const newest = Math.max(...sessions.map((s) => Date.parse(s)));
-      if (now.getTime() - newest < BRANCH_C_RECENT_SESSION_HOURS * 3600000) { skip("branch_c_recent_session"); continue; }
-      // One source with lifecycle-emails (W1): next_check_at only, no 7-day or 42-day math. Never a past date.
-      const nc = c.next_check_at && Number.isFinite(Date.parse(c.next_check_at)) ? c.next_check_at : null;
-      if (!nc || localParts(new Date(Date.parse(nc)), st.tz).date <= lp.date) { skip("no_next_check"); continue; }
-      nextCheck = shortDate(nc, st.tz);
-      if (!nextCheck) { skip("no_next_check"); continue; }
-    }
-    const f: Fill = { first_name: firstName(c.full_name), today_area: area, n, next_check_date: nextCheck };
-    const rendered = render(branch, f);
-    let email_skip: EmailSkip | null = null;
-    if (!protocolOptedIn(c.pref)) email_skip = "not_opted_in";
-    else if (c.marketing_opt_out === true) email_skip = "marketing_opt_out";
-    else if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) email_skip = "no_email";
-    else if (!isPlanDay(lp.dow, opts.planDays ?? PLAN_DAYS)) email_skip = "not_plan_day";
-    else if (!isBaseBrand(c.active_sport)) email_skip = "not_base_brand";
-    if (email_skip) emailSkipped[email_skip] = (emailSkipped[email_skip] ?? 0) + 1;
-    due.push({
-      user_id: c.user_id, assessment_id: a.id, branch, rendered,
-      note_id: `checkin-d3-${a.id}`, email_id: `checkin-d3-email-${a.id}`,
-      email_skip, email: email_skip ? null : c.email, local_date: lp.date, send: st,
-    });
+    const r = renderFor(c, now, st, lp, at);
+    if (typeof r === "string") { skip(r); continue; }
+    if (r.branch === "C" && now.getTime() - r.newestSession < BRANCH_C_RECENT_SESSION_HOURS * 3600000) { skip("branch_c_recent_session"); continue; }
+    due.push({ user_id: c.user_id, assessment_id: a.id, branch: r.branch, rendered: r.rendered, note_id: `checkin-d3-${a.id}`, local_date: lp.date, send: st });
   }
-  return { due, skipped, emailSkipped };
+  return { due, skipped };
+}
+
+const after = (iso: string | null | undefined, t: number) => !!iso && Number.isFinite(Date.parse(iso)) && Date.parse(iso) > t;
+
+/** Email phase (Grant Q3, Nov 16): the email fallback goes in the FIRST run at least 24 h after the note was written, at the
+ *  user's send hour (same rule as the note), on a plan day, and ONLY if there has been no app activity since the note:
+ *  no session save, no assessment (full or quick), no ROMBot message. Every other gate stays (P1-01 opt-in, marketing
+ *  opt-out, Base brand; LIFECYCLE_EMAILS_SEND is checked by the handler). Wait reasons (too_soon, outside_send_window,
+ *  not_plan_day) let a later run send; the window closes EMAIL_MAX_WAIT_HOURS after the note. */
+export function planEmails(now: Date, cands: Candidate[], opts: Opts) {
+  const due: PlannedEmail[] = [];
+  const skipped: Partial<Record<EmailSkip, number>> = {};
+  const skip = (r: EmailSkip) => { skipped[r] = (skipped[r] ?? 0) + 1; };
+  for (const c of cands) {
+    const note = c.note;
+    if (!note) continue; // no note yet: nothing to follow up
+    const g = commonGate(c, opts);
+    if (g) { skip(g); continue; }
+    if (c.email_already) { skip("email_already"); continue; }
+    const noteAt = Date.parse(note.at);
+    if (!Number.isFinite(noteAt)) { skip("note_stale"); continue; }
+    const ageH = (now.getTime() - noteAt) / 3600000;
+    if (ageH > EMAIL_MAX_WAIT_HOURS) { skip("email_expired"); continue; }
+    // Activity since the note, from data already recorded (no new open signal).
+    if (after(c.last_session_at, noteAt) || c.sessions_since.some((s) => after(s, noteAt))) { skip("activity_session"); continue; }
+    if (after(c.last_any_assessment_at, noteAt) || c.full_assessments.some((x) => after(x.assessed_at, noteAt))) { skip("activity_assessment"); continue; }
+    if (after(c.last_user_message_at, noteAt)) { skip("activity_rombot_message"); continue; }
+    const a = c.full_assessments[0];
+    if (!a || a.id !== note.assessment_id) { skip("note_stale"); continue; }
+    if (a.red_flag_triggered === true) { skip("red_flag"); continue; }
+    if (!protocolOptedIn(c.pref)) { skip("not_opted_in"); continue; }
+    if (c.marketing_opt_out === true) { skip("marketing_opt_out"); continue; }
+    if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) { skip("no_email"); continue; }
+    if (!isBaseBrand(c.active_sport)) { skip("not_base_brand"); continue; }
+    if (ageH < EMAIL_MIN_WAIT_HOURS) { skip("too_soon"); continue; }
+    const st = sendTime(c.pref);
+    const lp = localParts(now, st.tz);
+    if (!inWindow(lp.hour, st.hour)) { skip("outside_send_window"); continue; }
+    if (!isPlanDay(lp.dow, opts.planDays ?? PLAN_DAYS)) { skip("not_plan_day"); continue; }
+    const r = renderFor(c, now, st, lp, Date.parse(a.assessed_at));
+    if (typeof r === "string") { skip(r); continue; }
+    if (note.branch && note.branch !== r.branch) { skip("branch_changed"); continue; }
+    due.push({ user_id: c.user_id, assessment_id: a.id, branch: r.branch, rendered: r.rendered, email_id: `checkin-d3-email-${a.id}`, email: c.email, local_date: lp.date, send: st, note_age_hours: Math.round(ageH * 100) / 100 });
+  }
+  return { due, skipped };
 }
 
 /** In-app message text: Stacy's first and last lines. The button is carried in context_snapshot for the client to draw. */

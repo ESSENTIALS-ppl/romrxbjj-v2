@@ -45,7 +45,7 @@ export const SUBJECT_NAME_SUFFIX = ", {first_name}";
 /** Stacy: "{remaining} renders as a word: n = 1 gives "Two more", n = 2 gives "One more"." */
 export const REMAINING_WORD: Readonly<Record<1 | 2, string>> = { 1: "Two", 2: "One" };
 
-/** Stacy: "Email body opens with "ROMBot here."" */
+/** Stacy: "Email body opens with "ROMBot here."" Stacy Nov 16 answer: Branch B and C only; A already says it in its first line. */
 export const EMAIL_OPENER = "ROMBot here.";
 
 /** Shared lifecycle footer, reused verbatim from lifecycle-emails live v3 (copyFor lapsed + ALL_OFF_TEXT). Plan day reminders is

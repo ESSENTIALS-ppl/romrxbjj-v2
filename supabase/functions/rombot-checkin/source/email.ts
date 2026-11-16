@@ -13,6 +13,10 @@ export const BASE_BRAND = { key: "base", name: "ROMRx", appBase: "https://romrx.
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Stacy (Nov 16 answer): the email-level "ROMBot here." opener is dropped for Branch A ONLY, because A's own first line
+ *  already says it ("Hey {first_name}, ROMBot here." / "Hey there, ROMBot here."). B and C keep it. */
+export function opener(r: Rendered): boolean { return r.branch !== "A"; }
+
 export interface Built { from: string; replyTo: string; subject: string; html: string; text: string; headers: Record<string, string>; }
 export function buildCheckinEmail(r: Rendered, to: string, links: { offKind: string; offAll: string; oneClick: string }, postalLine: string): Built {
   const open = `${BASE_BRAND.appBase}${APP_PATH}`;
@@ -23,8 +27,7 @@ export function buildCheckinEmail(r: Rendered, to: string, links: { offKind: str
 <div style="max-width:600px;margin:0 auto;padding:32px 24px;">
   <div style="margin-bottom:24px;"><span style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a2e2e;">${esc(BASE_BRAND.name)}</span></div>
   <div style="background:#fff;border-radius:12px;border:1px solid #cde0e0;padding:32px;">
-${p(EMAIL_OPENER)}
-${p(r.line1)}
+${opener(r) ? p(EMAIL_OPENER) + "\n" : ""}${p(r.line1)}
     <a href="${esc(open)}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;margin:8px 0 12px;">${esc(r.button)}</a>
 ${p(r.line3)}
     <p style="font-size:12px;color:#5a7070;margin-top:24px;line-height:1.6;">${esc(FOOTER.why)} <a href="${esc(links.offKind)}" style="color:#008080;">${esc(FOOTER.off)}</a></p>
@@ -33,7 +36,7 @@ ${p(r.line3)}
   <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${esc(postalLine)}<br /><a href="mailto:${esc(ROMRX_SENDER.replyTo)}" style="color:#008080;">${esc(ROMRX_SENDER.replyTo)}</a><br />${esc(sentTo)}</p>
 </div></body></html>`;
   const text = [
-    EMAIL_OPENER, "", r.line1, "", `${r.button}: ${open}`, "", r.line3, "",
+    ...(opener(r) ? [EMAIL_OPENER, ""] : []), r.line1, "", `${r.button}: ${open}`, "", r.line3, "",
     `${FOOTER.why} ${FOOTER.off}: ${links.offKind}`, `${FOOTER.allOff}: ${links.offAll}`, "", postalLine, ROMRX_SENDER.replyTo, sentTo,
   ].join("\n");
   return {

@@ -70,33 +70,18 @@ Deno.test("{next_check_date} format is Stacy's \"Monday, Dec 28\"", () => {
   assertEquals(shortDate("2026-12-28T15:00:00Z", "America/New_York"), "Monday, Dec 28");
 });
 
-Deno.test("plan-day gating: no email on a non-plan day (note kept); every weekday is a plan day today", () => {
+Deno.test("plan days are every weekday today", () => {
   assertEquals(PLAN_DAYS, [0, 1, 2, 3, 4, 5, 6]);
   for (let d = 0; d < 7; d++) assert(isPlanDay(d));
   assert(!isPlanDay(7) && !isPlanDay(-1));
-  // If plan days ever narrow (lifecycle PROTOCOL_DAYS), a non-plan day skips the email and keeps the note. Mon Nov 16 = dow 1.
-  const off = plan(MON_730_ET, [cand()], { ...ALL, planDays: [2, 4] });
-  assertEquals(off.due.length, 1);
-  assertEquals([off.due[0].email_skip, off.due[0].email], ["not_plan_day", null]);
-  assertEquals(off.emailSkipped, { not_plan_day: 1 });
-  assertEquals(plan(MON_730_ET, [cand()], { ...ALL, planDays: [1] }).due[0].email_skip, null);
+  assert(!isPlanDay(1, [2, 4]));
 });
-Deno.test("consent gating: email only to P1-01 opt-ins (toggle on AND marker); others keep the in-app note only", () => {
-  const cases: [Partial<Candidate>, string | null][] = [
-    [{}, null],
-    [{ pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } }, "not_opted_in"],
-    [{ pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: false, protocol_opt_in_at: "2026-11-13T15:00:00Z" } }, "not_opted_in"],
-    [{ marketing_opt_out: true }, "marketing_opt_out"],
-    [{ email: null }, "no_email"],
-    [{ active_sport: "bjj" }, "not_base_brand"],
-    [{ active_sport: "bodybuilding" }, "not_base_brand"],
-  ];
-  for (const [over, why] of cases) {
-    const p = plan(MON_730_ET, [cand(over)], ALL);
-    assertEquals(p.due.length, 1, JSON.stringify(over)); // the in-app note is kept in every case
-    assertEquals(p.due[0].email_skip, why, JSON.stringify(over));
-    assertEquals(p.due[0].email === null, why !== null);
-  }
+Deno.test("Q4: the in-app note goes to every eligible Base user whatever their email opt-in, marketing setting, address or brand", () => {
+  for (const over of [
+    {}, { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } },
+    { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: false, protocol_opt_in_at: null } },
+    { marketing_opt_out: true }, { email: null }, { active_sport: "bjj" },
+  ] as Partial<Candidate>[]) assertEquals(plan(MON_730_ET, [cand(over)], ALL).due.length, 1, JSON.stringify(over));
   assert(!protocolOptedIn(null));
 });
 Deno.test("stop rules: audience, Base active, test account, deletion, first full assessment only, red flag, plan, recent ROMBot message", () => {
@@ -130,8 +115,6 @@ Deno.test("first name: plain first word only, else the no-name copy (HTML-safe f
   assert(p.rendered.line1.startsWith("Hey there, ROMBot here."));
   assert(!/[<>&]/.test(noteContent(p.rendered)));
 });
-Deno.test("claim ids: one note and at most one email per assessment", () => {
-  const d = plan(MON_730_ET, [cand()], ALL).due[0];
-  assertEquals(d.note_id, "checkin-d3-aaaaaaaa-0000-4000-8000-000000000001");
-  assertEquals(d.email_id, "checkin-d3-email-aaaaaaaa-0000-4000-8000-000000000001");
+Deno.test("note claim id: one note per assessment", () => {
+  assertEquals(plan(MON_730_ET, [cand()], ALL).due[0].note_id, "checkin-d3-aaaaaaaa-0000-4000-8000-000000000001");
 });

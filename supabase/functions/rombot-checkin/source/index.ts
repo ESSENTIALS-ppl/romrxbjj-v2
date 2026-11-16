@@ -1,11 +1,12 @@
 // rombot-checkin (P1-17 day 3 ROMBot check-in). NEW function, BUILD ONLY, not deployed; verify_jwt false (cron-only).
 // Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed), like lifecycle-emails. Dry run unless
-// ROMBOT_CHECKIN_SEND === "on"; the email fallback also needs LIFECYCLE_EMAILS_SEND === "on". Reads only the user's own rows
+// ROMBOT_CHECKIN_SEND === "on"; the email fallback also needs LIFECYCLE_EMAILS_SEND === "on", and goes 24 h+ after the note
+// only if there was no app activity since it. Reads only the user's own rows
 // listed in spec section 3; never scores, degrees, bands, prices or other users' data.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { handle } from "./handler.ts";
-import type { Candidate } from "./logic.ts";
+import { handle, NOTE_KIND } from "./handler.ts";
+import { type Candidate, EMAIL_MAX_WAIT_HOURS } from "./logic.ts";
 import { deletionRequested } from "./deletion.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -45,12 +46,18 @@ async function fullAssessments(userId: string): Promise<Candidate["full_assessme
 }
 
 async function load(now: Date): Promise<Candidate[]> {
-  // Day 3 in any zone falls inside 2 to 5 days after the assessment instant.
+  // Note phase: day 3 in any zone falls inside 2 to 5 days after the assessment instant.
   const from = new Date(now.getTime() - 5 * 86400000).toISOString();
   const to = new Date(now.getTime() - 2 * 86400000).toISOString();
   const { data: recent, error } = await sb.from("assessments").select("user_id").gte("assessed_at", from).lte("assessed_at", to).limit(5000);
   if (error) throw new Error("recent assessments load failed");
-  const ids = [...new Set((recent ?? []).map((r) => String(r.user_id)))];
+  // Email phase: users whose check-in note (ai_conversations, context_snapshot.kind = checkin_d3) was written between
+  // EMAIL_MAX_WAIT_HOURS + 1 h and 23 h ago. Existing rows only; no new table or column.
+  const nFrom = new Date(now.getTime() - (EMAIL_MAX_WAIT_HOURS + 1) * 3600000).toISOString();
+  const nTo = new Date(now.getTime() - 23 * 3600000).toISOString();
+  const { data: noted, error: nErr } = await sb.from("ai_conversations").select("user_id").eq("context_snapshot->>kind", NOTE_KIND).gte("created_at", nFrom).lte("created_at", nTo).limit(5000);
+  if (nErr) throw new Error("check-in notes load failed");
+  const ids = [...new Set([...(recent ?? []), ...(noted ?? [])].map((r) => String(r.user_id)))];
   const out: Candidate[] = [];
   for (const id of ids) {
     const { data: u } = await sb.from("users").select("id, email, full_name, active_sport, base_status, marketing_opt_out").eq("id", id).maybeSingle();
@@ -72,6 +79,19 @@ async function load(now: Date): Promise<Candidate[]> {
       const { data: sch, error: e } = await sb.from("user_mobility_schedule").select("next_check_at").eq("user_id", id).maybeSingle();
       if (!e && sch) nextCheckAt = (sch as { next_check_at: string | null }).next_check_at ?? null;
     } catch { nextCheckAt = null; } // table absent before P1-07 030000: Branch C is skipped (no_next_check)
+    // Email phase inputs (activity since the note = session save, assessment of any kind, or a ROMBot user message).
+    const { data: nc } = await sb.from("ai_conversations").select("created_at, context_snapshot").eq("user_id", id).eq("context_snapshot->>kind", NOTE_KIND).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    let note: Candidate["note"] = null;
+    let emailAlready = false;
+    if (nc) {
+      const snap = (nc.context_snapshot ?? {}) as Record<string, unknown>;
+      const b = snap.branch;
+      note = { assessment_id: String(snap.assessment_id ?? ""), branch: b === "A" || b === "B" || b === "C" ? b : null, at: String(nc.created_at) };
+      const { data: es, error: esErr } = await sb.from("email_sends").select("email_id").eq("user_id", id).eq("email_id", `checkin-d3-email-${note.assessment_id}`).limit(1);
+      emailAlready = esErr ? true : (es ?? []).length > 0; // fail closed: unknown = treat as already sent
+    }
+    const { data: ls } = await sb.from("protocol_sessions").select("logged_at").eq("user_id", id).order("logged_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: la } = await sb.from("assessments").select("assessed_at").eq("user_id", id).order("assessed_at", { ascending: false }).limit(1).maybeSingle();
     out.push({
       user_id: id, email: u.email ?? null, full_name: u.full_name ?? null, active_sport: u.active_sport ?? null,
       base_status: u.base_status ?? null, marketing_opt_out: u.marketing_opt_out ?? null,
@@ -79,6 +99,9 @@ async function load(now: Date): Promise<Candidate[]> {
       pref: pref ? { reminder_time: pref.reminder_time ?? null, timezone: pref.timezone ?? null, email_reminders: pref.email_reminders ?? null, protocol_opt_in_at: pref.protocol_opt_in_at ?? null } : null,
       full_assessments: full, ranked_joint_keys: ranked, sessions_since: sessions,
       last_user_message_at: (msg as { created_at?: string } | null)?.created_at ?? null, next_check_at: nextCheckAt,
+      note, email_already: emailAlready,
+      last_session_at: (ls as { logged_at?: string } | null)?.logged_at ?? null,
+      last_any_assessment_at: (la as { assessed_at?: string } | null)?.assessed_at ?? null,
     });
   }
   return out;
