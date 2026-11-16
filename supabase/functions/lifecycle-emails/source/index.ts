@@ -1,4 +1,4 @@
-// lifecycle-emails (from live v1) + standalone P1-15 digest sessions-this-week and days-to-next-check. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience rewrite, no P1-08 kinds. BRANCH ONLY: not deployed, no flags or cron changed.
+// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
 // Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed). Dry run unless LIFECYCLE_EMAILS_SEND === "on".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -27,7 +27,8 @@ async function cronOk(req: Request): Promise<boolean> {
 
 const iso = (d: Date) => d.toISOString();
 async function load(kinds: Kind[]): Promise<Candidate[]> {
-  const toggles = kinds.map((k) => k === "retest" ? "retest_reminders.eq.true" : k === "protocol" ? "email_reminders.eq.true" : "weekly_digest.eq.true").join(",");
+  const toggleOf = (k: Kind) => (k === "protocol" || k === "lapsed") ? "email_reminders.eq.true" : k === "digest" ? "weekly_digest.eq.true" : "retest_reminders.eq.true";
+  const toggles = [...new Set(kinds.map(toggleOf))].join(",");
   const { data: prefs, error } = await sb.from("notification_preferences")
     .select("user_id, reminder_time, timezone, retest_reminders, email_reminders, weekly_digest, created_at, updated_at, retest_opt_in_at, protocol_opt_in_at, digest_opt_in_at").or(toggles).limit(5000);
   if (error) throw new Error("prefs load failed");
@@ -56,12 +57,24 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
     try {
       const { data: sch, error: schErr } = await sb.from("user_mobility_schedule").select("last_assessment_id, last_assessed_at, next_retest_at, next_check_at").eq("user_id", p.user_id).maybeSingle();
       if (!schErr && sch) schedule = sch as Candidate["schedule"];
-    } catch { schedule = null; } // table may not exist until the P1-07 migration is applied; omit the next-check line
+    } catch { schedule = null; } // table may not exist until the P1-07 migration is applied
+    let hasQuick = false;
+    try {
+      if (a?.assessed_at) {
+        const { data: q, error: qErr } = await sb.from("assessments").select("id").eq("user_id", p.user_id).eq("check_kind", "quick").gt("assessed_at", a.assessed_at).limit(1);
+        if (!qErr && q && q.length) hasQuick = true;
+      }
+    } catch { hasQuick = false; } // column may not exist until the P1-06 check_kind migration is applied
+    let lastSignIn: string | null = null;
+    try {
+      const { data: au } = await sb.auth.admin.getUserById(p.user_id);
+      lastSignIn = au?.user?.last_sign_in_at ?? null;
+    } catch { lastSignIn = null; }
     out.push({
       user_id: p.user_id, email: u.email, full_name: u.full_name, active_sport: u.active_sport, marketing_opt_out: u.marketing_opt_out,
       deletion_requested: await deletionRequested(sb, p.user_id), pref: p as never, latest_assessment: a, latest_score: latestScore, previous_score: previousScore,
       session_dates: (s ?? []).map((r) => String(r.session_date)), has_protocol: (count ?? 0) > 0,
-      schedule,
+      schedule, last_sign_in_at: lastSignIn,
     });
   }
   return out;

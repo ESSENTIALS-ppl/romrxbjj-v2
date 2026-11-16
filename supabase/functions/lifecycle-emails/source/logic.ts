@@ -8,8 +8,8 @@
 //  - Nothing is sent to users with marketing_opt_out, with a pending deletion request, or with no email.
 //  - No scores in reminders. The digest holds the overall score change and the streak count only.
 
-export type Kind = "retest" | "protocol" | "digest";
-export const KINDS: readonly Kind[] = ["retest", "protocol", "digest"];
+export type Kind = "retest" | "protocol" | "digest" | "lapsed";
+export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed"];
 
 /** Fail-safe flag rule: ON only when the value is exactly the lowercase string "on". */
 export function flagOn(v: string | null | undefined): boolean { return v === "on"; }
@@ -23,6 +23,13 @@ export const SEND_WINDOW_HOURS = 3;
 export const RETEST_DAYS = 42;
 /** Retest is sent once per assessment, between day 42 and day 48 after it. Older assessments are never swept at go-live. */
 export const RETEST_GRACE_DAYS = 7;
+/** P1-08: earlier check-in emails. One send per assessment, on the due local date plus one grace day. */
+export const CHECK7_DAYS = 7;
+export const CHECK14_DAYS = 14;
+export const CHECK_GRACE_DAYS = 1;
+/** P1-16: one lapsed-user email at 14 local days with no session and no new assessment. */
+export const LAPSED_DAYS = 14;
+export const LAPSED_GRACE_DAYS = 3; // long enough that a day-14 check-in skip can still send on day 15-16
 /** Every day of the week has a protocol in the apps (MyProtocol ROTATION covers 0 to 6). Change here if Jim wants fewer days. */
 export const PROTOCOL_DAYS: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
 export const DIGEST_DOW = 0; // Sunday
@@ -46,18 +53,28 @@ export interface Candidate {
   /** session_date values (YYYY-MM-DD) from protocol_sessions, newest 60 or so. */
   session_dates: string[];
   has_protocol: boolean;
-  /** P1-07 user_mobility_schedule, loaded fail-soft. Missing table or row = omit the digest next-check line. */
+  /** P1-07 schedule, when the unapplied table exists. Missing row = fall back to latest_assessment. */
   schedule?: { last_assessment_id: string | null; last_assessed_at: string | null; next_retest_at: string | null; next_check_at: string | null } | null;
+  /** True when a check_kind=quick assessment exists after the last full one, or the schedule has moved off day 7. */
+  has_quick_check?: boolean;
+  /** auth.users.last_sign_in_at, when loaded. */
+  last_sign_in_at?: string | null;
 }
 export interface Due {
   kind: Kind; user_id: string; email: string; first_name: string; active_sport: string | null;
   email_id: string; // deterministic id used for the claim in email_sends
   digest?: { score: number; delta: number | null; streak: number; sessions_this_week?: number; days_to_next_check?: number | null };
   local_date: string;
+  /** Formatted "Monday, December 28" (year only if not current), for Stacy P1-08/P1-16 copy. */
+  retest_date?: string | null;
+  next_check_date?: string | null;
+  quick_check_done?: boolean;
+  next_check_line?: string | null;
 }
 
 const FIELD: Record<Kind, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
   retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
+  lapsed: "email_reminders",
 };
 
 export function validTz(tz: string | null | undefined): tz is string {
@@ -86,6 +103,7 @@ export function reminderHour(t: string | null | undefined): number {
 }
 const MARKER: Record<Kind, "retest_opt_in_at" | "protocol_opt_in_at" | "digest_opt_in_at"> = {
   retest: "retest_opt_in_at", protocol: "protocol_opt_in_at", digest: "digest_opt_in_at",
+  lapsed: "protocol_opt_in_at",
 };
 /** True only for a toggle that is true AND carries an explicit opt-in marker (set only by set_reminder_opt_in when the user turned it on).
  *  A default-on row, a plain save of the form, or an old "touched" row has no marker and gets nothing. */
@@ -123,6 +141,103 @@ export function ymdAdd(date: string, days: number): string {
   if (!y || !m || !d) return date;
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+export function assessmentLocalDate(c: Candidate, tz: string | null | undefined): string | null {
+  const iso = c.schedule?.last_assessed_at || c.latest_assessment?.assessed_at;
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  return localParts(new Date(t), tz).date;
+}
+export function assessmentIdOf(c: Candidate): string | null {
+  const id = c.schedule?.last_assessment_id || c.latest_assessment?.id;
+  return id ? String(id) : null;
+}
+/** True when the user's local date is on the check due day or the one grace day after it. */
+export function checkDueOn(kind: "check7" | "check14", nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
+  if (kind === "check7" && c.schedule?.next_check_at) {
+    const dueAt = Date.parse(c.schedule.next_check_at);
+    if (!Number.isFinite(dueAt)) return false;
+    const due = localParts(new Date(dueAt), tz).date;
+    return nowDate >= due && nowDate < ymdAdd(due, CHECK_GRACE_DAYS + 1);
+  }
+  const start = assessmentLocalDate(c, tz);
+  if (!start) return false;
+  const due = ymdAdd(start, kind === "check7" ? CHECK7_DAYS : CHECK14_DAYS);
+  return nowDate >= due && nowDate < ymdAdd(due, CHECK_GRACE_DAYS + 1);
+}
+
+/** "Monday, December 28" or "Monday, December 28, 2027" when the year is not the current year in tz. */
+export function friendlyDate(iso: string | null | undefined, tz: string | null | undefined, now: Date): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const zone = validTz(tz) ? tz : DEFAULT_TZ;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "long", month: "long", day: "numeric", year: "numeric" }).formatToParts(new Date(t));
+  const g = (x: string) => parts.find((p) => p.type === x)?.value ?? "";
+  const body = `${g("weekday")}, ${g("month")} ${g("day")}`;
+  if (!g("weekday") || !g("month") || !g("day")) return null;
+  const nowYear = localParts(now, zone).date.slice(0, 4);
+  return g("year") && g("year") !== nowYear ? `${body}, ${g("year")}` : body;
+}
+
+/** Day-14 email version B if a quick check already happened. */
+export function quickCheckDone(c: Candidate): boolean {
+  if (c.has_quick_check) return true;
+  const last = c.schedule?.last_assessed_at;
+  if (!last) return false;
+  const start = Date.parse(last);
+  if (!Number.isFinite(start)) return false;
+  const day14 = start + 14 * 86400000;
+  if (c.schedule?.next_check_at == null) return true;
+  const nxt = Date.parse(c.schedule.next_check_at);
+  return Number.isFinite(nxt) && nxt >= day14 - 1000;
+}
+
+function retestIsoOf(c: Candidate): string | null {
+  if (c.schedule?.next_retest_at) return c.schedule.next_retest_at;
+  const a = c.schedule?.last_assessed_at || c.latest_assessment?.assessed_at;
+  if (!a) return null;
+  const t = Date.parse(a);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + RETEST_DAYS * 86400000).toISOString();
+}
+
+export function lastActivityLocalDate(c: Candidate, tz: string | null | undefined): string | null {
+  const dates = [...c.session_dates];
+  const a = assessmentLocalDate(c, tz);
+  if (a) dates.push(a);
+  dates.sort();
+  return dates.length ? dates[dates.length - 1] : null;
+}
+export function lapsedDueOn(nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
+  const lastSess = lastActivityLocalDate(c, tz);
+  if (!lastSess) return false;
+  let last = lastSess;
+  if (c.last_sign_in_at) {
+    const t = Date.parse(c.last_sign_in_at);
+    if (Number.isFinite(t)) {
+      const d = localParts(new Date(t), tz).date;
+      if (d > last) last = d;
+    }
+  }
+  const due = ymdAdd(last, LAPSED_DAYS);
+  return nowDate >= due && nowDate < ymdAdd(due, LAPSED_GRACE_DAYS + 1);
+}
+
+/** Stacy P1-16 next-check line. Omit if unknown. Never show a past date; if the retest is due: "Your retest is ready now." */
+export function lapsedNextLine(c: Candidate, tz: string | null | undefined, now: Date, today: string): string | null {
+  const retest = retestIsoOf(c);
+  const check = c.schedule?.next_check_at ?? null;
+  const retestDay = retest && Number.isFinite(Date.parse(retest)) ? localParts(new Date(Date.parse(retest)), tz).date : null;
+  const checkDay = check && Number.isFinite(Date.parse(check)) ? localParts(new Date(Date.parse(check)), tz).date : null;
+  if (retestDay && retestDay <= today) return "Your retest is ready now.";
+  if (checkDay && checkDay <= today) return "Your next check is ready now.";
+  const upcoming = (check && checkDay && checkDay > today) ? check : (retest && retestDay && retestDay > today) ? retest : null;
+  const formatted = friendlyDate(upcoming, tz, now);
+  return formatted ? `Your next check: ${formatted}` : null;
+}
+
+
 /** Monday of the local week that ends on Sunday `sunday` (YYYY-MM-DD). */
 export function weekStartMonday(sunday: string): string { return ymdAdd(sunday, -6); }
 export function sessionsThisWeek(dates: string[], sunday: string): number {
@@ -169,6 +284,14 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       const days = (now.getTime() - at) / 86400000;
       if (!Number.isFinite(at) || days < RETEST_DAYS || days >= RETEST_DAYS + RETEST_GRACE_DAYS) { skip("not_due"); continue; }
       due.push({ ...base, email_id: `lc-retest-${c.latest_assessment.id}` });
+    } else if (kind === "lapsed") {
+      if (!c.has_protocol) { skip("no_protocol"); continue; }
+      if (!c.latest_assessment && !c.schedule?.last_assessed_at) { skip("no_assessment"); continue; }
+      if (!lapsedDueOn(lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
+      // If the day-14 check-in is also due, skip lapsed (Stacy: send only the day-14 check). Works without the P1-08 email kind; uses the same day-14 math.
+      if (checkDueOn("check14", lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
+      const last = lastActivityLocalDate(c, c.pref.timezone) ?? lp.date;
+      due.push({ ...base, email_id: `lc-lapsed-${last}`, next_check_line: lapsedNextLine(c, c.pref.timezone, now, lp.date) });
     } else if (kind === "protocol") {
       if (!PROTOCOL_DAYS.includes(lp.dow)) { skip("wrong_weekday"); continue; }
       if (!c.has_protocol) { skip("no_protocol"); continue; }

@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertFalse, assertMatch } from "jsr:@std/assert@1";
 import { audienceAll, type Candidate, explicitOn, flagOn, localParts, planKind, reminderHour, streakDays } from "../source/logic.ts";
-import { BRANDS, brandFor, buildEmail, COPY } from "../source/email.ts";
+import { BRANDS, brandFor, buildEmail, COPY, copyFor } from "../source/email.ts";
 import { signUnsubToken, verifyUnsubToken } from "../_shared/unsub_token.ts";
 import { CONFIRM_PAGES, type Deps, handle, idList, UNSUB_BASE } from "../source/handler.ts";
 
@@ -266,6 +266,56 @@ Deno.test("handler: footer links go to the brand confirm page, the one-click hea
   assertEquals(sent.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
   assert(sent.html.includes(CONFIRM_PAGES[brand.key] + "?t="), "footer link is the confirm page");
   assert(!sent.html.includes(UNSUB_BASE), "no visible link to the function URL (a GET would apply nothing, but links stay on the confirm page)");
+});
+
+Deno.test("P1-16 lapsed: 14 local days quiet, skipped when day-14 check would also be due", () => {
+  // Last (and only) activity = assessment 2026-10-18 15:00Z = 2026-10-18 Chicago. Day 14 = 2026-11-01, same day as a check14 due date.
+  const assessedOnly = cand({ latest_assessment: { id: "a-l", assessed_at: "2026-10-18T15:00:00Z" }, session_dates: [] });
+  const day13 = new Date("2026-10-31T14:00:00Z");
+  const day14 = new Date("2026-11-01T14:00:00Z");
+  const day16 = new Date("2026-11-03T14:00:00Z");
+  assertEquals(planKind("lapsed", day13, [assessedOnly], canaryAll).due.length, 0);
+  assertEquals(planKind("lapsed", day14, [assessedOnly], canaryAll).due.length, 0); // defer: same-day as day-14 check math
+  assertEquals(planKind("lapsed", day16, [assessedOnly], canaryAll).due[0]?.email_id, "lc-lapsed-2026-10-18");
+  // Last session 14 days ago, assessment earlier: lapsed fires on day 14 (check14 is not due).
+  const withSession = cand({ latest_assessment: { id: "a-l", assessed_at: "2026-09-01T15:00:00Z" }, session_dates: ["2026-10-18"] });
+  const p = planKind("lapsed", day14, [withSession], canaryAll);
+  assertEquals(p.due.length, 1);
+  assertEquals(p.due[0].email_id, "lc-lapsed-2026-10-18");
+  const unmarked = cand({ pref: { protocol_opt_in_at: null, email_reminders: true }, latest_assessment: { id: "a-l", assessed_at: "2026-09-01T15:00:00Z" }, session_dates: ["2026-10-18"] });
+  assertEquals(planKind("lapsed", day14, [unmarked], canaryAll).due.length, 0);
+});
+Deno.test("P1-16 Stacy final words: exact subject and lines, no scores or em dash", () => {
+  const links = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https://romrx.io/app/unsubscribe?t=a", oneClick: "https://example.com/unsub" };
+  const postal = "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774";
+  const d = buildEmail(
+    { kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "lc-lapsed-x", local_date: "2026-11-03", next_check_line: "Your next check: Monday, December 28" },
+    BRANDS.base, links, postal,
+  );
+  assertEquals(d.subject, "Your ROMRx plan is still here");
+  assertEquals(copyFor({ kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "x", local_date: "2026-11-03" }, BRANDS.base).preheader, "Pick up where you left off.");
+  assert(d.text.includes("We haven't seen you in a couple of weeks. Your plan is saved and ready."));
+  assert(d.text.includes("You can start again with today's session."));
+  assert(d.text.includes("Your next check: Monday, December 28"));
+  assert(d.text.includes("Open today's session: https://romrx.io/app/dashboard/my-protocol"));
+  assert(d.text.includes("You're getting this because Plan day reminders is on in your ROMRx settings."));
+  assert(d.text.includes("Want fewer emails? Change your reminders in Settings: https://romrx.io/app/dashboard/settings"));
+  assert(d.text.includes("This message was sent to alex@example.com."));
+  assert(d.text.includes("jim@romrxbjj.com"));
+  assertFalse(/score|PRS|hip|shoulder|\bjoint\b/i.test(d.subject + d.text));
+  assertFalse(d.text.includes("\u2014"));
+  assertFalse(/sessions this week|days to next check/i.test(d.text));
+  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+});
+Deno.test("P1-16 lapsed: protocol opt-in only, no plan skipped, recent sign-in is not quiet", () => {
+  const day14 = new Date("2026-11-01T14:00:00Z");
+  const base = { latest_assessment: { id: "a-l", assessed_at: "2026-09-01T15:00:00Z" }, session_dates: ["2026-10-18"] as string[] };
+  const noPlan = cand({ ...base, has_protocol: false });
+  assertEquals(planKind("lapsed", day14, [noPlan], canaryAll).due.length, 0);
+  const retestOnly = cand({ ...base, pref: { protocol_opt_in_at: null, retest_opt_in_at: "2026-10-02T00:00:00Z" } });
+  assertEquals(planKind("lapsed", day14, [retestOnly], canaryAll).due.length, 0);
+  const recentSignIn = cand({ ...base, last_sign_in_at: "2026-10-28T15:00:00Z" });
+  assertEquals(planKind("lapsed", day14, [recentSignIn], canaryAll).due.length, 0);
 });
 
 Deno.test("P1-15 digest includes sessions this week and days to next check (Stacy CLEAR words)", () => {

@@ -17,7 +17,8 @@ export function brandFor(sport: string | null | undefined): Brand {
   return BRANDS.base;
 }
 
-export const COPY: Record<Kind, { subject: string; preheader: string; lines: (d: Due) => string[]; button: string; path: string; why: string; off: string }> = {
+type StaticKind = "retest" | "protocol" | "digest";
+export const COPY: Record<StaticKind, { subject: string; preheader: string; lines: (d: Due) => string[]; button: string; path: string; why: string; off: string }> = {
   retest: {
     subject: "Time for your ROMRx retest",
     preheader: "Your 6-week check-in is ready when you are.",
@@ -55,12 +56,42 @@ export const ALL_OFF_TEXT = "Turn off all ROMRx emails except account and billin
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+
+export interface CopySpec {
+  subject: string; preheader: string; lines: string[]; button: string; path: string;
+  why: string; off: string; afterButton?: string[]; sentTo: boolean;
+}
+
+/** Stacy P1-16 final words, used exactly. Jim wording yes still required before any send. */
+export function copyFor(d: Due, brand?: Brand): CopySpec {
+  if (d.kind === "lapsed") {
+    const settings = brand ? `${brand.appBase}${brand.settingsPath}` : "/dashboard/settings";
+    return {
+      subject: "Your ROMRx plan is still here",
+      preheader: "Pick up where you left off.",
+      lines: [
+        "We haven't seen you in a couple of weeks. Your plan is saved and ready.",
+        "You can start again with today's session.",
+        ...(d.next_check_line ? [d.next_check_line] : []),
+      ],
+      button: "Open today's session", path: "/dashboard/my-protocol",
+      why: "You're getting this because Plan day reminders is on in your ROMRx settings.",
+      off: "Turn off plan day reminders",
+      afterButton: [`Want fewer emails? Change your reminders in Settings: ${settings}`],
+      sentTo: true,
+    };
+  }
+  const c = COPY[d.kind as StaticKind];
+  return { subject: c.subject, preheader: c.preheader, lines: c.lines(d), button: c.button, path: c.path, why: c.why, off: c.off, sentTo: false };
+}
+
 export interface Built { subject: string; html: string; text: string; headers: Record<string, string>; }
 export function buildEmail(d: Due, brand: Brand, links: { offKind: string; offAll: string; oneClick: string }, postalLine: string): Built {
-  const c = COPY[d.kind];
-  const lines = c.lines(d);
+  const c = copyFor(d, brand);
   const open = `${brand.appBase}${c.path}`;
   const hello = `Hi ${esc(d.first_name)},`;
+  const after = (c.afterButton ?? []).map((l) => `    <p style="font-size:12px;color:#5a7070;margin-top:16px;line-height:1.6;">${esc(l)}</p>`).join("\n");
+  const sentTo = c.sentTo ? `This message was sent to ${d.email}.` : "";
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f8fcfc;font-family:Inter,system-ui,sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;">${esc(c.preheader)}</div>
@@ -68,14 +99,18 @@ export function buildEmail(d: Due, brand: Brand, links: { offKind: string; offAl
   <div style="margin-bottom:24px;"><span style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a2e2e;">${esc(brand.name)}</span></div>
   <div style="background:#fff;border-radius:12px;border:1px solid #cde0e0;padding:32px;">
     <p style="font-size:14px;color:#1a2e2e;line-height:1.7;margin:0 0 12px;">${hello}</p>
-${lines.map((l) => `    <p style="font-size:14px;color:#1a2e2e;line-height:1.7;margin:0 0 12px;">${esc(l)}</p>`).join("\n")}
-    <a href="${esc(open)}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;margin-top:8px;">${esc(c.button)}</a>
+${c.lines.map((l) => `    <p style="font-size:14px;color:#1a2e2e;line-height:1.7;margin:0 0 12px;">${esc(l)}</p>`).join("\n")}
+    <a href="${esc(open)}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;margin-top:8px;">${esc(c.button)}</a>${after ? "\n" + after : ""}
     <p style="font-size:12px;color:#5a7070;margin-top:24px;line-height:1.6;">${esc(c.why)} <a href="${esc(links.offKind)}" style="color:#008080;">${esc(c.off)}</a></p>
     <p style="font-size:12px;color:#5a7070;line-height:1.6;"><a href="${esc(links.offAll)}" style="color:#008080;">${esc(ALL_OFF_TEXT)}</a></p>
   </div>
-  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${esc(postalLine)}<br /><a href="mailto:${esc(brand.replyTo)}" style="color:#008080;">${esc(brand.replyTo)}</a></p>
+  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${esc(postalLine)}<br /><a href="mailto:${esc(brand.replyTo)}" style="color:#008080;">${esc(brand.replyTo)}</a>${c.sentTo ? `<br />${esc(sentTo)}` : ""}</p>
 </div></body></html>`;
-  const text = [hello.replace(/&amp;/g, "&"), "", ...lines, "", `${c.button}: ${open}`, "", `${c.why} ${c.off}: ${links.offKind}`, `${ALL_OFF_TEXT}: ${links.offAll}`, "", postalLine].join("\n");
+  const textParts = [hello.replace(/&amp;/g, "&"), "", ...c.lines, "", `${c.button}: ${open}`];
+  if (c.afterButton?.length) textParts.push("", ...c.afterButton);
+  textParts.push("", `${c.why} ${c.off}: ${links.offKind}`, `${ALL_OFF_TEXT}: ${links.offAll}`, "", postalLine);
+  if (c.sentTo) textParts.push(brand.replyTo, sentTo);
+  const text = textParts.join("\n");
   return {
     subject: c.subject, html, text,
     // RFC 8058 one-click: the header URL takes a POST only (a GET to it redirects to the confirm page and applies nothing). Signed scoped token only, no email address.
