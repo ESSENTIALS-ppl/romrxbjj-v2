@@ -23,10 +23,13 @@ export const SEND_WINDOW_HOURS = 3;
 export const RETEST_DAYS = 42;
 /** Retest is sent once per assessment, between day 42 and day 48 after it. Older assessments are never swept at go-live. */
 export const RETEST_GRACE_DAYS = 7;
-/** P1-08: earlier check-in emails. One send per assessment, on the due local date plus one grace day. */
+/** P1-08: earlier check-in emails. One send per assessment.
+ *  check7: the due local date plus one grace day (days 7-8).
+ *  check14: through the end of local day 14 only (no grace), matching the P1-07 v3 quick-check window. */
 export const CHECK7_DAYS = 7;
 export const CHECK14_DAYS = 14;
 export const CHECK_GRACE_DAYS = 1;
+export const CHECK14_GRACE_DAYS = 0;
 /** P1-16: one lapsed-user email at 14 local days with no session and no new assessment. */
 export const LAPSED_DAYS = 14;
 export const LAPSED_GRACE_DAYS = 3; // long enough that a day-14 check-in skip can still send on day 15-16
@@ -154,14 +157,16 @@ export function assessmentIdOf(c: Candidate): string | null {
   const id = c.schedule?.last_assessment_id || c.latest_assessment?.id;
   return id ? String(id) : null;
 }
-/** True when the user's local date is on the check due day or the one grace day after it.
+/** True when the user's local date is on the check due day, or (check7 only) the one grace day after it.
+ *  check14 has no grace: it sends only through the end of local day 14 after the last full assessment.
  *  Both checks count from the last FULL assessment's local date (+7 / +14). Not from schedule.next_check_at: after the P1-07
  *  roll (rule 3) or a quick check (rule 2) next_check_at equals the retest date, which would move check7 to ~day 42. */
 export function checkDueOn(kind: "check7" | "check14", nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
   const start = assessmentLocalDate(c, tz);
   if (!start) return false;
   const due = ymdAdd(start, kind === "check7" ? CHECK7_DAYS : CHECK14_DAYS);
-  return nowDate >= due && nowDate < ymdAdd(due, CHECK_GRACE_DAYS + 1);
+  const grace = kind === "check14" ? CHECK14_GRACE_DAYS : CHECK_GRACE_DAYS;
+  return nowDate >= due && nowDate < ymdAdd(due, grace + 1);
 }
 
 /** "Monday, December 28" or "Monday, December 28, 2027" when the year is not the current year in tz. */
@@ -297,6 +302,8 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       if (!id || (!c.latest_assessment && !c.schedule?.last_assessed_at)) { skip("no_assessment"); continue; }
       if (!checkDueOn(kind, lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
       const done = quickCheckDone(c);
+      // Skip the day-7 "quick check is ready" email when a quick check already exists after the last full assessment.
+      if (kind === "check7" && done) { skip("not_due"); continue; }
       due.push({
         ...base,
         email_id: `lc-${kind}-${id}`,
