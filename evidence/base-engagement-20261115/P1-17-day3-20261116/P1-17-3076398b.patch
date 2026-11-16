@@ -1,0 +1,29 @@
+diff --git a/supabase/functions/rombot-checkin/source/email.ts b/supabase/functions/rombot-checkin/source/email.ts
+index 0b8372b..4d5d2ce 100644
+--- a/supabase/functions/rombot-checkin/source/email.ts
++++ b/supabase/functions/rombot-checkin/source/email.ts
+@@ -6,7 +6,8 @@ import { APP_PATH } from "./logic.ts";
+ 
+ /** P1-08 Base sender, the same value as ROMRX_SENDER in b19b13dca82a3c2eb34a641aa5ca79e410090c00
+  *  (lifecycle-emails/source/email.ts). Defined here so this function does not depend on that deploy. A test pins the two equal
+- *  whenever lifecycle-emails exports it. HELD with P1-08: no send before Jim's sender yes is relayed. */
++ *  whenever lifecycle-emails exports it. Reply-To hello@romrx.io per Jim 9:42 AM ET Nov 16 ("Replies go to hello@, Reid triages them
++ *  from my inbox."). HELD with P1-08: no send before Jim's sender yes is relayed. */
+ export const ROMRX_SENDER = { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" } as const;
+ export const BASE_BRAND = { key: "base", name: "ROMRx", appBase: "https://romrx.io/app" } as const;
+ 
+diff --git a/supabase/functions/rombot-checkin/test/handler.test.ts b/supabase/functions/rombot-checkin/test/handler.test.ts
+index f58aa3f..153a5a9 100644
+--- a/supabase/functions/rombot-checkin/test/handler.test.ts
++++ b/supabase/functions/rombot-checkin/test/handler.test.ts
+@@ -74,7 +74,10 @@ Deno.test("email fallback: Base sender ROMRx <hello@romrx.io>, Stacy subject, op
+   assertEquals(j.results.emails_sent, 1);
+   const { to, b } = log.sends[0];
+   assertEquals(to, "user@example.com");
++  // Jim, 9:42 AM ET Nov 16 (as relayed by Grant): "Replies go to hello@, Reid triages them from my inbox." Reply-To is hello@, never reid@.
+   assertEquals([b.from, b.replyTo], ["ROMRx <hello@romrx.io>", "hello@romrx.io"]);
++  assert(!/reid@/i.test(b.replyTo + b.html + b.text));
++  assert(b.html.includes('href="mailto:hello@romrx.io"'));
+   assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
+   assertEquals(b.subject, "Your plan is ready, Sam");
+   assert(b.text.startsWith("ROMBot here.\n\nHey Sam, ROMBot here."));
