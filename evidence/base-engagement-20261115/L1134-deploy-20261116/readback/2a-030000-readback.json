@@ -1,0 +1,212 @@
+{
+ "at": "2026-11-16T14:37:46.904724+00:00",
+ "regclass": "user_mobility_schedule",
+ "rls": true,
+ "rows": 19,
+ "rolled": 19,
+ "open_plus7": 0,
+ "retest_42": 19,
+ "policies": [
+  {
+   "name": "schedule_own_read",
+   "cmd": "SELECT",
+   "roles": [
+    "authenticated"
+   ],
+   "qual": "(user_id = ( SELECT auth.uid() AS uid))"
+  }
+ ],
+ "grants": [
+  {
+   "grantee": "authenticated",
+   "priv": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "DELETE"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "INSERT"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "REFERENCES"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "TRIGGER"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "TRUNCATE"
+  },
+  {
+   "grantee": "postgres",
+   "priv": "UPDATE"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "DELETE"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "INSERT"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "REFERENCES"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "SELECT"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "TRIGGER"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "TRUNCATE"
+  },
+  {
+   "grantee": "service_role",
+   "priv": "UPDATE"
+  }
+ ],
+ "indexes": [
+  "user_mobility_schedule_last_assessment_id_idx",
+  "user_mobility_schedule_next_check_at_idx",
+  "user_mobility_schedule_next_retest_at_idx",
+  "user_mobility_schedule_pkey"
+ ],
+ "fks": [
+  "FOREIGN KEY (last_assessment_id) REFERENCES assessments(id) ON DELETE SET NULL",
+  "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+ ],
+ "roll_fn": {
+  "secdef": true,
+  "config": [
+   "search_path=pg_catalog, public, pg_temp"
+  ],
+  "acl": "{postgres=X/postgres,service_role=X/postgres}",
+  "md5": "865310a2aed1cccfbbc422bdbce23827"
+ },
+ "anon_exec_roll": false,
+ "auth_exec_roll": false,
+ "cron_jobs": [
+  {
+   "jobid": 1,
+   "jobname": "send-renewal-reminders-daily",
+   "schedule": "0 12 * * *",
+   "active": true,
+   "cmd_md5": "caab15b0a3b771bccfd127f7c3db4df2",
+   "cmd": null
+  },
+  {
+   "jobid": 2,
+   "jobname": "s1-2-followup-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "96ffa790027acd45313edf20e6612677",
+   "cmd": null
+  },
+  {
+   "jobid": 3,
+   "jobname": "s1-3-masters-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "5c632dc347104173f09055083687f2b0",
+   "cmd": null
+  },
+  {
+   "jobid": 4,
+   "jobname": "s1-4-stillhere-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "053dbb8f4ed2270b0cd3217179f09cfa",
+   "cmd": null
+  },
+  {
+   "jobid": 5,
+   "jobname": "bb-s1-2-followup-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "f0aefa2f88c94e80935601390d44ec2d",
+   "cmd": null
+  },
+  {
+   "jobid": 6,
+   "jobname": "bb-s1-3-followup-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "84dcb7331405342a57af8fc0c73d2fb5",
+   "cmd": null
+  },
+  {
+   "jobid": 7,
+   "jobname": "bb-s1-4-stillhere-email-hourly",
+   "schedule": "0 * * * *",
+   "active": false,
+   "cmd_md5": "e3612627db468c64852a7fa730ce4146",
+   "cmd": null
+  },
+  {
+   "jobid": 8,
+   "jobname": "conversion-drip-hourly",
+   "schedule": "15 * * * *",
+   "active": true,
+   "cmd_md5": "5a228f65f8009616ea9c2760119c1845",
+   "cmd": null
+  },
+  {
+   "jobid": 9,
+   "jobname": "consent-events-retention-daily",
+   "schedule": "17 4 * * *",
+   "active": true,
+   "cmd_md5": "a7ee748b979d9d3fd61d8cf8d3bc09ff",
+   "cmd": null
+  },
+  {
+   "jobid": 10,
+   "jobname": "ai-chat-retention-90d-daily",
+   "schedule": "17 8 * * *",
+   "active": true,
+   "cmd_md5": "1760ebc6aa9483d0d329e563df706858",
+   "cmd": null
+  },
+  {
+   "jobid": 11,
+   "jobname": "lifecycle-emails-hourly",
+   "schedule": "30 * * * *",
+   "active": true,
+   "cmd_md5": "a40ec3691de43187cbfb5b3061fd2519",
+   "cmd": null
+  },
+  {
+   "jobid": 12,
+   "jobname": "assessment-drafts-purge-hourly",
+   "schedule": "17 * * * *",
+   "active": true,
+   "cmd_md5": "15fc1f98d9fd7dab332077448c912d00",
+   "cmd": null
+  },
+  {
+   "jobid": 13,
+   "jobname": "roll-next-check-at-hourly",
+   "schedule": "20 * * * *",
+   "active": true,
+   "cmd_md5": "01daf01196ef85d698253ef29f32122e",
+   "cmd": "select public.roll_next_check_at();"
+  }
+ ],
+ "cron_md5_jobs_1_12": "08757cf075ed473abc9b9f06e10bffd6",
+ "assessments": 22,
+ "stored_stmt_md5": "bcfe91b2d50e9c5c31ae64850def0faf",
+ "stored_version": "20261116143732",
+ "stored_n_stmts": 1
+}
