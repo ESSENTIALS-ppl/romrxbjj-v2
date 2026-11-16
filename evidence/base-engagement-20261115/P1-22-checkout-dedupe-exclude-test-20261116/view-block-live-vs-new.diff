@@ -1,0 +1,16 @@
+--- live-030659-view-block
++++ 20261116150000-view-block
+@@ -5,6 +5,7 @@
+          COALESCE(e.props->>'purpose', '') AS _purpose
+   FROM public.product_events e
+   WHERE e.event = 'checkout_completed'
++    AND NOT COALESCE(ops.is_excluded_from_metrics(e.user_id), false)
+ ),
+ with_sid AS (
+   SELECT DISTINCT ON (_sid)
+@@ -40,4 +41,4 @@
+ SELECT * FROM no_sid;
+ 
+ COMMENT ON VIEW ops.checkout_completed_deduped IS
+-  'P1-22. Prefer props.stripe_checkout_session_id when present. Fallback (no session id): one row per user_id + purpose + 2-hour timestamp window (gaps-and-islands; a new window starts when the gap from the previous row for that user and purpose is greater than 2 hours). Latest row in the window is kept. Purpose is kept so a Base unlock and a sport-pack unlock close together are not collapsed. Window is 2 hours because Stripe webhook retries for one checkout usually arrive minutes to a couple of hours apart; a calendar-day rule can split a late-ET retry or merge two real checkouts on the same date.';
++  'P1-22. Prefer props.stripe_checkout_session_id when present. Fallback (no session id): one row per user_id + purpose + 2-hour timestamp window (gaps-and-islands; a new window starts when the gap from the previous row for that user and purpose is greater than 2 hours). Latest row in the window is kept. Purpose is kept so a Base unlock and a sport-pack unlock close together are not collapsed. Window is 2 hours because Stripe webhook retries for one checkout usually arrive minutes to a couple of hours apart; a calendar-day rule can split a late-ET retry or merge two real checkouts on the same date. Excludes test fixtures and ops.internal_accounts via ops.is_excluded_from_metrics(user_id), the same rule as ops.v_real_assessed (20261116150000).';

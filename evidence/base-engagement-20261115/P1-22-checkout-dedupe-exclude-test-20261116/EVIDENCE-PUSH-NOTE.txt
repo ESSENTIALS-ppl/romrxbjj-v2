@@ -1,0 +1,2 @@
+Evidence copy of /workspace/process/batches/base-engagement-20261115/P1-22-checkout-dedupe-exclude-test-20261116/ (SHA256SUMS d3496dc0f3aece02a9c41ee82cab18b65c617cb607b469a7d0aa075bc9947f5e). Not in SUMS.
+Kept local: 3fe9badd.patch and hunks-U0.patch. They carry the synthetic fixture/test addresses from test.mjs (jim+romrx-*@romrx.io pattern and example.com), which the address rule excludes. The commit itself is on origin fix/p1-22-checkout-dedupe-exclude-test-20261116 (3fe9badd).
