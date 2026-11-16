@@ -82,12 +82,23 @@ Deno.test("retry window: hour 0 to 2 after target, not 3 and not before", () => 
   assertEquals(at("2026-11-02T16:00:00Z"), 1); // 10:00
   assertEquals(at("2026-11-02T17:00:00Z"), 0); // 11:00
 });
-Deno.test("bad reminder_time or timezone fall back to 09:00 Chicago", () => {
+Deno.test("bad reminder_time or timezone fall back to 09:00 America/New_York", () => {
   assertEquals(reminderHour("garbage"), 9);
   assertEquals(reminderHour(null), 9);
   assertEquals(reminderHour("8:30 PM"), 20);
   assertEquals(reminderHour("12:00 AM"), 0);
-  assertEquals(localParts(MON_8_CST, "Not/AZone").tz, "America/Chicago");
+  assertEquals(localParts(MON_8_CST, "Not/AZone").tz, "America/New_York");
+  assertEquals(localParts(MON_8_CST, null).tz, "America/New_York");
+  assertEquals(localParts(MON_8_CST, undefined).tz, "America/New_York");
+  assertEquals(localParts(MON_8_CST, "").tz, "America/New_York");
+  // valid stored zones are unchanged (including America/Chicago)
+  assertEquals(localParts(MON_8_CST, "America/Chicago").tz, "America/Chicago");
+  assertEquals(localParts(MON_8_CST, "America/New_York").tz, "America/New_York");
+  assertEquals(localParts(MON_8_CST, "Asia/Tokyo").tz, "Asia/Tokyo");
+  // 14:00Z Mon = 08:00 Chicago, 09:00 New York
+  assertEquals(localParts(MON_8_CST, "America/Chicago").hour, 8);
+  assertEquals(localParts(MON_8_CST, "Not/AZone").hour, 9);
+  assertEquals(localParts(MON_8_CST, null).hour, 9);
 });
 Deno.test("opt-outs: marketing_opt_out, deletion request, no/invalid email, not canary, no pref", () => {
   const cs = [

@@ -4,7 +4,7 @@
 //  - Audience is EXPLICIT SAVED ON only: the toggle is true AND the row was saved by the user after it was created
 //    (updated_at later than created_at). A default-on retest_reminders row nobody touched gets nothing.
 //  - Sender re-reads the toggle at send time (the caller loads rows in the same run it sends).
-//  - Send time follows reminder_time and timezone. A bad or missing value falls back to 09:00 America/Chicago.
+//  - Send time follows reminder_time and timezone. A bad or missing value falls back to 09:00 America/New_York.
 //  - Nothing is sent to users with marketing_opt_out, with a pending deletion request, or with no email.
 //  - No scores in reminders. The digest holds the overall score change and the streak count only.
 
@@ -16,7 +16,7 @@ export function flagOn(v: string | null | undefined): boolean { return v === "on
 /** Audience rule: everyone explicit-on only when LIFECYCLE_AUDIENCE is exactly "all"; anything else is canary (listed user ids only). */
 export function audienceAll(v: string | null | undefined): boolean { return v === "all"; }
 
-export const DEFAULT_TZ = "America/Chicago";
+export const DEFAULT_TZ = "America/New_York";
 export const DEFAULT_HOUR = 9;
 /** A user is eligible from their send hour until this many hours later, so one failed run is retried by the next hourly run. */
 export const SEND_WINDOW_HOURS = 3;
