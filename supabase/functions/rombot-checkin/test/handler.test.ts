@@ -74,7 +74,10 @@ Deno.test("email fallback: Base sender ROMRx <hello@romrx.io>, Stacy subject, op
   assertEquals(j.results.emails_sent, 1);
   const { to, b } = log.sends[0];
   assertEquals(to, "user@example.com");
+  // Jim, 9:42 AM ET Nov 16 (as relayed by Grant): "Replies go to hello@, Reid triages them from my inbox." Reply-To is hello@, never reid@.
   assertEquals([b.from, b.replyTo], ["ROMRx <hello@romrx.io>", "hello@romrx.io"]);
+  assert(!/reid@/i.test(b.replyTo + b.html + b.text));
+  assert(b.html.includes('href="mailto:hello@romrx.io"'));
   assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
   assertEquals(b.subject, "Your plan is ready, Sam");
   assert(b.text.startsWith("ROMBot here.\n\nHey Sam, ROMBot here."));

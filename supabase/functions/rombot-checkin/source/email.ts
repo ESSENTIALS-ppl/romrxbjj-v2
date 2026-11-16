@@ -6,7 +6,8 @@ import { APP_PATH } from "./logic.ts";
 
 /** P1-08 Base sender, the same value as ROMRX_SENDER in b19b13dca82a3c2eb34a641aa5ca79e410090c00
  *  (lifecycle-emails/source/email.ts). Defined here so this function does not depend on that deploy. A test pins the two equal
- *  whenever lifecycle-emails exports it. HELD with P1-08: no send before Jim's sender yes is relayed. */
+ *  whenever lifecycle-emails exports it. Reply-To hello@romrx.io per Jim 9:42 AM ET Nov 16 ("Replies go to hello@, Reid triages them
+ *  from my inbox."). HELD with P1-08: no send before Jim's sender yes is relayed. */
 export const ROMRX_SENDER = { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" } as const;
 export const BASE_BRAND = { key: "base", name: "ROMRx", appBase: "https://romrx.io/app" } as const;
 
