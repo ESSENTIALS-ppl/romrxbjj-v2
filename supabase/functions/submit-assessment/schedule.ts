@@ -2,6 +2,10 @@
 export const RETEST_DAYS = 42;
 export const CHECK_DAYS = 7;
 export const CHECK14_DAYS = 14;
+// Grant (Nov 15): unified timezone fallback is America/New_York. Stored user tz
+// (notification_preferences.timezone) is used first; only invalid or missing falls back here.
+// Single constant — do not add another fallback value.
+export const DEFAULT_TZ = "America/New_York";
 
 // Field targets mirrored from compute-tiers JOINT_TARGETS (Nov 2026). Used only to pick 1-2
 // provisional check_joints when assessments.worst_joints is still empty at submit time.
@@ -121,3 +125,69 @@ export const QUICK_ERRORS: Record<string, string> = {
   unexpected_joint: "Quick re-check only accepts the scheduled joints",
   missing_scheduled_joints: "Quick re-check needs a measurement for a scheduled joint",
 };
+
+/** The one timezone fallback. Invalid or missing tz uses DEFAULT_TZ (America/New_York). */
+export function resolveTz(tz: string | null | undefined): string {
+  if (!tz || typeof tz !== "string" || tz.length > 64) return DEFAULT_TZ;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_TZ;
+  }
+}
+
+/** User's local calendar date (YYYY-MM-DD) for an instant. */
+export function localYmd(at: Date | string, tz?: string | null): string | null {
+  const t = typeof at === "string" ? Date.parse(at) : at.getTime();
+  if (!Number.isFinite(t)) return null;
+  const zone = resolveTz(tz);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(t));
+  const g = (typ: string) => parts.find((p) => p.type === typ)?.value ?? "";
+  const y = g("year"), m = g("month"), d = g("day");
+  if (!y || !m || !d) return null;
+  return `${y}-${m}-${d}`;
+}
+
+/** Calendar-day add on a YYYY-MM-DD string (UTC date arithmetic, no timezone shift). */
+export function ymdAdd(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return date;
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Local day number of `now` relative to last full assessment: day 0 is that assessment's local date. */
+export function localDayOffset(lastAssessedAt: string, now: Date, tz?: string | null): number | null {
+  const start = localYmd(lastAssessedAt, tz);
+  const today = localYmd(now, tz);
+  if (!start || !today) return null;
+  const [ys, ms, ds] = start.split("-").map((x) => parseInt(x, 10));
+  const [yt, mt, dt] = today.split("-").map((x) => parseInt(x, 10));
+  const a = Date.UTC(ys, ms - 1, ds);
+  const b = Date.UTC(yt, mt - 1, dt);
+  return Math.round((b - a) / 86400000);
+}
+
+/** Rule 2 signal: after a saved quick check, next_check_at equals next_retest_at (a full save resets both). */
+export function quickAlreadyDoneThisCycle(s: Pick<ScheduleRead, "next_check_at" | "next_retest_at"> | null | undefined): boolean {
+  if (!s?.next_check_at || !s?.next_retest_at) return false;
+  const a = Date.parse(s.next_check_at);
+  const b = Date.parse(s.next_retest_at);
+  return Number.isFinite(a) && Number.isFinite(b) && a === b;
+}
+
+/** Grant (a): a quick check is accepted only on local days 7 to 14 after the last full assessment,
+ *  and only if the user has not already done one this cycle. Outside that, existing no_schedule error. */
+export function rejectQuickWindow(
+  sched: ScheduleRead | null | undefined,
+  now: Date,
+  tz?: string | null,
+): "no_schedule" | null {
+  if (!sched?.last_assessed_at) return "no_schedule";
+  if (quickAlreadyDoneThisCycle(sched)) return "no_schedule";
+  const day = localDayOffset(sched.last_assessed_at, now, tz);
+  if (day === null || day < CHECK_DAYS || day > CHECK14_DAYS) return "no_schedule";
+  return null;
+}
