@@ -13,7 +13,7 @@ export const BASE_SUPPORT_EMAIL = "hello@romrx.io";
 
 export const BRAND_BASE: Brand = {
   key: "base",
-  name: "ROMRx",
+  name: "ROMRx Base",
   brandHtml: "ROMRx",
   from: "ROMRx <hello@romrx.io>",
   replyTo: "hello@romrx.io",
