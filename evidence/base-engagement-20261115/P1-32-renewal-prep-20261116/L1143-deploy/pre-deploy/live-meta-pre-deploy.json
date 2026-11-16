@@ -1,0 +1,18 @@
+{
+ "id": "891d3add-5646-4f98-84c1-c062454fdea0",
+ "slug": "send-renewal-reminders",
+ "name": "send-renewal-reminders",
+ "status": "ACTIVE",
+ "version": 26,
+ "created_at": 1779994599102,
+ "updated_at": 1793674592530,
+ "verify_jwt": false,
+ "import_map": false,
+ "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_891d3add-5646-4f98-84c1-c062454fdea0_25/source/source/index.ts",
+ "ezbr_sha256": "dece2cb78932a506618281454dad3fb9f7d15ffb50d69ed5663d31edfe615dda",
+ "file_sha256": {
+  "source/index.ts": "c318e360150ebce65d1a4b176557c297d5109b7c08d2393dad0c56fc2c3c0243",
+  "_shared/email_footer.ts": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+  "source/logic.ts": "1741f4b7b57074b4c61a3b4b3aa6c516f41f6bd114b06475f628f5fad4518eae"
+ }
+}

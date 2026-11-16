@@ -1,0 +1,3 @@
+L1143 deploy evidence copy. Not in SHA256SUMS.
+Source: /workspace/process/batches/base-engagement-20261115/P1-32-renewal-prep-20261116/L1143-deploy (SHA256SUMS sha256 3058eb5a8c4b277f1b39e9f0e0e3f0b36d6ccee35b9a60b8f7cc4efc849506c2, 18 entries).
+Kept local (sport sender addresses or the approved placeholder recipient): source/index.ts and source/email.ts (deploy-src and readback; their sha256s are in SHA256SUMS and the receipt), p132_renewal_test_on_v27_readback.ts.

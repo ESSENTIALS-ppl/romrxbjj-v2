@@ -1,0 +1,11 @@
+Check p132_renewal_test_on_v27_readback.ts
+running 6 tests from ./p132_renewal_test_on_v27_readback.ts
+Base From / Reply-To are the approved ones ... ok (355µs)
+Base render rebuilds RENEWAL-FOR-JIM.md (2bf843e3) byte for byte ... ok (875µs)
+negative control: a one-character change breaks the byte match ... ok (48µs)
+BJJ and Bodybuilding output byte-identical to live v26 ... ok (215µs)
+routing: only exact sport strings get a sport brand ... ok (10ms)
+logic unchanged: windows 45/30/2, price $60/yr, send flag only 'on' ... ok (102µs)
+
+ok | 6 passed | 0 failed (16ms)
+
