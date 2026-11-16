@@ -1,0 +1,114 @@
+{
+ "np_rows": 48,
+ "roll_fn": 0,
+ "cron_jobs": [
+  {
+   "jobid": 1,
+   "active": true,
+   "cmd_md5": "caab15b0a3b771bccfd127f7c3db4df2",
+   "jobname": "send-renewal-reminders-daily",
+   "schedule": "0 12 * * *"
+  },
+  {
+   "jobid": 2,
+   "active": false,
+   "cmd_md5": "96ffa790027acd45313edf20e6612677",
+   "jobname": "s1-2-followup-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 3,
+   "active": false,
+   "cmd_md5": "5c632dc347104173f09055083687f2b0",
+   "jobname": "s1-3-masters-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 4,
+   "active": false,
+   "cmd_md5": "053dbb8f4ed2270b0cd3217179f09cfa",
+   "jobname": "s1-4-stillhere-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 5,
+   "active": false,
+   "cmd_md5": "f0aefa2f88c94e80935601390d44ec2d",
+   "jobname": "bb-s1-2-followup-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 6,
+   "active": false,
+   "cmd_md5": "84dcb7331405342a57af8fc0c73d2fb5",
+   "jobname": "bb-s1-3-followup-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 7,
+   "active": false,
+   "cmd_md5": "e3612627db468c64852a7fa730ce4146",
+   "jobname": "bb-s1-4-stillhere-email-hourly",
+   "schedule": "0 * * * *"
+  },
+  {
+   "jobid": 8,
+   "active": true,
+   "cmd_md5": "5a228f65f8009616ea9c2760119c1845",
+   "jobname": "conversion-drip-hourly",
+   "schedule": "15 * * * *"
+  },
+  {
+   "jobid": 9,
+   "active": true,
+   "cmd_md5": "a7ee748b979d9d3fd61d8cf8d3bc09ff",
+   "jobname": "consent-events-retention-daily",
+   "schedule": "17 4 * * *"
+  },
+  {
+   "jobid": 10,
+   "active": true,
+   "cmd_md5": "1760ebc6aa9483d0d329e563df706858",
+   "jobname": "ai-chat-retention-90d-daily",
+   "schedule": "17 8 * * *"
+  },
+  {
+   "jobid": 11,
+   "active": true,
+   "cmd_md5": "a40ec3691de43187cbfb5b3061fd2519",
+   "jobname": "lifecycle-emails-hourly",
+   "schedule": "30 * * * *"
+  },
+  {
+   "jobid": 12,
+   "active": true,
+   "cmd_md5": "15fc1f98d9fd7dab332077448c912d00",
+   "jobname": "assessment-drafts-purge-hourly",
+   "schedule": "17 * * * *"
+  }
+ ],
+ "ums_table": null,
+ "users_rows": 47,
+ "read_at_utc": "2026-11-16T13:45:46.401544+00:00",
+ "assessments_idx": [
+  "assessments_athlete_id_idx",
+  "assessments_created_at_idx",
+  "assessments_pkey",
+  "assessments_sport_idx",
+  "idx_assessments_assessed_at",
+  "idx_assessments_user_id"
+ ],
+ "migrations_head": "20261116030659",
+ "np_timezone_col": 1,
+ "assessments_rows": 22,
+ "migrations_count": 179,
+ "assessments_users": 19,
+ "assessments_triggers": [
+  "assessments",
+  "assessments_clear_draft_ai",
+  "trg_assessments_autofill_athlete_id",
+  "zz_pe_assessment_inserted"
+ ],
+ "assessments_check_kind_chk": 0,
+ "assessments_check_kind_col": 0
+}

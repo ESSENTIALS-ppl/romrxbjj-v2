@@ -1,0 +1,6 @@
+{"source":"execute_sql SELECT on net._http_response (read-only), Mon Nov 16 2026 ~8:47 AM ET; only flag fields + due counts extracted","rows":[
+{"id":22397,"created_utc":"2026-11-16 13:30:00","created_et":"Mon Nov 16 8:30 AM ET","status":200,"send_enabled":false,"dry_run":true,"audience":"canary","canary_count":0,"due":{"digest":0,"lapsed":0,"retest":0,"protocol":0}},
+{"id":22395,"created_et":"Mon Nov 16 7:30 AM ET","status":200,"send_enabled":false,"dry_run":true,"audience":"canary","canary_count":0,"due":{"digest":0,"lapsed":0,"retest":0,"protocol":0}},
+{"id":22392,"created_et":"Mon Nov 16 6:30 AM ET","status":200,"send_enabled":false,"dry_run":true,"audience":"canary","canary_count":0,"due":{"digest":0,"lapsed":0,"retest":0,"protocol":0}},
+{"id":22390,"created_et":"Mon Nov 16 5:30 AM ET","status":200,"send_enabled":false,"dry_run":true,"audience":"canary","canary_count":0,"due":{"digest":0,"lapsed":0,"retest":0,"protocol":0}},
+{"id":22388,"created_et":"Mon Nov 16 4:30 AM ET","status":200,"send_enabled":false,"dry_run":true,"audience":"canary","canary_count":0,"due":{"digest":0,"lapsed":0,"retest":0,"protocol":0}}]}

@@ -1,0 +1,68 @@
+{
+  "submit-assessment": {
+    "version": 44,
+    "ezbr_sha256": "110f365775b57b68977c68627ef2cda1645aae09a4ef23944555de8fcb0ff19a",
+    "updated_at": 1793114288188,
+    "verify_jwt": true,
+    "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_078815b9-b8c4-482b-b67a-1d62ccf16575_39/source/supabase/functions/submit-assessment/index.ts",
+    "updated_at_et": "Tue Oct 27, 2026 11:18:08 AM ET",
+    "files": [
+      "functions/submit-assessment/index.ts",
+      "functions/_shared/rate_limit.ts",
+      "functions/_shared/events.ts",
+      "functions/_shared/email_footer.ts",
+      "functions/_shared/capture_methods.ts",
+      "functions/submit-assessment/mood_block.ts"
+    ]
+  },
+  "lifecycle-emails": {
+    "version": 2,
+    "ezbr_sha256": "aa79a1dc7f114e23d9d2b9d4b85aeb7e430046c6509eda5ac83b5e0794665e96",
+    "updated_at": 1794798268446,
+    "verify_jwt": false,
+    "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_612296fe-7b65-4062-919f-d6a6bcc14657_2/source/source/index.ts",
+    "updated_at_et": "Sun Nov 15, 2026 10:04:28 PM ET",
+    "files": [
+      "source/index.ts",
+      "source/handler.ts",
+      "source/logic.ts",
+      "source/email.ts",
+      "source/score.ts",
+      "_shared/mobility/mobilityBands.ts",
+      "_shared/mobility/lumbarFlag.ts",
+      "_shared/email_footer.ts",
+      "_shared/unsub_token.ts",
+      "source/deletion.ts"
+    ]
+  },
+  "unsubscribe": {
+    "version": 12,
+    "ezbr_sha256": "97503ff467084edfe1780bf5d5a8bebfe06939dbfe429da0cd11e4741f790e86",
+    "updated_at": 1793685436797,
+    "verify_jwt": false,
+    "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_d7eaa2d5-647f-4936-a879-e3ff25e8db2b_12/source/source/index.ts",
+    "updated_at_et": "Tue Nov 3, 2026 12:57:16 AM ET",
+    "files": [
+      "source/index.ts",
+      "_shared/rate_limit.ts",
+      "_shared/events.ts",
+      "source/token_path.ts",
+      "_shared/unsub_token.ts"
+    ]
+  },
+  "compute-tiers": {
+    "version": 53,
+    "ezbr_sha256": "6f4c506ac0df2069b8d7bd93844f68e6dfa99f7919f0d448bf96e442730a06ad",
+    "updated_at": 1793748442085,
+    "verify_jwt": false,
+    "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_7c308d07-a2a3-47df-b525-df53cf14af25_53/source/source/index.ts",
+    "updated_at_et": "Tue Nov 3, 2026 6:27:22 PM ET",
+    "files": [
+      "source/index.ts",
+      "source/joint_totals.ts",
+      "_shared/t1_narrow_bands.ts",
+      "source/pack_recompute.ts"
+    ]
+  },
+  "read_at_et": "Mon Nov 16, 2026 8:44:30 AM ET"
+}

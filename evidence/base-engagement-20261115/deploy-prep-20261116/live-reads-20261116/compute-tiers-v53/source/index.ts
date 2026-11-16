@@ -1,0 +1,343 @@
+// compute-tiers v51 (FG-36 + FG-37 B1 STAGED, not deployed; base = live v50, rollback = redeploy v50). v51 also: pack owners get recompute_user_eligibility after every assessment (try/catch). v51: hip flexion scored (target 120, Jim override Nov 2 5:56 PM) for assessments created at/after public.scoring_cutovers[hip_flex_scored]; older ones unchanged.
+// compute-tiers v42-t1-rebased (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist
+// v42 (T1 rebased on the range reset; Jim Oct 21 2026 10:53 AM ET 'T1: A plus C', narrowed 11:47 AM ET, and 4:38 PM ET
+//   'Drop the T1 buffers on the reset moves'): worst_joints ordered by the T1 weighted gap (buffer A on hip_abd, cervical_rot,
+//   shoulder_er only + 0.5 weight until two assessments in a row agree, C). Bands come from SQL compute_joint_scores (same rule).
+// v41-range-reset (Jim Oct 21 2026 4:15 PM ET, proof-20261020/range-proposal.md): Steady target = pooled mean minus 1 SD:
+//   hip ER 23 / IR 24 (Simoneau 1998 PMID 9742472 + Roach 1991 PMID 1881956), shoulder_flex 141 (Gill 2020 PMID 33046038),
+//   ankle_df 6.1 cm (McBride 2026 PMID 41723909, all ages), neck side bend 37 / flexion 39 / extension 48 (pooled WITH Wadhwa 2024:
+//   PMIDs 23829201, 32626769, 33868830, 39677250).
+//   hip_abd, hip_flex, shoulder_er, cervical_rot, lumbar unchanged. 90% Building rule unchanged. techniques.*_min NOT rescaled.
+// v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,
+//   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().
+// v39 (Jim decisions, Oct 6 2026): earlier Steady targets, superseded by v41 for hip_er, hip_ir, shoulder_flex, ankle_df and
+//   cervical_lat (sources now: PMIDs 9742472, 1881956, 33046038, 41723909, 23829201, 32626769, 33868830, 39677250).
+//   hip_abd 40 and cervical_rot 70 are Oct 6 values not covered by range-proposal.md.
+//   shoulder_er 40 (was 90) was the lying tucked-elbow test, later replaced by v40 (85, standing goal-post test).
+//   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are rescaled to these targets by
+//   migration 20261012220000_pack_minimums_rescale.sql (Jim YES Oct 6 12:10 PM; data only, classify() is unchanged; Quinn calls 12:22 PM: SLR 60/120,
+//   shoulder_er 85/90, 4 ankle overrides).
+//   Mirrors romrx-io-web mobilityBands.ts JOINT_SCORE_TARGETS and public.compute_joint_scores().
+// v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)
+// v36: also emits per-joint scores into public.joint_scores via the SQL fn
+//   public.compute_joint_scores(p_assessment_id). Sport-agnostic, guarded so a
+//   failure never blocks tier/eligibility. Single source of truth = the SQL fn. (Jim 2026-07-07)
+// v34: techniques with NO threshold on any assessed joint -> GREEN (not skipped).
+//
+// v33 restores technique readiness scoring that v32 stubbed out.
+// RULE (worst-joint driven, agreed w/ Jim 2026-07-06):
+//   RED / YELLOW / GREEN from required joint thresholds.
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const JOINT_TARGETS: Record<string, number> = {
+  hip_er_l: 23, hip_er_r: 23,   // Oct 21 2026 range reset: was 29 (PMIDs 9742472, 1881956)
+  hip_ir_l: 24, hip_ir_r: 24,   // Oct 21 2026 range reset: was 26 (PMIDs 9742472, 1881956)
+  hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90
+  hip_flex_l: 120, hip_flex_r: 120,
+  hip_ext_l: 30, hip_ext_r: 30,
+  shoulder_er_l: 85, shoulder_er_r: 85,       // Oct 6 2026 8:19 PM: standing goal-post (was 40 tucked elbow; 90 before)
+  shoulder_flex_l: 141, shoulder_flex_r: 141, // Oct 21 2026 range reset: was 140 (PMID 33046038)
+  ankle_df_l: 6.1, ankle_df_r: 6.1,           // Oct 21 2026 range reset: was 6 cm (PMID 41723909)
+  cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Oct 6 value not covered by range-proposal.md)
+  cervical_lat_l: 37, cervical_lat_r: 37,     // Oct 21 2026 range reset: was 38 (PMIDs 23829201, 32626769, 33868830, 39677250)
+  cervical_flex: 39, cervical_ext: 48,        // Oct 21 2026 range reset: were 50 / 60 (same 4 PMIDs, with Wadhwa 2024)
+  thoracic_rot_l: 45, thoracic_rot_r: 45,
+  lumbar_flex: 60, lumbar_ext: 25,
+  balance_l: 30, balance_r: 30,
+};
+
+const YELLOW_BAND = 0.90;
+
+const BILATERAL: Record<string, [string, string]> = {
+  hip_er:        ["hip_er_l", "hip_er_r"],
+  hip_ir:        ["hip_ir_l", "hip_ir_r"],
+  hip_abd:       ["hip_abd_l", "hip_abd_r"],
+  hip_flex:      ["hip_flex_l", "hip_flex_r"],
+  shoulder_er:   ["shoulder_er_l", "shoulder_er_r"],
+  shoulder_flex: ["shoulder_flex_l", "shoulder_flex_r"],
+  ankle_df:      ["ankle_df_l", "ankle_df_r"],
+  cervical_rot:  ["cervical_rot_l", "cervical_rot_r"],
+  cervical_lat:  ["cervical_lat_l", "cervical_lat_r"],
+};
+const SINGLE: Record<string, string> = {
+  lumbar_flex:   "lumbar_flex",
+  lumbar_ext:    "lumbar_ext",
+  cervical_flex: "cervical_flex",
+  cervical_ext:  "cervical_ext",
+};
+const EVALUABLE = new Set([...Object.keys(BILATERAL), ...Object.keys(SINGLE)]);
+
+function toNum(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return isFinite(n) ? n : null;
+}
+
+function athleteValue(a: Record<string, unknown>, joint: string): number | null {
+  if (joint in BILATERAL) {
+    const [l, r] = BILATERAL[joint];
+    const vs = [toNum(a[l]), toNum(a[r])].filter((x): x is number => x != null);
+    return vs.length ? Math.min(...vs) : null;
+  }
+  if (joint in SINGLE) return toNum(a[SINGLE[joint]]);
+  return null;
+}
+
+type LimitingJoint = { joint: string; value: number | null; min: number; ratio?: number; reason?: string };
+type TierResult = { tier: "GREEN" | "YELLOW" | "RED"; limiting: LimitingJoint[] };
+
+function classify(a: Record<string, unknown>, technique: Record<string, unknown>): TierResult {
+  const required: { joint: string; thresh: number }[] = [];
+  for (const [col, val] of Object.entries(technique)) {
+    if (!col.endsWith("_min")) continue;
+    const thresh = toNum(val);
+    if (thresh == null || thresh === 0) continue;
+    const joint = col.slice(0, -4);
+    if (!EVALUABLE.has(joint)) continue;
+    required.push({ joint, thresh });
+  }
+  if (required.length === 0) return { tier: "GREEN", limiting: [] };
+
+  const limiting: LimitingJoint[] = [];
+  const missing: LimitingJoint[] = [];
+  let worstRatio: number | null = null;
+
+  for (const { joint, thresh } of required) {
+    const av = athleteValue(a, joint);
+    if (av == null) {
+      missing.push({ joint, value: null, min: thresh, reason: "not_measured" });
+      continue;
+    }
+    const ratio = thresh ? av / thresh : 1.0;
+    if (worstRatio == null || ratio < worstRatio) worstRatio = ratio;
+    if (ratio < 1.0) limiting.push({ joint, value: av, min: thresh, ratio: Math.round(ratio * 1000) / 1000 });
+  }
+
+  if (worstRatio != null && worstRatio < YELLOW_BAND) {
+    return { tier: "RED", limiting: limiting.filter(x => (x.ratio ?? 1) < YELLOW_BAND) };
+  }
+  const band = limiting.filter(x => (x.ratio ?? 1) >= YELLOW_BAND && (x.ratio ?? 1) < 1.0);
+  if (band.length || missing.length) {
+    return { tier: "YELLOW", limiting: [...band, ...missing] };
+  }
+  return { tier: "GREEN", limiting: [] };
+}
+
+function computeWorstJointKeys(a: Record<string, unknown>, limit = 5, prev: Record<string, unknown> | null = null, opts: ScoreOpts = {}): string[] {
+  // body in ./joint_totals.ts (pure, unit tested); the FG-36 cutover guard there keeps hip flexion out of pre-cutover weak spots and the /100
+  // T1 option C: prev = the user's previous assessment, so narrow-joint gaps get full weight only when two in a row agree
+  return worstJointKeys(a, JOINT_TARGETS, toNum, limit, prev, opts);
+}
+
+function computeRomTotal(a: Record<string, unknown>, opts: ScoreOpts = {}): number {
+  return romTotal(a, JOINT_TARGETS, toNum, opts);
+}
+import { romTotal, worstJointKeys, type ScoreOpts } from "./joint_totals.ts";
+import { recomputePackEligibility } from "./pack_recompute.ts";
+
+// CORS (Reid E2E): the browser preflight (OPTIONS) used to fall through to req.json() and answer 400
+// missing_assessment_id, so the belt-change call from romrx.io failed in browsers. Same header set the other
+// browser-called functions use. No auth change here (verify_jwt stays false: the assessments DB webhook posts without a header, F-08).
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+// Row 19 caller check. Two accepted callers: (1) the assessments DB trigger, which sends x-cron-secret (verified by
+// public.verify_webhook_secret('cron_webhook_secret'), fail closed); (2) a signed-in user whose JWT owns the assessment.
+// COMPUTE_TIERS_ENFORCE: unset/"off" = log-only (warn, still process); "on" = reject with 401. Flip with an env change, no redeploy.
+// deno-lint-ignore no-explicit-any
+async function callerOk(req: Request, supa: any, assessmentUserId: string | null): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const got = (req.headers.get("x-cron-secret") ?? "").trim();
+  if (got.length >= 32) {
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/verify_webhook_secret`, {
+        method: "POST",
+        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
+      });
+      if (r.ok && (await r.json()) === true) return true;
+    } catch { /* fall through */ }
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (token && assessmentUserId) {
+    try {
+      const { data } = await supa.auth.getUser(token);
+      if (data?.user?.id && data.user.id === assessmentUserId) return true;
+    } catch { /* fall through */ }
+  }
+  return false;
+}
+function enforceOn(): boolean { return (Deno.env.get("COMPUTE_TIERS_ENFORCE") ?? "").toLowerCase() === "on"; }
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
+  try {
+    const body = await req.json().catch(() => ({}));
+    const record = (body?.record ?? body) as Record<string, unknown>;
+    const assessmentId = record?.id as string | undefined;
+
+    if (!assessmentId) {
+      return json({ success: false, error: "missing_assessment_id" }, 400);
+    }
+
+    const supa = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const { data: assessment, error: fetchErr } = await supa
+      .from("assessments")
+      .select("*")
+      .eq("id", assessmentId)
+      .single();
+    if (fetchErr || !assessment) {
+      return json({ success: false, error: "assessment_not_found", detail: fetchErr?.message }, 404);
+    }
+    if (!(await callerOk(req, supa, (assessment.user_id as string | null) ?? null))) {
+      console.warn("compute-tiers: caller check failed", { enforce: enforceOn() });
+      if (enforceOn()) return json({ success: false, error: "unauthorized" }, 401);
+    }
+
+    const sport = (assessment.sport as string | undefined) ?? "general";
+    const userId = assessment.user_id as string | undefined;
+    const athleteId = (assessment.athlete_id as string | undefined) ?? null;
+
+    // T1 option C (Oct 21 2026): the user's previous assessment (read only) for the two-in-a-row agreement check.
+    let prevAssessment: Record<string, unknown> | null = null;
+    if (userId && assessment.created_at) {
+      const { data: prevRows } = await supa
+        .from("assessments")
+        .select("*")
+        .eq("user_id", userId)
+        .lt("created_at", assessment.created_at as string)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      prevAssessment = (prevRows && prevRows[0]) ? (prevRows[0] as Record<string, unknown>) : null;
+    }
+    // FG-36: hip flexion is scored only for assessments created at or after the DB cutover. Any read failure = old behavior.
+    let hipFlexScored = false;
+    try {
+      const { data: cut } = await supa.from("scoring_cutovers").select("effective_at").eq("key", "hip_flex_scored").maybeSingle();
+      const eff = cut?.effective_at ? Date.parse(cut.effective_at as string) : NaN;
+      const made = assessment.created_at ? Date.parse(assessment.created_at as string) : NaN;
+      hipFlexScored = Number.isFinite(eff) && Number.isFinite(made) && made >= eff;
+    } catch (_e) { hipFlexScored = false; }
+    const scoreOpts: ScoreOpts = { hipFlexScored };
+    const worstJoints = computeWorstJointKeys(assessment, 5, prevAssessment, scoreOpts);
+    const romTotal = computeRomTotal(assessment, scoreOpts);
+    const { error: updErr } = await supa
+      .from("assessments")
+      .update({ worst_joints: worstJoints, rom_total: romTotal })
+      .eq("id", assessmentId);
+    if (updErr) {
+      return json({ success: false, error: "assessment_update_failed", detail: updErr.message }, 500);
+    }
+
+    try {
+      const { error: jsErr } = await supa.rpc("compute_joint_scores", { p_assessment_id: assessmentId });
+      if (jsErr) console.error("compute_joint_scores failed:", jsErr.message);
+    } catch (e) {
+      console.error("compute_joint_scores threw:", String(e));
+    }
+
+    // Phase A1: persist protocol for ALL sports (including general/Base) so ROMBot
+    // and My Protocol share one source of truth via rombot_context.protocol.
+    // SQL fn public.persist_protocols_for_assessment mirrors My Protocol ranking + RX pick.
+    let protocolPersist: Record<string, unknown> = { written: 0 };
+    try {
+      const { data: protoData, error: protoErr } = await supa.rpc(
+        "persist_protocols_for_assessment",
+        { p_assessment_id: assessmentId },
+      );
+      if (protoErr) {
+        console.error("persist_protocols RPC failed:", protoErr.message);
+        protocolPersist = { error: protoErr.message };
+      } else {
+        protocolPersist = (protoData as Record<string, unknown>) ?? { written: 0 };
+      }
+    } catch (e) {
+      console.error("persist_protocols threw:", String(e));
+      protocolPersist = { error: String(e) };
+    }
+
+    // FG-37 B1: refresh technique unlocks for every pack this user owns (any sport the new row is tagged with), before the early return.
+    const packEligibility = await recomputePackEligibility(supa, userId);
+
+    if (sport !== "bjj" && sport !== "bodybuilding") {
+      return json({
+        success: true, assessment_id: assessmentId, sport,
+        worst_joints: worstJoints, rom_total: romTotal,
+        protocol: protocolPersist,
+        eligibility: "skipped_no_technique_catalog_for_sport",
+        pack_eligibility: packEligibility,
+      });
+    }
+
+    const { data: techniques, error: techErr } = await supa
+      .from("techniques")
+      .select("*")
+      .eq("sport", sport);
+    if (techErr || !techniques) {
+      return json({ success: false, error: "techniques_fetch_failed", detail: techErr?.message }, 500);
+    }
+
+    const now = new Date().toISOString();
+    const rows: Record<string, unknown>[] = [];
+    const counts: Record<string, number> = { GREEN: 0, YELLOW: 0, RED: 0 };
+
+    for (const t of techniques as Record<string, unknown>[]) {
+      const res = classify(assessment, t);
+      counts[res.tier]++;
+      rows.push({
+        user_id: userId,
+        athlete_id: athleteId,
+        assessment_id: assessmentId,
+        technique_id: t.id,
+        technique_code: t.code,
+        sport,
+        tier: res.tier,
+        limiting_joints: res.limiting.map(l =>
+          l.reason === "not_measured"
+            ? `${l.joint}:not_measured(min ${l.min})`
+            : `${l.joint}:${l.value} vs min ${l.min}`
+        ),
+        computed_at: now,
+      });
+    }
+
+    if (rows.length) {
+      const { error: upErr } = await supa
+        .from("technique_eligibility")
+        .upsert(rows, { onConflict: "user_id,assessment_id,technique_id" });
+      if (upErr) {
+        return json({ success: false, error: "eligibility_upsert_failed", detail: upErr.message }, 500);
+      }
+    }
+
+    return json({
+      success: true,
+      assessment_id: assessmentId,
+      sport,
+      worst_joints: worstJoints,
+      rom_total: romTotal,
+      protocol: protocolPersist,
+      eligibility: { written: rows.length, ...counts },
+    });
+  } catch (e) {
+    return json({ success: false, error: "unexpected", detail: String(e) }, 500);
+  }
+});
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}

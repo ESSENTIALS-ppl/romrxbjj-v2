@@ -1,0 +1,2 @@
+Check supabase/functions/submit-assessment/index.ts
+Check supabase/functions/compute-tiers/index.ts

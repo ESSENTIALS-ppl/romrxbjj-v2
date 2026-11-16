@@ -1,0 +1,9 @@
+Check ../workspace/process/batches/base-engagement-20261115/deploy-prep-20261116/step5-evidence/x-compat-e5488088-in-8c9f9120.test.ts
+running 4 tests from ../workspace/process/batches/base-engagement-20261115/deploy-prep-20261116/step5-evidence/x-compat-e5488088-in-8c9f9120.test.ts
+every e5488088 scope is still in 8c9f9120 with the same setting ... ok (767µs)
+every e5488088 send kind is still a send kind in 8c9f9120 and has a scope ... ok (83µs)
+tokens cross-verify both ways for every e5488088 scope (lifecycle signer -> unsubscribe verifier) ... ok (3ms)
+fail closed unchanged: short secret signs nothing, tampered token rejected ... ok (170µs)
+
+ok | 4 passed | 0 failed (10ms)
+

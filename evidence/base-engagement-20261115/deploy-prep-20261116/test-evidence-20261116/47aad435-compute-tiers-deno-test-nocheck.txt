@@ -1,0 +1,227 @@
+------- pre-test output -------
+compute-tiers hip_flex migration tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/hip_flex_migration.test.ts
+Uncaught error from ./supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts FAILED
+running 0 tests from ./supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts
+------- pre-test output -------
+compute-tiers minimums_rescale tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/minimums_rescale.test.ts
+------- pre-test output -------
+compute-tiers range_reset_pooled tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/range_reset_pooled.test.ts
+------- pre-test output -------
+compute-tiers rescore_saved tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/rescore_saved.test.ts
+Uncaught error from ./supabase/functions/compute-tiers/test/shoulder_er_85.test.ts FAILED
+------- pre-test output -------
+compute-tiers steady_targets tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/steady_targets.test.ts
+------- pre-test output -------
+compute-tiers t1_narrow_config tests: ok
+----- pre-test output end -----
+running 0 tests from ./supabase/functions/compute-tiers/test/t1_narrow_config.test.ts
+
+ ERRORS 
+
+./supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts (uncaught error)
+error: SyntaxError: The requested module '../joint_totals.ts' does not provide an export named 'HIP_FLEX_UNSCORED'
+import { HIP_FLEX_UNSCORED, isUnscoredJoint, romTotal, worstJointKeys } from "../joint_totals.ts";
+         ^
+    at <anonymous> (file:///tmp/arch-47aad435/supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts:2:10)
+This error was not caught from a test and caused the test runner to fail on the referenced module.
+It most likely originated from a dangling promise, event/timeout handler or top-level code.
+
+./supabase/functions/compute-tiers/test/shoulder_er_85.test.ts (uncaught error)
+error: (in promise) AssertionError: The input did not match the regular expression /^\/\/ compute-tiers v4\d/. Input:
+
+'// compute-tiers v51 (FG-36 + FG-37 B1 STAGED, not deployed; base = live v50, rollback = redeploy v50). v51 also: pack owners get recompute_user_eligibility after every assessment (try/catch). v51: hip flexion scored (target 120, Jim override Nov 2 5:56 PM) for assessments created at/after public.scoring_cutovers[hip_flex_scored]; older ones unchanged.\n' +
+  '// compute-tiers v42-t1-rebased (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist\n' +
+  "// v42 (T1 rebased on the range reset; Jim Oct 21 2026 10:53 AM ET 'T1: A plus C', narrowed 11:47 AM ET, and 4:38 PM ET\n" +
+  "//   'Drop the T1 buffers on the reset moves'): worst_joints ordered by the T1 weighted gap (buffer A on hip_abd, cervical_rot,\n" +
+  '//   shoulder_er only + 0.5 weight until two assessments in a row agree, C). Bands come from SQL compute_joint_scores (same rule).\n' +
+  '// v41-range-reset (Jim Oct 21 2026 4:15 PM ET, proof-20261020/range-proposal.md): Steady target = pooled mean minus 1 SD:\n' +
+  '//   hip ER 23 / IR 24 (Simoneau 1998 PMID 9742472 + Roach 1991 PMID 1881956), shoulder_flex 141 (Gill 2020 PMID 33046038),\n' +
+  '//   ankle_df 6.1 cm (McBride 2026 PMID 41723909, all ages), neck side bend 37 / flexion 39 / extension 48 (pooled WITH Wadhwa 2024:\n' +
+  '//   PMIDs 23829201, 32626769, 33868830, 39677250).\n' +
+  '//   hip_abd, hip_flex, shoulder_er, cervical_rot, lumbar unchanged. 90% Building rule unchanged. techniques.*_min NOT rescaled.\n' +
+  '// v40 (Oct 6 2026, 8:19 PM; Jim-approved, Quinn spec): shoulder_er 40 -> 85, the STANDING goal-post test (arm out to the side,\n' +
+  '//   elbow at shoulder height, bent like a goal post). Only that target changes. Mirrors mobilityBands.ts / compute_joint_scores().\n' +
+  '// v39 (Jim decisions, Oct 6 2026): earlier Steady targets, superseded by v41 for hip_er, hip_ir, shoulder_flex, ankle_df and\n' +
+  '//   cervical_lat (sources now: PMIDs 9742472, 1881956, 33046038, 41723909, 23829201, 32626769, 33868830, 39677250).\n' +
+  '//   hip_abd 40 and cervical_rot 70 are Oct 6 values not covered by range-proposal.md.\n' +
+  '//   shoulder_er 40 (was 90) was the lying tucked-elbow test, later replaced by v40 (85, standing goal-post test).\n' +
+  '//   Feeds worst_joints + rom_total only. Technique minimums (techniques.*_min) are rescaled to these targets by\n' +
+  '//   migration 20261012220000_pack_minimums_rescale.sql (Jim YES Oct 6 12:10 PM; data only, classify() is unchanged; Quinn calls 12:22 PM: SLR 60/120,\n' +
+  '//   shoulder_er 85/90, 4 ankle overrides).\n' +
+  '//   Mirrors romrx-io-web mobilityBands.ts JOINT_SCORE_TARGETS and public.compute_joint_scores().\n' +
+  '// v38: persist top-3 joint daily Rx into public.protocols (matches My Protocol / rombot_context)\n' +
+  '// v36: also emits per-joint scores into public.joint_scores via the SQL fn\n' +
+  '//   public.compute_joint_scores(p_assessment_id). Sport-agnostic, guarded so a\n' +
+  '//   failure never blocks tier/eligibility. Single source of truth = the SQL fn. (Jim 2026-07-07)\n' +
+  '// v34: techniques with NO threshold on any assessed joint -> GREEN (not skipped).\n' +
+  '//\n' +
+  '// v33 restores technique readiness scoring that v32 stubbed out.\n' +
+  '// RULE (worst-joint driven, agreed w/ Jim 2026-07-06):\n' +
+  '//   RED / YELLOW / GREEN from required joint thresholds.\n' +
+  '\n' +
+  'import "jsr:@supabase/functions-js/edge-runtime.d.ts";\n' +
+  'import { createClient } from "jsr:@supabase/supabase-js@2";\n' +
+  '\n' +
+  'const JOINT_TARGETS: Record<string, number> = {\n' +
+  '  hip_er_l: 23, hip_er_r: 23,   // Oct 21 2026 range reset: was 29 (PMIDs 9742472, 1881956)\n' +
+  '  hip_ir_l: 24, hip_ir_r: 24,   // Oct 21 2026 range reset: was 26 (PMIDs 9742472, 1881956)\n' +
+  '  hip_abd_l: 40, hip_abd_r: 40, // Oct 6 2026: was 90\n' +
+  '  hip_flex_l: 120, hip_flex_r: 120,\n' +
+  '  hip_ext_l: 30, hip_ext_r: 30,\n' +
+  '  shoulder_er_l: 85, shoulder_er_r: 85,       // Oct 6 2026 8:19 PM: standing goal-post (was 40 tucked elbow; 90 before)\n' +
+  '  shoulder_flex_l: 141, shoulder_flex_r: 141, // Oct 21 2026 range reset: was 140 (PMID 33046038)\n' +
+  '  ankle_df_l: 6.1, ankle_df_r: 6.1,           // Oct 21 2026 range reset: was 6 cm (PMID 41723909)\n' +
+  '  cervical_rot_l: 70, cervical_rot_r: 70,     // Oct 6 2026: was 80 (Oct 6 value not covered by range-proposal.md)\n' +
+  '  cervical_lat_l: 37, cervical_lat_r: 37,     // Oct 21 2026 range reset: was 38 (PMIDs 23829201, 32626769, 33868830, 39677250)\n' +
+  '  cervical_flex: 39, cervical_ext: 48,        // Oct 21 2026 range reset: were 50 / 60 (same 4 PMIDs, with Wadhwa 2024)\n' +
+  '  thoracic_rot_l: 45, thoracic_rot_r: 45,\n' +
+  '  lumbar_flex: 60, lumbar_ext: 25,\n' +
+  '  balance_l: 30, balance_r: 30,\n' +
+  '};\n' +
+  '\n' +
+  'const YELLOW_BAND = 0.90;\n' +
+  '\n' +
+  'const BILATERAL: Record<string, [string, string]> = {\n' +
+  '  hip_er:        ["hip_er_l", "hip_er_r"],\n' +
+  '  hip_ir:        ["hip_ir_l", "hip_ir_r"],\n' +
+  '  hip_abd:       ["hip_abd_l", "hip_abd_r"],\n' +
+  '  hip_flex:      ["hip_flex_l", "hip_flex_r"],\n' +
+  '  shoulder_er:   ["shoulder_er_l", "shoulder_er_r"],\n' +
+  '  shoulder_flex: ["shoulder_flex_l", "shoulder_flex_r"],\n' +
+  '  ankle_df:      ["ankle_df_l", "ankle_df_r"],\n' +
+  '  cervical_rot:  ["cervical_rot_l", "cervical_rot_r"],\n' +
+  '  cervical_lat:  ["cervical_lat_l", "cervical_lat_r"],\n' +
+  '};\n' +
+  'const SINGLE: Record<string, string> = {\n' +
+  '  lumbar_flex:   "lumbar_flex",\n' +
+  '  lumbar_ext:    "lumbar_ext",\n' +
+  '  cervical_flex: "cervical_flex",\n' +
+  '  cervical_ext:  "cervical_ext",\n' +
+  '};\n' +
+  'const EVALUABLE = new Set([...Object.keys(BILATERAL), ...Object.keys(SINGLE)]);\n' +
+  '\n' +
+  'function toNum(v: unknown): number | null {\n' +
+  '  if (v == null) return null;\n' +
+  '  const n = typeof v === "number" ? v : Number(v);\n' +
+  '  return isFinite(n) ? n : null;\n' +
+  '}\n' +
+  '\n' +
+  'function athleteValue(a: Record<string, unknown>, joint: string): number | null {\n' +
+  '  if (joint in BILATERAL) {\n' +
+  '    const [l, r] = BILATERAL[joint];\n' +
+  '    const vs = [toNum(a[l]), toNum(a[r])].filter((x): x is number => x != null);\n' +
+  '    return vs.length ? Math.min(...vs) : null;\n' +
+  '  }\n' +
+  '  if (joint in SINGLE) return toNum(a[SINGLE[joint]]);\n' +
+  '  return null;\n' +
+  '}\n' +
+  '\n' +
+  'type LimitingJoint = { joint: string; value: number | null; min: number; ratio?: number; reason?: string };\n' +
+  'type TierResult = { tier: "GREEN" | "YELLOW" | "RED"; limiting: LimitingJoint[] };\n' +
+  '\n' +
+  'function classify(a: Record<string, unknown>, technique: Record<string, unknown>): TierResult {\n' +
+  '  const required: { joint: string; thresh: number }[] = [];\n' +
+  '  for (const [col, val] of Object.entries(technique)) {\n' +
+  '    if (!col.endsWith("_min")) continue;\n' +
+  '    const thresh = toNum(val);\n' +
+  '    if (thresh == null || thresh === 0) continue;\n' +
+  '    const joint = col.slice(0, -4);\n' +
+  '    if (!EVALUABLE.has(joint)) continue;\n' +
+  '    required.push({ joint, thresh });\n' +
+  '  }\n' +
+  '  if (required.length === 0) return { tier: "GREEN", limiting: [] };\n' +
+  '\n' +
+  '  const limiting: LimitingJoint[] = [];\n' +
+  '  const missing: LimitingJoint[] = [];\n' +
+  '  let worstRatio: number | null = null;\n' +
+  '\n' +
+  '  for (const { joint, thresh } of required) {\n' +
+  '    const av = athleteValue(a, joint);\n' +
+  '    if (av == null) {\n' +
+  '      missing.push({ joint, value: null, min: thresh, reason: "not_measured" });\n' +
+  '      continue;\n' +
+  '    }\n' +
+  '    const ratio = thresh ? av / thresh : 1.0;\n' +
+  '    if (worstRatio == null || ratio < worstRatio) worstRatio = ratio;\n' +
+  '    if (ratio < 1.0) limiting.push({ joint, value: av, min: thresh, ratio: Math.round(ratio * 1000) / 1000 });\n' +
+  '  }\n' +
+  '\n' +
+  '  if (worstRatio != null && worstRatio < YELLOW_BAND) {\n' +
+  '    return { tier: "RED", limiting: limiting.filter(x => (x.ratio ?? 1) < YELLOW_BAND) };\n' +
+  '  }\n' +
+  '  const band = limiting.filter(x => (x.ratio ?? 1) >= YELLOW_BAND && (x.ratio ?? 1) < 1.0);\n' +
+  '  if (band.length || missing.length) {\n' +
+  '    return { tier: "YELLOW", limiting: [...band, ...missing] };\n' +
+  '  }\n' +
+  '  return { tier: "GREEN", limiting: [] };\n' +
+  '}\n' +
+  '\n' +
+  'function computeWorstJointKeys(a: Record<string, unknown>, limit = 5, prev: Record<string, unknown> | null = null, opts: ScoreOpts = {}): string[] {\n' +
+  '  // body in ./joint_totals.ts (pure, unit tested); the FG-36 cutover guard there keeps hip flexion out of pre-cutover weak spots and the /100\n' +
+  "  // T1 option C: prev = the user's previous assessment, so narrow-joint gaps get full weight only when two in a row agree\n" +
+  '  return worstJointKeys(a, JOINT_TARGETS, toNum, limit, prev, opts);\n' +
+  '}\n' +
+  '\n' +
+  'function computeRomTotal(a: Record<string, unknown>, opts: ScoreOpts = {}): number {\n' +
+  '  return romTotal(a, JOINT_TARGETS, toNum, opts);\n' +
+  '}\n' +
+  'import { romTotal, worstJointKeys, type ScoreOpts } from "./joint_totals.ts";\n' +
+  'import { recomputePackEligibility } from "./pack_recompute.ts";\n' +
+  '\n' +
+  '// CORS (Reid E2E): the browser preflight (OPTIONS) used to fall through to req.json() and answer 400\n' +
+  '// missing_assessment_id, so the belt-change call from romrx.io failed in browsers. Same header set the other\n' +
+  '// browser-called functions use. No auth change here (verify_jwt stays false: the assessments DB webhook posts without a header, F-08).\n' +
+  'const CORS_HEADERS: Record<string, string> = {\n' +
+  '  "Access-Control-Allow-Origin": "*",\n' +
+  '  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",\n' +
+  '  "Access-Control-Allow-Methods": "POST, OPTIONS",\n' +
+  '};\n' +
+  '\n' +
+  '// Row 19 caller check. Two accepted callers: (1) the assessments DB trigger, which sends x-cron-secret (verified by\n' +
+  "// public.verify_webhook_secret('cron_webhook_secret'), fail closed); (2) a signed-in user whose JWT owns the assessment.\n" +
+  '// COMPUTE_TIERS_ENFORCE: unset/"off" = log-only (warn, still process); "on" = reject with 401. Flip with an env change, no redeploy.\n' +
+  '// deno-lint-ignore no-explicit-any\n' +
+  'async function callerOk(req: Request, supa: any, assessmentUserId: string | null): Promise<boolean> {\n' +
+  '  const url = Deno.env.get("SUPABASE_URL")!;\n' +
+  '  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;\n' +
+  '  const got = (req.headers.get("x-cron-secret") ?? "").trim();\n' +
+  '  if (got.length >= 32) {\n' +
+  '    try {\n' +
+  '      const r = await fetch(`${url}/rest/v1/rpc/verify_webhook_secret`, {\n' +
+  '        method: "POST",\n' +
+  '        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },\n' +
+  '        body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),\n' +
+  '      });\n' +
+  '      if (r.ok && (await r.json()) === true) return true;\n' +
+  '    } catch { /* fall through */ }\n' +
+  '  }\n' +
+  '  const auth = req.headers.get("authorization") ?? "";\n' +
+  '  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";\n' +
+  '  if (token && assessmentUserId) {\n' +
+  '    try {\n' +
+  '    '... 8448 more characters
+
+assert.match(read("../index.ts"), /^\/\/ compute-tiers v4\d/);
+       ^
+    at file:///tmp/arch-47aad435/supabase/functions/compute-tiers/test/shoulder_er_85.test.ts:49:8
+This error was not caught from a test and caused the test runner to fail on the referenced module.
+It most likely originated from a dangling promise, event/timeout handler or top-level code.
+
+ FAILURES 
+
+./supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts (uncaught error)
+./supabase/functions/compute-tiers/test/shoulder_er_85.test.ts (uncaught error)
+
+FAILED | 0 passed | 2 failed (758ms)
+
+error: Test failed

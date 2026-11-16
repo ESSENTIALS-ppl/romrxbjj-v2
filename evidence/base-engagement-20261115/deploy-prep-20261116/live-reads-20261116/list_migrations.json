@@ -1,0 +1,718 @@
+[
+ {
+  "version": "20260428000001",
+  "name": "coaches"
+ },
+ {
+  "version": "20260428000002",
+  "name": "athletes"
+ },
+ {
+  "version": "20260428000003",
+  "name": "assessments"
+ },
+ {
+  "version": "20260428000004",
+  "name": "technique_eligibility"
+ },
+ {
+  "version": "20260428000005",
+  "name": "consents_onboarding"
+ },
+ {
+  "version": "20260518184329",
+  "name": "seed_exercises_hip_er_ir_abd"
+ },
+ {
+  "version": "20260518191930",
+  "name": "add_shoulder_flex_min_and_lumbar_ext_min_to_techniques"
+ },
+ {
+  "version": "20260518194811",
+  "name": "m2_final_insert_ws9_wd1_through_wd8_techniques"
+ },
+ {
+  "version": "20260518195102",
+  "name": "m3_final_v2_insert_rom_thresholds_ws9_wd1_through_wd8"
+ },
+ {
+  "version": "20260526144927",
+  "name": "extend_schools_and_wire_gym_fk"
+ },
+ {
+  "version": "20260526144943",
+  "name": "create_protocol_completions"
+ },
+ {
+  "version": "20260526144955",
+  "name": "add_subscription_tier_and_coach_notes_created_at"
+ },
+ {
+  "version": "20260526145215",
+  "name": "m4_new_threshold_columns_and_eligibility_flag"
+ },
+ {
+  "version": "20260526145615",
+  "name": "seed_v1_clients_users"
+ },
+ {
+  "version": "20260526153618",
+  "name": "port_v1_assessments"
+ },
+ {
+  "version": "20260526164308",
+  "name": "fix_rls_explicit_select_policies"
+ },
+ {
+  "version": "20260526165911",
+  "name": "create_get_my_profile_function"
+ },
+ {
+  "version": "20260527183922",
+  "name": "20260527000001_coach_dashboard_schema"
+ },
+ {
+  "version": "20260528163607",
+  "name": "athletes_gym_name"
+ },
+ {
+  "version": "20260528165356",
+  "name": "save_my_profile_rpc"
+ },
+ {
+  "version": "20260528165417",
+  "name": "save_my_gym_rpc"
+ },
+ {
+  "version": "20260528175936",
+  "name": "game_plans_and_drill_sessions"
+ },
+ {
+  "version": "20260528182743",
+  "name": "pgvector_rag"
+ },
+ {
+  "version": "20260528182814",
+  "name": "notification_preferences"
+ },
+ {
+  "version": "20260528185550",
+  "name": "renewal_reminders_log"
+ },
+ {
+  "version": "20260528185846",
+  "name": "enable_pg_cron"
+ },
+ {
+  "version": "20260531192924",
+  "name": "coach_assignments"
+ },
+ {
+  "version": "20260531192932",
+  "name": "coach_video_feedback"
+ },
+ {
+  "version": "20260531192945",
+  "name": "coach_promote_athlete_rpc"
+ },
+ {
+  "version": "20260531194231",
+  "name": "find_coach_by_email_rpc"
+ },
+ {
+  "version": "20260531194319",
+  "name": "get_my_coach_rpc"
+ },
+ {
+  "version": "20260531194856",
+  "name": "protocol_sessions"
+ },
+ {
+  "version": "20260531202638",
+  "name": "warmup_coaching_cue"
+ },
+ {
+  "version": "20260602151251",
+  "name": "sport_aware_schema"
+ },
+ {
+  "version": "20260602154533",
+  "name": "hotfix_restrictive_policies"
+ },
+ {
+  "version": "20260602160726",
+  "name": "sport_aware_rag"
+ },
+ {
+  "version": "20260602185736",
+  "name": "bb_rom_schema_extension"
+ },
+ {
+  "version": "20260602185833",
+  "name": "bb_tier_gating"
+ },
+ {
+  "version": "20260602190155",
+  "name": "bb_workouts_schema"
+ },
+ {
+  "version": "20260602190731",
+  "name": "fix_bb_slug_to_bodybuilding"
+ },
+ {
+  "version": "20260602190913",
+  "name": "seed_bb_techniques_batch1"
+ },
+ {
+  "version": "20260602191300",
+  "name": "seed_bb_techniques_batch1"
+ },
+ {
+  "version": "20260602191429",
+  "name": "seed_bb_b1c1"
+ },
+ {
+  "version": "20260602191557",
+  "name": "seed_bb_b1c2"
+ },
+ {
+  "version": "20260602191717",
+  "name": "seed_bb_b1c3"
+ },
+ {
+  "version": "20260603000009",
+  "name": "seed_bb_techniques_batches_full"
+ },
+ {
+  "version": "20260603000010",
+  "name": "seed_bb_template_workouts"
+ },
+ {
+  "version": "20260603000011",
+  "name": "seed_bb_rombot_knowledge"
+ },
+ {
+  "version": "20260603025032",
+  "name": "set_my_bb_tier_rpc"
+ },
+ {
+  "version": "20260603032647",
+  "name": "athlete_tracking_v1"
+ },
+ {
+  "version": "20260603184535",
+  "name": "add_cervical_mobility_and_thoracic_bilateral_columns"
+ },
+ {
+  "version": "20260603192137",
+  "name": "cervical_technique_thresholds_targeted_pass"
+ },
+ {
+  "version": "20260603195322",
+  "name": "null_thoracic_rot_min_techniques"
+ },
+ {
+  "version": "20260604141141",
+  "name": "create_coach_competitors"
+ },
+ {
+  "version": "20260604142922",
+  "name": "create_attendance"
+ },
+ {
+  "version": "20260604163634",
+  "name": "consolidate_coach_rls_policies_v10"
+ },
+ {
+  "version": "20260604182323",
+  "name": "recreate_unlocked_techniques_v_cascade_with_cervical"
+ },
+ {
+  "version": "20260604182444",
+  "name": "bb_training_muscle_stretch_volume_meso"
+ },
+ {
+  "version": "20260604183344",
+  "name": "add_muscle_stretch_cols_to_unlocked_view"
+ },
+ {
+  "version": "20260604183526",
+  "name": "weekly_muscle_volume_rpc"
+ },
+ {
+  "version": "20260604185042",
+  "name": "add_set_type_to_workout_sets"
+ },
+ {
+  "version": "20260604190916",
+  "name": "program_planned_volume_rpc"
+ },
+ {
+  "version": "20260608200710",
+  "name": "add_technique_description_and_video_url"
+ },
+ {
+  "version": "20260609005819",
+  "name": "user_technique_competency"
+ },
+ {
+  "version": "20260615013358",
+  "name": "add_stripe_subscription_id_and_freeze_columns"
+ },
+ {
+  "version": "20260702205753",
+  "name": "create_sport_pack_waitlist"
+ },
+ {
+  "version": "20260702211429",
+  "name": "create_partner_inquiries"
+ },
+ {
+  "version": "20260703014847",
+  "name": "bb_paywall_grandfather"
+ },
+ {
+  "version": "20260705194132",
+  "name": "phase1_base_entitlements_and_leads"
+ },
+ {
+  "version": "20260705194153",
+  "name": "phase1_get_my_profile_with_entitlements"
+ },
+ {
+  "version": "20260705222114",
+  "name": "leads_unlock_token_rls_policies"
+ },
+ {
+  "version": "20260705222209",
+  "name": "leads_unlock_token_rls_policies"
+ },
+ {
+  "version": "20260705223608",
+  "name": "phase1_fix_handle_new_user_paywall_and_belt"
+ },
+ {
+  "version": "20260705230504",
+  "name": "leads_select_owner_after_claim"
+ },
+ {
+  "version": "20260706001729",
+  "name": "base_settings_meta_and_notifs"
+ },
+ {
+  "version": "20260706002536",
+  "name": "base_settings_buckets"
+ },
+ {
+  "version": "20260706014006",
+  "name": "handle_new_user_default_base"
+ },
+ {
+  "version": "20260706014034",
+  "name": "handle_new_user_default_general"
+ },
+ {
+  "version": "20260706022235",
+  "name": "handle_new_user_v2_reconcile_lead"
+ },
+ {
+  "version": "20260706121747",
+  "name": "assessments_autofill_athlete_id"
+ },
+ {
+  "version": "20260706131354",
+  "name": "pr0_recompute_technique_eligibility"
+ },
+ {
+  "version": "20260706132727",
+  "name": "pr0_recompute_technique_eligibility_v34_noreq_green"
+ },
+ {
+  "version": "20260707141233",
+  "name": "stripe_gate_hardening_2026_07_07"
+ },
+ {
+  "version": "20260707141334",
+  "name": "sport_access_array_rpcs_2026_07_07"
+ },
+ {
+  "version": "20260707234943",
+  "name": "recompute_user_eligibility_2026_07_07"
+ },
+ {
+  "version": "20260707235057",
+  "name": "recompute_user_eligibility_fmtnum_2026_07_07"
+ },
+ {
+  "version": "20260708001749",
+  "name": "wire_recompute_into_add_sport_access_2026_07_07"
+ },
+ {
+  "version": "20260708012529",
+  "name": "compute_joint_scores_fn_2026_07_07"
+ },
+ {
+  "version": "20260708014427",
+  "name": "wire_joint_scores_into_recompute_rpc_2026_07_07"
+ },
+ {
+  "version": "20260720120836",
+  "name": "filter_get_my_profile_eligibility_to_bjj"
+ },
+ {
+  "version": "20260906233932",
+  "name": "sprint1_revoke_anon_entitlement_definer_rpcs"
+ },
+ {
+  "version": "20260907015101",
+  "name": "sprint3_fix_bb_tier_bypass_and_leads_rls"
+ },
+ {
+  "version": "20260907015146",
+  "name": "sprint3_fix_set_my_bb_tier_exists_bug"
+ },
+ {
+  "version": "20260908215555",
+  "name": "field_counters_views"
+ },
+ {
+  "version": "20260908215944",
+  "name": "harden_field_counter_view_grants"
+ },
+ {
+  "version": "20260914235943",
+  "name": "rate_limit_buckets_and_hit_rpc"
+ },
+ {
+  "version": "20260915161608",
+  "name": "p0_security_invoker_views"
+ },
+ {
+  "version": "20260915163315",
+  "name": "p1_revoke_anon_execute_definer_rpcs"
+ },
+ {
+  "version": "20260915163848",
+  "name": "p2_fix_always_true_service_policies"
+ },
+ {
+  "version": "20260915183354",
+  "name": "base_audit_security_lockdown_20260915"
+ },
+ {
+  "version": "20260915183620",
+  "name": "base_product_events_20260915"
+ },
+ {
+  "version": "20260915183954",
+  "name": "p5_hygiene_search_path_and_tg_pe_revoke"
+ },
+ {
+  "version": "20260916024812",
+  "name": "harden_auth_users_ops_views"
+ },
+ {
+  "version": "20260916225008",
+  "name": "phase_a1_persist_protocols_fn"
+ },
+ {
+  "version": "20260916225044",
+  "name": "phase_a1_fix_persist_protocols_fn"
+ },
+ {
+  "version": "20260917135920",
+  "name": "harden_persist_protocols_execute_grants"
+ },
+ {
+  "version": "20260921222913",
+  "name": "email_sends_send_once"
+ },
+ {
+  "version": "20260921224338",
+  "name": "fuel_logs_per_user_capture"
+ },
+ {
+  "version": "20260921225333",
+  "name": "auth_public_users_orphan_sync"
+ },
+ {
+  "version": "20260921230049",
+  "name": "seed_rombot_knowledge_general"
+ },
+ {
+  "version": "20260922104341",
+  "name": "signup_assess_stall_view"
+ },
+ {
+  "version": "20260922111331",
+  "name": "client_feedback_sport_allow_base"
+ },
+ {
+  "version": "20260922163347",
+  "name": "revoke_anon_ensure_public_user_profile"
+ },
+ {
+  "version": "20260922163646",
+  "name": "users_signup_utm_attribution"
+ },
+ {
+  "version": "20260922195455",
+  "name": "ops_feature_flags_free_unlock_temp"
+ },
+ {
+  "version": "20260922200013",
+  "name": "public_feature_flags_view_for_edge"
+ },
+ {
+  "version": "20260924221316",
+  "name": "consent_events"
+ },
+ {
+  "version": "20260924223904",
+  "name": "ai_chat_retention_90d"
+ },
+ {
+  "version": "20260924224536",
+  "name": "user_ads_consent"
+ },
+ {
+  "version": "20260924224742",
+  "name": "consent_events_banner_region"
+ },
+ {
+  "version": "20260924224749",
+  "name": "users_drop_ads_consent_columns"
+ },
+ {
+  "version": "20260929033225",
+  "name": "vault_webhook_secrets"
+ },
+ {
+  "version": "20260929033406",
+  "name": "webhook_triggers_use_vault"
+ },
+ {
+  "version": "20260929034016",
+  "name": "base_protocol_ranking_matches_my_protocol"
+ },
+ {
+  "version": "20260929034724",
+  "name": "investor_requests_lead_notify"
+ },
+ {
+  "version": "20260929035452",
+  "name": "cron_jobs_send_cron_secret"
+ },
+ {
+  "version": "20260929035611",
+  "name": "billing_consents"
+ },
+ {
+  "version": "20260929035908",
+  "name": "revoke_definer_fns_without_client_callers"
+ },
+ {
+  "version": "20260929040226",
+  "name": "consent_events_request_ticket_id_format"
+ },
+ {
+  "version": "20260929041729",
+  "name": "age_18_plus"
+ },
+ {
+  "version": "20260929115104",
+  "name": "subscription_cancel_state"
+ },
+ {
+  "version": "20260929130739",
+  "name": "users_age_bucket_check_drop_13_17"
+ },
+ {
+  "version": "20261001202112",
+  "name": "sec_20261001_leads_claim_email_bound"
+ },
+ {
+  "version": "20261001213523",
+  "name": "fix_search_rombot_knowledge_search_path"
+ },
+ {
+  "version": "20261002225532",
+  "name": "is_test_account_romrx_io_only"
+ },
+ {
+  "version": "20261003004119",
+  "name": "is_test_account_requires_flag"
+ },
+ {
+  "version": "20261003021319",
+  "name": "unlocked_techniques_v_use_sports_enabled"
+ },
+ {
+  "version": "20261004125756",
+  "name": "yoga_testers_allowlist"
+ },
+ {
+  "version": "20261004173852",
+  "name": "hip_flex_unscored_scoring"
+ },
+ {
+  "version": "20261006164650",
+  "name": "steady_targets_hip_shoulder_ankle"
+ },
+ {
+  "version": "20261007004019",
+  "name": "shoulder_er_target_85"
+ },
+ {
+  "version": "20261012232720",
+  "name": "signup_terms_consent_record"
+ },
+ {
+  "version": "20261012232732",
+  "name": "pack_minimums_rescale"
+ },
+ {
+  "version": "20261019184813",
+  "name": "revoke_unused_security_definer"
+ },
+ {
+  "version": "20261019184818",
+  "name": "coach_connect_rpc"
+ },
+ {
+  "version": "20261019184825",
+  "name": "athletes_coach_id_guard"
+ },
+ {
+  "version": "20261019184832",
+  "name": "find_coach_by_email_ci"
+ },
+ {
+  "version": "20261020145350",
+  "name": "terms_version_20261019"
+ },
+ {
+  "version": "20261026214904",
+  "name": "range_reset_pooled"
+ },
+ {
+  "version": "20261026214915",
+  "name": "t1_rebased"
+ },
+ {
+  "version": "20261026214925",
+  "name": "lumbar_never_ranked"
+ },
+ {
+  "version": "20261026214942",
+  "name": "rescore_saved"
+ },
+ {
+  "version": "20261026215000",
+  "name": "lumbar_null_saved"
+ },
+ {
+  "version": "20261026215011",
+  "name": "capture_methods"
+ },
+ {
+  "version": "20261026215016",
+  "name": "leads_capture_methods"
+ },
+ {
+  "version": "20261027151721",
+  "name": "romood_mood_entries"
+ },
+ {
+  "version": "20261027151732",
+  "name": "romood_mood_settings"
+ },
+ {
+  "version": "20261027151738",
+  "name": "romood_retention"
+ },
+ {
+  "version": "20261027151747",
+  "name": "romood_daily_cap"
+ },
+ {
+  "version": "20261027151753",
+  "name": "romood_insert_requires_v2_consent"
+ },
+ {
+  "version": "20261029192733",
+  "name": "join_waitlist"
+ },
+ {
+  "version": "20261103023359",
+  "name": "fg36_hip_flex_scored"
+ },
+ {
+  "version": "20261103023421",
+  "name": "fg08_fg19_history_queries"
+ },
+ {
+  "version": "20261103023459",
+  "name": "fg40_coach_link_scoped_rls"
+ },
+ {
+  "version": "20261103023541",
+  "name": "reminder_opt_in"
+ },
+ {
+  "version": "20261103023640",
+  "name": "export_backups_and_gate"
+ },
+ {
+  "version": "20261103023659",
+  "name": "export_backups_skip_dropped_and_fg36"
+ },
+ {
+  "version": "20261103023722",
+  "name": "fg21_account_deletion_requests"
+ },
+ {
+  "version": "20261103023726",
+  "name": "fg21_purge_function"
+ },
+ {
+  "version": "20261103023730",
+  "name": "fg21_fg36_rescore_erasure"
+ },
+ {
+  "version": "20261103025415",
+  "name": "fg21_erase_backup_copies"
+ },
+ {
+  "version": "20261103025603",
+  "name": "fg12_push_subscriptions"
+ },
+ {
+  "version": "20261103055855",
+  "name": "lifecycle_emails_cron"
+ },
+ {
+  "version": "20261103232557",
+  "name": "row12_v2_change1_security_advisors_l983"
+ },
+ {
+  "version": "20261116024051",
+  "name": "assessment_drafts"
+ },
+ {
+  "version": "20261116024056",
+  "name": "assessment_drafts_clear_on_submit"
+ },
+ {
+  "version": "20261116024102",
+  "name": "assessment_drafts_purge_cron"
+ },
+ {
+  "version": "20261116030255",
+  "name": "p1_22_stripe_checkout_claims"
+ },
+ {
+  "version": "20261116030659",
+  "name": "p1_22_retention_measurement"
+ }
+]

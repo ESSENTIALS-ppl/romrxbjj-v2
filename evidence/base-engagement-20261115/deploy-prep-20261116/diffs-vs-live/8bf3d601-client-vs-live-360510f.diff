@@ -1,0 +1,1073 @@
+diff --git a/app/src/App.tsx b/app/src/App.tsx
+index dabf56e..95f3f47 100644
+--- a/app/src/App.tsx
++++ b/app/src/App.tsx
+@@ -26,6 +26,7 @@ import { CompleteProfile } from './pages/CompleteProfile'
+ 
+ import { signupSportRedirectTarget } from './lib/signupRedirect'
+ import { dashboardIndexTarget } from './lib/checkoutLanding'
++import { QuickCheck } from './pages/QuickCheck'
+ 
+ // P1-03: Stripe success landing (/dashboard?checkout=base_success|unlock_success) opens the Today card; plain /dashboard stays My Body.
+ function DashboardIndex() {
+@@ -67,6 +68,7 @@ export default function App() {
+             <Route path="/dashboard/what-changed" element={<WhatChanged />} />
+             <Route path="/dashboard/mood" element={<QuickMood />} />
+             <Route path="/dashboard/my-protocol" element={<MyProtocol />} />
++            <Route path="/dashboard/quick-check" element={<QuickCheck />} />
+             <Route path="/dashboard/my-fuel" element={<MyFuel />} />
+             <Route path="/dashboard/my-sport" element={<MySport />} />
+             <Route path="/dashboard/rombot" element={<ROMBot />} />
+diff --git a/app/src/components/QuickCheckBanner.tsx b/app/src/components/QuickCheckBanner.tsx
+new file mode 100644
+index 0000000..2d88342
+--- /dev/null
++++ b/app/src/components/QuickCheckBanner.tsx
+@@ -0,0 +1,53 @@
++// P1-06: Today card banner (quick check due) and the "Your next check" line. Behind QUICK_CHECK_ON (false).
++// Due only inside Avery's server window (romrxbjj-v2 c9bf74ed and 832056dd, tip 47aad435): local days 7 to 14 after the cycle's full assessment,
++// stored time zone else America/New_York, and not if a quick check is already done this cycle (schedule or quick row).
++import { useEffect, useState } from 'react'
++import { useNavigate } from 'react-router-dom'
++import { QUICK_CHECK_ON, QUICK_CHECK_COPY as Q, QUICK_CHECK_PATH, isQuickCheckDue, nextCheckLineInCycle, quickCheckDismissKey, type QuickContext, type Schedule } from '../lib/quickCheck'
++import { loadQuickContext } from '../lib/quickCheckLoad'
++
++export function QuickCheckBanner({ userId }: { userId: string }) {
++  if (!QUICK_CHECK_ON || !userId) return null
++  return <QuickCheckBannerInner userId={userId} />
++}
++
++function QuickCheckBannerInner({ userId }: { userId: string }) {
++  const navigate = useNavigate()
++  const [s, setS] = useState<Schedule | null>(null)
++  const [ctx, setCtx] = useState<QuickContext>({})
++  const [later, setLater] = useState(false)
++  useEffect(() => {
++    let cancelled = false
++    loadQuickContext(userId).then(r => { if (!cancelled && !r.failed && r.schedule) { setCtx(r.ctx); setS(r.schedule) } }).catch(() => { /* nothing shown */ })
++    return () => { cancelled = true }
++  }, [userId])
++  if (!s) return null
++  const due = isQuickCheckDue(s, new Date(), ctx)
++  const dismissed = later || (due && (() => { try { return localStorage.getItem(quickCheckDismissKey(userId, s.next_check_at!)) === '1' } catch { return false } })())
++  const line = nextCheckLineInCycle(s, new Date(), ctx)
++  if (due && !dismissed) {
++    return (
++      <div className="rounded-card border border-cobalt/20 bg-white p-4 space-y-2" data-testid="quick-check-banner">
++        <p className="text-sm font-bold text-cobalt-ink">{Q.bannerTitle}</p>
++        <p className="text-xs text-slate-600">{Q.bannerLine}</p>
++        <div className="flex gap-2">
++          <button type="button" className="btn-primary flex-1 text-sm" onClick={() => navigate(QUICK_CHECK_PATH)}>{Q.bannerButton}</button>
++          <button
++            type="button"
++            className="btn-ghost text-sm px-3"
++            onClick={() => { try { localStorage.setItem(quickCheckDismissKey(userId, s.next_check_at!), '1') } catch { /* ignore */ } setLater(true) }}
++          >
++            {Q.bannerDismiss}
++          </button>
++        </div>
++      </div>
++    )
++  }
++  if (!line) return null
++  return (
++    <div data-testid="next-check-line">
++      <p className="text-xs font-semibold text-cobalt-ink">{line}</p>
++      <p className="text-[11px] text-slate-500">{Q.nextCheckHelper}</p>
++    </div>
++  )
++}
+diff --git a/app/src/hooks/useProfile.ts b/app/src/hooks/useProfile.ts
+index 2572998..3980698 100644
+--- a/app/src/hooks/useProfile.ts
++++ b/app/src/hooks/useProfile.ts
+@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
+ import { useHipFlexCutover, loadHipScoredIds } from '../lib/hipFlexCutover'
+ import { gateAssessment, gateJointScores } from '../lib/hipFlexGate'
+ import type { JointScoreRow } from '../lib/mobilityBands'
++import { pickFullAssessments } from '../lib/assessmentReads'
+ 
+ export interface SportEntitlement {
+   sport: string
+@@ -117,9 +118,11 @@ export function useProfile(userId: string | undefined) {
+           ? { ...result.profile, sport_entitlements: result.sport_entitlements ?? result.profile.sport_entitlements ?? [] }
+           : null,
+       )
+-      setAssessment(result.assessment)
+-      setAssessments(result.assessments ?? [])
+-      setHipScoredIds(await loadHipScoredIds([result.assessment?.id, ...(result.assessments ?? []).map(a => a.id)].filter((x): x is string => !!x)))
++      // P1-06b: latest and history skip quick-check rows (My Body, My Protocol, retest banner, protocol inputs all read these)
++      const full = pickFullAssessments(result.assessment, result.assessments ?? [])
++      setAssessment(full.latest)
++      setAssessments(full.history)
++      setHipScoredIds(await loadHipScoredIds([full.latest?.id, ...full.history.map(a => a.id)].filter((x): x is string => !!x)))
+       setSessionDates(
+         (sessionsRes.data ?? [])
+           .map((r: { session_date: string }) => r.session_date)
+@@ -128,11 +131,11 @@ export function useProfile(userId: string | undefined) {
+ 
+       // Shared scoring path with ROMBot: persisted joint_scores for latest assessment.
+       // RLS: "joint_scores: athlete reads own" via assessments.user_id = auth.uid().
+-      if (result.assessment?.id) {
++      if (full.latest?.id) {
+         const { data: scores, error: scoresErr } = await supabase
+           .from('joint_scores')
+           .select('joint_key, score, left_value, right_value, asymmetry_pct, asymmetry_flag')
+-          .eq('assessment_id', result.assessment.id)
++          .eq('assessment_id', full.latest.id)
+         if (scoresErr) {
+           console.error('joint_scores fetch error:', scoresErr.message)
+           setJointScores([])
+diff --git a/app/src/lib/assessmentDraftStore.ts b/app/src/lib/assessmentDraftStore.ts
+index b80797f..af9e8b5 100644
+--- a/app/src/lib/assessmentDraftStore.ts
++++ b/app/src/lib/assessmentDraftStore.ts
+@@ -3,6 +3,7 @@
+ // The client is loaded on first use, so pages that only import the saver (and their tests) never build it.
+ const db = async () => (await import('./supabase')).supabase
+ import type { DraftStore } from './assessmentDraft'
++import { skipQuick } from './assessmentReads'
+ 
+ export const supabaseDraftStore: DraftStore = {
+   async save(_userId, row) {
+@@ -24,10 +25,11 @@ export const supabaseDraftStore: DraftStore = {
+     return !error
+   },
+   async newestAssessmentAt(userId) {
+-    const { data, error } = await (await db())
++    // P1-06b: a quick check is not a newer full assessment, so it never makes a full-assessment draft stale (needs migration 20261116031000)
++    const { data, error } = await skipQuick((await db())
+       .from('assessments')
+       .select('created_at')
+-      .eq('user_id', userId)
++      .eq('user_id', userId))
+       .order('created_at', { ascending: false })
+       .limit(1)
+       .maybeSingle()
+diff --git a/app/src/lib/assessmentReads.test.ts b/app/src/lib/assessmentReads.test.ts
+new file mode 100644
+index 0000000..6863d95
+--- /dev/null
++++ b/app/src/lib/assessmentReads.test.ts
+@@ -0,0 +1,47 @@
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { SKIP_QUICK_OR, skipQuick, isFullAssessment, pickFullAssessments } from './assessmentReads'
++
++const src = (f: string) => readFileSync(join(process.cwd(), 'src', f), 'utf8')
++
++describe('P1-06b skip quick-check rows', () => {
++  it('filter string is the null-safe IS DISTINCT FROM quick', () => {
++    expect(SKIP_QUICK_OR).toBe('check_kind.is.null,check_kind.neq.quick')
++  })
++  it('skipQuick adds exactly that .or() and returns the same builder', () => {
++    const calls: string[] = []
++    const q = { or(f: string) { calls.push(f); return q } }
++    expect(skipQuick(q)).toBe(q)
++    expect(calls).toEqual(['check_kind.is.null,check_kind.neq.quick'])
++  })
++  it('skipQuick on a real supabase-js builder puts the or filter in the URL', async () => {
++    const { createClient } = await import('@supabase/supabase-js')
++    const c = createClient('http://localhost:1', 'k')
++    const b = skipQuick(c.from('assessments').select('*').eq('user_id', 'u')) as unknown as { url: URL }
++    expect(decodeURIComponent(b.url.search)).toContain('or=(check_kind.is.null,check_kind.neq.quick)')
++  })
++  it('isFullAssessment is null-safe', () => {
++    expect(isFullAssessment({})).toBe(true)
++    expect(isFullAssessment({ check_kind: null })).toBe(true)
++    expect(isFullAssessment({ check_kind: 'full' })).toBe(true)
++    expect(isFullAssessment({ check_kind: 'quick' })).toBe(false)
++    expect(isFullAssessment(null)).toBe(false)
++  })
++  it('pickFullAssessments drops quick rows and moves latest to the newest full row', () => {
++    const q = { id: 'q', check_kind: 'quick' }, a = { id: 'a' }, b = { id: 'b', check_kind: 'full' }
++    expect(pickFullAssessments(q, [q, b, a])).toEqual({ latest: b, history: [b, a] })
++    expect(pickFullAssessments(a, [a])).toEqual({ latest: a, history: [a] })
++    expect(pickFullAssessments(q, [q])).toEqual({ latest: q, history: [] })
++    expect(pickFullAssessments(null, [])).toEqual({ latest: null, history: [] })
++  })
++  it('every direct assessments read in the app uses skipQuick', () => {
++    for (const f of ['pages/Settings.tsx', 'pages/ResultsPreview.tsx', 'pages/MyProtocol.tsx', 'lib/postAuthDest.ts', 'lib/assessmentDraftStore.ts']) {
++      const s = src(f)
++      const reads = s.split(".from('assessments')").length - 1
++      expect(reads, f).toBeGreaterThan(0)
++      expect(s.split(/skipQuick\((?:supabase|\(await db\(\)\))/).length - 1, f).toBe(reads)
++    }
++    expect(src('hooks/useProfile.ts')).toContain('pickFullAssessments(result.assessment, result.assessments ?? [])')
++  })
++})
+diff --git a/app/src/lib/assessmentReads.ts b/app/src/lib/assessmentReads.ts
+new file mode 100644
+index 0000000..3728fc4
+--- /dev/null
++++ b/app/src/lib/assessmentReads.ts
+@@ -0,0 +1,29 @@
++// P1-06b: assessment reads skip quick-check rows (P1-06 writes check_kind = 'quick').
++// Null-safe, the same as SQL `check_kind IS DISTINCT FROM 'quick'`: older rows with no check_kind still count.
++// SHIP DEPENDENCY: the check_kind column arrives in Avery's migration 20261116031000. Before that migration is live,
++// PostgREST rejects the filter (unknown column) and every read below gets an error, so this must ship with or after
++// that migration and with P1-06 (5ab7443).
++export const SKIP_QUICK_OR = 'check_kind.is.null,check_kind.neq.quick'
++
++/** Adds the null-safe "not a quick check" filter to a supabase-js query on public.assessments. */
++export function skipQuick<Q extends { or: (filters: string) => Q }>(query: Q): Q {
++  return query.or(SKIP_QUICK_OR)
++}
++
++/** Same rule in code, for rows that come back from an RPC (get_my_profile). */
++export function isFullAssessment(row: unknown): boolean {
++  if (!row || typeof row !== 'object') return false
++  const kind = (row as { check_kind?: unknown }).check_kind
++  return kind == null || kind !== 'quick'
++}
++
++/**
++ * get_my_profile is server-side, so its rows are filtered here: history drops quick rows, and the latest is the newest
++ * full row. If the RPC returned no full row at all, the original latest is kept rather than showing no assessment.
++ * AVERY: get_my_profile should apply the same filter server-side (and my_joint_history, my_joint_start_vs_now).
++ */
++export function pickFullAssessments<T>(latest: T | null, history: readonly T[]): { latest: T | null; history: T[] } {
++  const full = history.filter(isFullAssessment)
++  if (!latest || isFullAssessment(latest)) return { latest, history: full }
++  return { latest: full[0] ?? latest, history: full }
++}
+diff --git a/app/src/lib/postAuthDest.ts b/app/src/lib/postAuthDest.ts
+index 6713b1f..e34fb3b 100644
+--- a/app/src/lib/postAuthDest.ts
++++ b/app/src/lib/postAuthDest.ts
+@@ -1,6 +1,7 @@
+ import { supabase } from './supabase'
+ import { track } from './track'
+ import { takePostAuthNext } from './packReturn'
++import { skipQuick } from './assessmentReads'
+ 
+ /** Default post-login home when the user already has an assessment. */
+ export const DEFAULT_HOME = '/dashboard/my-body'
+@@ -25,10 +26,11 @@ export async function resolvePostAuthDest(
+   if (stashedNext) return stashedNext
+   if (!userId) return DEFAULT_HOME
+   try {
+-    const { count, error } = await supabase
++    // P1-06b: only full assessments count (needs migration 20261116031000; on error the user goes to DEFAULT_HOME as before)
++    const { count, error } = await skipQuick(supabase
+       .from('assessments')
+       .select('id', { count: 'exact', head: true })
+-      .eq('user_id', userId)
++      .eq('user_id', userId))
+     if (error) return DEFAULT_HOME
+     if ((count ?? 0) === 0) {
+       track('login_redirected_to_assessment', { reason: 'no_assessment' })
+diff --git a/app/src/lib/quickCheck.test.ts b/app/src/lib/quickCheck.test.ts
+new file mode 100644
+index 0000000..6c4283c
+--- /dev/null
++++ b/app/src/lib/quickCheck.test.ts
+@@ -0,0 +1,105 @@
++// P1-06 quick check UI helpers and gate.
++process.env.TZ = 'America/New_York'
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { STEPS } from '../pages/assessmentSteps'
++import {
++  QUICK_CHECK_ON, QUICK_CHECK_PATH, QUICK_CHECK_COPY as Q, quickCheckSteps, jointName, compareLine, nextCheckLine,
++  isQuickCheckDue, isQuickCheckPending, quickSubmitBody, lastFullAssessment, dayOneAssessment, formatCheckDate, SCHEDULE_COLUMNS,
++} from './quickCheck'
++
++describe('P1-06 quick check', () => {
++  it('is OFF until Avery\'s server set (tip 47aad435) ships; route matches the emails', () => {
++    expect(QUICK_CHECK_ON).toBe(false)
++    expect(QUICK_CHECK_PATH).toBe('/dashboard/quick-check')
++    const app = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8')
++    expect(app).toContain('<Route path="/dashboard/quick-check" element={<QuickCheck />} />')
++  })
++  it('measures only the scheduled sides', () => {
++    const steps = quickCheckSteps(STEPS, ['hip_er_r', 'shoulder_flex_l'])
++    expect(steps.map(s => s.id)).toEqual(['hip_er', 'shoulder_flex'])
++    expect(steps.flatMap(s => s.fields.map(f => f.key))).toEqual(['hip_er_r', 'shoulder_flex_l'])
++    expect(jointName(steps[0], steps[0].fields[0])).toBe(`${steps[0].title} (Right)`)
++    expect(quickCheckSteps(STEPS, null)).toEqual([])
++  })
++  it('submit body has check_kind quick and only the scheduled fields', () => {
++    expect(quickSubmitBody({ hip_er_r: '31', hip_er_l: '20' }, ['hip_er_r'])).toEqual({ check_kind: 'quick', hip_er_r: 31 })
++    expect(quickSubmitBody({}, ['hip_er_r'])).toEqual({ check_kind: 'quick', hip_er_r: null })
++  })
++  it('before and now lines: up, down (neutral), about the same', () => {
++    expect(compareLine(30, 35, '°')).toBe('Up 5° since day 1.')
++    expect(compareLine(30, 27.5, '°')).toBe('Down 2.5° since day 1. Readings can change from day to day.')
++    expect(compareLine(30, 30.2, '°')).toBe('About the same as day 1.')
++  })
++  it('next check line and due banner', () => {
++    const now = new Date('2026-11-15T12:00:00-05:00')
++    expect(formatCheckDate('2026-12-28T17:00:00Z')).toBe('Monday, December 28')
++    expect(nextCheckLine({ next_check_at: '2026-12-28T17:00:00Z', next_retest_at: null, check_joints: ['x'] }, now)).toBe('Your next check: Monday, December 28')
++    expect(nextCheckLine({ next_check_at: '2026-11-14T17:00:00Z', next_retest_at: null, check_joints: ['x'] }, now)).toBe(Q.nextCheckDue)
++    expect(nextCheckLine(null, now)).toBeNull()
++    // due by the c9bf74ed local-day window, so the row carries last_assessed_at (Nov 7 = day 0, Nov 15 = day 8)
++    expect(isQuickCheckDue({ next_check_at: '2026-11-14T17:00:00Z', next_retest_at: null, check_joints: ['hip_er_r'], last_assessed_at: '2026-11-07T17:00:00Z' }, now)).toBe(true)
++    expect(isQuickCheckDue({ next_check_at: '2026-11-14T17:00:00Z', next_retest_at: null, check_joints: [] }, now)).toBe(false)
++  })
++  it('day 1 = last full assessment, quick rows skipped', () => {
++    expect(lastFullAssessment([{ id: 'q', check_kind: 'quick' }, { id: 'f', check_kind: null }, { id: 'old' }])).toEqual({ id: 'f', check_kind: null })
++  })
++  it('schedule rules (rule 2): pending only while next_check_at differs from next_retest_at', () => {
++    const now = new Date('2026-11-15T12:00:00-05:00')
++    const retest = '2026-12-13T17:00:00Z'
++    // full save: day 7 check, day 42 retest; due once day 7 is reached
++    const full = { next_check_at: '2026-11-08T17:00:00Z', next_retest_at: retest, check_joints: ['hip_er_r'], last_assessed_at: '2026-11-01T17:00:00Z' }
++    expect(isQuickCheckDue(full, new Date('2026-11-08T18:00:00Z'))).toBe(true)
++    expect(isQuickCheckDue(full, new Date('2026-11-07T18:00:00Z'))).toBe(false)
++    // rule 2 (quick saved) and the roll both set next_check_at = next_retest_at: no banner, even on retest day
++    const done = { next_check_at: retest, next_retest_at: retest, check_joints: ['hip_er_r'] }
++    expect(isQuickCheckPending(done)).toBe(false)
++    expect(isQuickCheckDue(done, new Date('2026-12-14T12:00:00Z'))).toBe(false)
++    expect(isQuickCheckDue({ ...done, next_check_at: '2026-12-13T17:00:00.000Z' }, new Date('2026-12-14T12:00:00Z'))).toBe(false)
++    // the next check line then names the retest date
++    expect(nextCheckLine(done, now)).toBe('Your next check: Sunday, December 13')
++    // backfilled rows have check_joints NULL until the next full save: never due
++    expect(isQuickCheckDue({ next_check_at: '2026-11-08T17:00:00Z', next_retest_at: retest, check_joints: null }, now)).toBe(false)
++  })
++  it('day 1 = the schedule last_assessment_id when present, else newest full row', () => {
++    const rows = [{ id: 'q', check_kind: 'quick' }, { id: 'f2', check_kind: 'full' }, { id: 'f1' }]
++    expect(dayOneAssessment(rows, 'f1')).toEqual({ id: 'f1' })
++    expect(dayOneAssessment(rows, null)).toEqual({ id: 'f2', check_kind: 'full' })
++    expect(dayOneAssessment(rows, 'q')).toEqual({ id: 'f2', check_kind: 'full' })
++    expect(dayOneAssessment(rows, 'gone')).toEqual({ id: 'f2', check_kind: 'full' })
++  })
++  it('banner and screen read the same schedule columns; page cites the final server set', () => {
++    expect(SCHEDULE_COLUMNS).toBe('next_check_at, next_retest_at, check_joints, last_assessed_at, last_assessment_id')
++    const page = readFileSync(join(process.cwd(), 'src', 'pages', 'QuickCheck.tsx'), 'utf8')
++    const banner = readFileSync(join(process.cwd(), 'src', 'components', 'QuickCheckBanner.tsx'), 'utf8')
++    const loader = readFileSync(join(process.cwd(), 'src', 'lib', 'quickCheckLoad.ts'), 'utf8')
++    expect(page.match(/select\(SCHEDULE_COLUMNS\)/g)?.length).toBe(1) // re-read after a save
++    expect(loader).toContain('select(SCHEDULE_COLUMNS)')
++    expect(page).toContain('loadQuickContext(user.id)')
++    expect(banner).toContain('loadQuickContext(userId)')
++    expect(page).toContain('47aad435')
++    expect(page).not.toMatch(/65a251b8|c8769478/)
++  })
++  it('window day 7 to 14 (Avery roll after local day 14): day 7 shows, day 14 shows, day 15 hidden after the roll', () => {
++    // Full save on Sun Nov 1, 2026, 10:00 AM ET: next_check_at = +7 days, next_retest_at = +42 days (rule 1).
++    const assessed = '2026-11-01T15:00:00.000Z'
++    const open = { next_check_at: '2026-11-08T15:00:00.000Z', next_retest_at: '2026-12-13T15:00:00.000Z', check_joints: ['hip_er_r'], last_assessed_at: assessed }
++    const day7 = new Date('2026-11-08T15:30:00.000Z')   // day 7, just after next_check_at
++    const day14 = new Date('2026-11-16T04:30:00.000Z')  // Nov 15, 11:30 PM ET: last hour of local day 14, row not rolled yet
++    expect(isQuickCheckDue(open, day7)).toBe(true)
++    expect(isQuickCheckDue(open, day14)).toBe(true)
++    // Day 15 after the roll: next_check_at = next_retest_at, so no banner and the line names the retest date.
++    const rolled = { ...open, next_check_at: open.next_retest_at }
++    const day15 = new Date('2026-11-16T15:00:00.000Z')
++    expect(isQuickCheckDue(rolled, day15)).toBe(false)
++    expect(nextCheckLine(rolled, day15)).toBe('Your next check: Sunday, December 13')
++    // Before day 7 nothing shows either.
++    expect(isQuickCheckDue(open, new Date('2026-11-07T15:00:00.000Z'))).toBe(false)
++  })
++  it('words: Stacy exact, no dashes', () => {
++    expect(Q.note).toBe('A quick check is a snapshot, not a full retest. Your plan stays the same until your 6-week retest.')
++    expect(Q.introBody('Hip')).toBe("We'll re-measure Hip. Then you'll see your day 1 result next to today's.")
++    expect(JSON.stringify(Q)).not.toMatch(/[\u2013\u2014]/)
++  })
++})
+diff --git a/app/src/lib/quickCheck.ts b/app/src/lib/quickCheck.ts
+new file mode 100644
+index 0000000..e561c02
+--- /dev/null
++++ b/app/src/lib/quickCheck.ts
+@@ -0,0 +1,230 @@
++// P1-06 (Base engagement): day 7 to 14 quick re-check of the 1 or 2 focus areas, shown as day 1 next to now.
++// SHIP GATE: this UI may go live ONLY with or after Avery's final server set, romrxbjj-v2 branch feat/p1-06-v5-on-p1-07-v4-20261115
++// (tip 47aad435): P1-07 v4 1fae96b8 (20261116030000 user_mobility_schedule and its roll, America/New_York fallback),
++// 170e1bc (compute-tiers quick guard after the Row 19 caller check, submit-assessment quick path, migration 20261116031000
++// assessments.check_kind; content of 65c3a036), 3b30ab57 (server reads skip check_kind='quick': get_my_profile,
++// my_joint_history, my_joint_start_vs_now, rombot_context; migrations 20261116031100 and 20261116031200; content of bda32302),
++// c9bf74ed (day 7 to 14 window) and 832056dd (saved quick row check). Live submit-assessment today ignores check_kind, so a
++// quick submit would be saved as a FULL assessment and rewrite the plan. So the whole feature is behind QUICK_CHECK_ON = false.
++//
++// Server contract this file follows (read only, at 47aad435):
++//  - POST functions/v1/submit-assessment, body { check_kind: 'quick', <scheduled field keys>: number }.
++//    200 { ok: true, assessment_id, assessed_at, sport, check_kind: 'quick' } (no assessment-done email).
++//    400 { error } with: 'check_kind must be full or quick', 'No quick re-check is scheduled' (no schedule row, empty
++//    check_joints, outside the window, or a quick check already done this cycle), 'Quick re-check only accepts the scheduled
++//    joints', 'Quick re-check needs a measurement for a scheduled joint', 'At least one ROM measurement is required'.
++//  - compute-tiers skips a quick row: 200 { success: true, assessment_id, sport, skipped: 'quick_check_no_rescore' }.
++//  - Schedule writer rules (Grant 9:38 PM ET): full save sets next_check_at = +7 days and next_retest_at = +42 days;
++//    a quick save sets next_check_at = next_retest_at; the hourly roll sets next_check_at = next_retest_at after local day 14.
++//    So next_check_at === next_retest_at means no quick check is pending (only the full retest).
++import type { Field, Step } from '../pages/assessmentMeta'
++
++export const QUICK_CHECK_ON = false
++export const QUICK_CHECK_PATH = '/dashboard/quick-check' // the day 7 and day 14 emails link here (Avery note)
++
++// Words: Stacy, /workspace/process/evidence/STACY-P1-06-WORDS-20261115-2055.md, character for character. Jim yes needed.
++export const QUICK_CHECK_COPY = {
++  bannerTitle: 'Your quick check is ready',
++  bannerLine: 'Re-measure 1 or 2 focus areas and see them next to day 1.',
++  bannerButton: 'Start quick check',
++  bannerDismiss: 'Later',
++  introTitle: 'Quick check',
++  introBody: (joints: string) => `We'll re-measure ${joints}. Then you'll see your day 1 result next to today's.`,
++  introSecond: 'This is a quick snapshot. Your full retest is still at 6 weeks.',
++  start: 'Start',
++  notNow: 'Not now',
++  resultTitle: 'Your quick check',
++  day1: (v: string) => `Day 1: ${v}`,
++  now: (v: string) => `Now: ${v}`,
++  higher: (n: string) => `Up ${n} since day 1.`,
++  lower: (n: string) => `Down ${n} since day 1. Readings can change from day to day.`,
++  same: 'About the same as day 1.',
++  // Ships only with the compute-tiers guard; if the screen ever ships without it, Stacy says drop this line entirely.
++  note: 'A quick check is a snapshot, not a full retest. Your plan stays the same until your 6-week retest.',
++  nextCheck: (date: string) => `Your next check: ${date}`,
++  nextCheckDue: 'Your next check is ready now.',
++  nextCheckHelper: 'Quick check around day 7 to 14. Full retest every 6 weeks.',
++  back: "Back to today's session",
++} as const
++
++export type Schedule = { next_check_at: string | null; next_retest_at: string | null; check_joints: string[] | null; last_assessed_at?: string | null; last_assessment_id?: string | null }
++
++/** user_mobility_schedule columns the client reads (owner select policy schedule_own_read). */
++export const SCHEDULE_COLUMNS = 'next_check_at, next_retest_at, check_joints, last_assessed_at, last_assessment_id'
++
++/** Steps that hold a scheduled field, each cut down to the scheduled sides only (the server rejects any other field). */
++export function quickCheckSteps(all: readonly Step[], checkJoints: readonly string[] | null | undefined): Step[] {
++  const want = new Set(checkJoints ?? [])
++  return all
++    .map(s => ({ ...s, fields: s.fields.filter(f => want.has(f.key)) }))
++    .filter(s => s.fields.length > 0)
++}
++
++/** The app's own names: step title plus the side label the measure screen shows. */
++export function jointName(step: Step, field: Field): string {
++  return step.fields.length > 1 || /left|right/i.test(field.label) ? `${step.title} (${field.label})` : step.title
++}
++
++export function jointList(names: readonly string[]): string {
++  return names.join(', ')
++}
++
++/** Values shown the way the measure screen enters them: the number plus the field unit. */
++export function formatValue(v: number, unit?: string): string {
++  const r = Math.round(v * 10) / 10
++  return `${r}${unit ?? ''}`
++}
++
++/** Up, Down or About the same. "Same" = equal after the app's 0.5 entry rounding. */
++export function compareLine(day1: number, now: number, unit?: string): string {
++  const d = Math.round((now - day1) * 2) / 2
++  if (d === 0) return QUICK_CHECK_COPY.same
++  return d > 0 ? QUICK_CHECK_COPY.higher(formatValue(d, unit)) : QUICK_CHECK_COPY.lower(formatValue(-d, unit))
++}
++
++/** "Monday, December 28" in the user's locale settings (en-US wording, local time zone). */
++export function formatCheckDate(iso: string, tz?: string): string {
++  return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', ...(tz ? { timeZone: tz } : {}) })
++}
++
++export function nextCheckLine(s: Schedule | null, now: Date = new Date()): string | null {
++  const next = s?.next_check_at ?? s?.next_retest_at ?? null
++  if (!next) return null
++  return new Date(next).getTime() <= now.getTime() ? QUICK_CHECK_COPY.nextCheckDue : QUICK_CHECK_COPY.nextCheck(formatCheckDate(next))
++}
++
++/** A quick check is pending only while next_check_at is set and differs from next_retest_at (server rule 2 and the roll
++ *  both set next_check_at = next_retest_at once it is done or missed). */
++export function isQuickCheckPending(s: Schedule | null): boolean {
++  if (!s?.next_check_at || !s.check_joints?.length) return false
++  return !s.next_retest_at || new Date(s.next_check_at).getTime() !== new Date(s.next_retest_at).getTime()
++}
++
++/** Banner and page: due = inside the c9bf74ed / 832056dd window (see isQuickCheckInWindow below). Replaces the v3 "next_check_at reached" rule. */
++export function isQuickCheckDue(s: Schedule | null, now: Date = new Date(), ctx: QuickContext = {}): boolean {
++  return isQuickCheckInWindow(s, now, ctx)
++}
++
++// ---------------------------------------------------------------------------------------------------------------
++// Window, matching Avery's server guard romrxbjj-v2 c9bf74ed and 832056dd (schedule.ts rejectQuickWindow and
++// rejectQuickSavedRow at 47aad435, read only):
++//  - day 0 is the LOCAL calendar date of user_mobility_schedule.last_assessed_at (the cycle's full assessment);
++//  - the day number is the local date of now minus day 0, in calendar days;
++//  - a quick check is accepted on local days 7 to 14 inclusive (day 14 runs to the end of that local day);
++//  - zone: notification_preferences.timezone if valid, else America/New_York (server DEFAULT_TZ); the device zone
++//    is used only if this browser cannot format America/New_York;
++//  - once per cycle: next_check_at === next_retest_at (rule 2), OR an assessments row with check_kind = 'quick' and
++//    created_at strictly after last_assessed_at (832056dd quickRowExistsThisCycle; created_at is the table default now()).
++// Outside that the server answers 400 'No quick re-check is scheduled' (QUICK_NOT_SCHEDULED_ERROR).
++export const DEFAULT_TZ = 'America/New_York'
++export const QUICK_WINDOW_FIRST_DAY = 7
++export const QUICK_WINDOW_LAST_DAY = 14
++export const QUICK_NOT_SCHEDULED_ERROR = 'No quick re-check is scheduled'
++/** The app's existing generic error line (Assessment.tsx, ResultsPreview.tsx). No new words. */
++export const GENERIC_ERROR = 'Something went wrong. Please try again.'
++
++function zoneWorks(tz: string): boolean {
++  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true } catch { return false }
++}
++
++/** Stored zone if valid, else America/New_York, else the device zone, else undefined (runtime local). */
++export function resolveTz(stored: string | null | undefined): string | undefined {
++  if (stored && typeof stored === 'string' && stored.length <= 64 && zoneWorks(stored)) return stored
++  if (zoneWorks(DEFAULT_TZ)) return DEFAULT_TZ
++  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined } catch { return undefined }
++}
++
++/** Local calendar date YYYY-MM-DD of an instant in a zone. */
++export function localYmd(at: Date | string, tz: string | undefined): string | null {
++  const t = typeof at === 'string' ? Date.parse(at) : at.getTime()
++  if (!Number.isFinite(t)) return null
++  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(t))
++  const g = (k: string) => parts.find(p => p.type === k)?.value ?? ''
++  const y = g('year'), m = g('month'), d = g('day')
++  return y && m && d ? `${y}-${m}-${d}` : null
++}
++
++/** Local day number of now; day 0 is the local date of lastAssessedAt (same as the server's localDayOffset). */
++export function localDayNumber(lastAssessedAt: string, now: Date, tz: string | undefined): number | null {
++  const a = localYmd(lastAssessedAt, tz), b = localYmd(now, tz)
++  if (!a || !b) return null
++  const [ya, ma, da] = a.split('-').map(Number), [yb, mb, db] = b.split('-').map(Number)
++  return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / 86400000)
++}
++
++/** Server rule 2 signal: next_check_at equals next_retest_at after a saved quick check (and after the roll). */
++export function quickDoneBySchedule(s: Schedule | null): boolean {
++  if (!s?.next_check_at || !s.next_retest_at) return false
++  const a = Date.parse(s.next_check_at), b = Date.parse(s.next_retest_at)
++  return Number.isFinite(a) && Number.isFinite(b) && a === b
++}
++
++/** Any quick row created after the cycle's full assessment (832056dd: created_at strictly after last_assessed_at). */
++export function quickRowAfter(rows: readonly { created_at?: string | null; check_kind?: string | null }[] | null | undefined, lastAssessedAt: string | null | undefined): boolean {
++  const start = lastAssessedAt ? Date.parse(lastAssessedAt) : NaN
++  if (!rows?.length || !Number.isFinite(start)) return false
++  return rows.some(r => r.check_kind === 'quick' && !!r.created_at && Number.isFinite(Date.parse(r.created_at)) && Date.parse(r.created_at) > start)
++}
++
++export type QuickContext = { tz?: string | null; quickDone?: boolean }
++
++/** Quick check is offered only inside the server window, with joints scheduled, and not yet done this cycle. */
++export function isQuickCheckInWindow(s: Schedule | null, now: Date = new Date(), ctx: QuickContext = {}): boolean {
++  if (!s?.check_joints?.length || !s.last_assessed_at) return false
++  if (ctx.quickDone || quickDoneBySchedule(s)) return false
++  const day = localDayNumber(s.last_assessed_at, now, resolveTz(ctx.tz))
++  return day !== null && day >= QUICK_WINDOW_FIRST_DAY && day <= QUICK_WINDOW_LAST_DAY
++}
++
++/** "Your next check" line for the cycle: the quick check date before the window, "ready now" in it, else the retest. */
++export function nextCheckLineInCycle(s: Schedule | null, now: Date = new Date(), ctx: QuickContext = {}): string | null {
++  if (!s) return null
++  if (isQuickCheckInWindow(s, now, ctx)) return QUICK_CHECK_COPY.nextCheckDue
++  const tz = resolveTz(ctx.tz)
++  const day = s.last_assessed_at ? localDayNumber(s.last_assessed_at, now, tz) : null
++  const beforeWindow = !!s.check_joints?.length && !ctx.quickDone && !quickDoneBySchedule(s) && day !== null && day < QUICK_WINDOW_FIRST_DAY
++  if (beforeWindow) {
++    // Day 7 as a local date (day 0 + 7), the same day the server window opens; not next_check_at's clock time.
++    const start = localYmd(s.last_assessed_at!, tz)!
++    const [y, m, d] = start.split('-').map(Number)
++    return QUICK_CHECK_COPY.nextCheck(formatCheckDate(new Date(Date.UTC(y, m - 1, d + QUICK_WINDOW_FIRST_DAY, 12)).toISOString(), 'UTC'))
++  }
++  const next = s.next_retest_at
++  if (!next) return null
++  return new Date(next).getTime() <= now.getTime() ? QUICK_CHECK_COPY.nextCheckDue : QUICK_CHECK_COPY.nextCheck(formatCheckDate(next, tz))
++}
++
++/** Page gate on load: show the intro only when a quick check is in the window; otherwise go to Today with no form. */
++export function quickCheckPageGate(s: Schedule | null, now: Date = new Date(), ctx: QuickContext = {}): 'intro' | 'today' {
++  return isQuickCheckInWindow(s, now, ctx) ? 'intro' : 'today'
++}
++
++export type SubmitOutcome = { kind: 'result' } | { kind: 'today' } | { kind: 'error'; message: string }
++
++/** What the page does with a submit response. The window 400 goes to Today (no loop); other failures show the generic line. */
++export function quickSubmitOutcome(status: number, data: { ok?: boolean; error?: string } | null | undefined): SubmitOutcome {
++  if (status >= 200 && status < 300 && data?.ok) return { kind: 'result' }
++  if (status === 400 && data?.error === QUICK_NOT_SCHEDULED_ERROR) return { kind: 'today' }
++  return { kind: 'error', message: GENERIC_ERROR }
++}
++
++export const quickCheckDismissKey = (userId: string, nextCheckAt: string) => `romrx_hq_quickcheck_later_${userId}_${nextCheckAt.slice(0, 10)}`
++
++/** Request body for submit-assessment: only the scheduled fields, plus check_kind. */
++export function quickSubmitBody(values: Record<string, string>, checkJoints: readonly string[]): Record<string, unknown> {
++  const body: Record<string, unknown> = { check_kind: 'quick' }
++  for (const k of checkJoints) body[k] = values[k] === undefined || values[k] === '' ? null : parseFloat(values[k])
++  return body
++}
++
++/** Last FULL assessment from rows newest first (rows with check_kind 'quick' are skipped; the column may not exist yet). */
++export function lastFullAssessment<T extends Record<string, unknown>>(rows: readonly T[]): T | null {
++  return rows.find(r => r.check_kind !== 'quick') ?? null
++}
++
++/** Day 1 values: the schedule's last_assessment_id (the full save that set it) when it is in the rows and not quick,
++ *  else the newest full row. last_assessment_id can be null (ON DELETE SET NULL). */
++export function dayOneAssessment<T extends Record<string, unknown>>(rows: readonly T[], lastAssessmentId: string | null | undefined): T | null {
++  const byId = lastAssessmentId ? rows.find(r => r.id === lastAssessmentId && r.check_kind !== 'quick') : undefined
++  return byId ?? lastFullAssessment(rows)
++}
+diff --git a/app/src/lib/quickCheckLoad.ts b/app/src/lib/quickCheckLoad.ts
+new file mode 100644
+index 0000000..52539d6
+--- /dev/null
++++ b/app/src/lib/quickCheckLoad.ts
+@@ -0,0 +1,28 @@
++// P1-06 v4: the reads behind the quick check gate (banner and page). Behind QUICK_CHECK_ON (false).
++import { supabase } from './supabase'
++import { SCHEDULE_COLUMNS, quickRowAfter, type QuickContext, type Schedule } from './quickCheck'
++
++export type QuickLoad = { schedule: Schedule | null; ctx: QuickContext; failed: boolean }
++
++/** Schedule, stored time zone, and the ONE explicit quick-row read (check_kind = 'quick', created_at after the cycle's
++ *  full assessment, the same read as Avery's 832056dd; needs migration 20261116031000). Every other assessments read stays quick-skipped. A failed read of the
++ *  schedule or the quick rows counts as "not due" (failed = true), so nothing is offered that the server would reject. */
++export async function loadQuickContext(userId: string): Promise<QuickLoad> {
++  const [{ data: sch, error: sErr }, { data: pref }] = await Promise.all([
++    supabase.from('user_mobility_schedule').select(SCHEDULE_COLUMNS).eq('user_id', userId).maybeSingle(),
++    supabase.from('notification_preferences').select('timezone').eq('user_id', userId).maybeSingle(),
++  ])
++  const schedule = (sErr ? null : sch) as Schedule | null
++  const tz = (pref as { timezone?: unknown } | null)?.timezone
++  const ctx: QuickContext = { tz: typeof tz === 'string' ? tz : null }
++  if (!schedule?.last_assessed_at) return { schedule, ctx, failed: !!sErr }
++  const { data: rows, error: qErr } = await supabase
++    .from('assessments')
++    .select('id, created_at, check_kind')
++    .eq('user_id', userId)
++    .eq('check_kind', 'quick')
++    .gt('created_at', schedule.last_assessed_at)
++    .limit(1)
++  if (qErr) return { schedule, ctx: { ...ctx, quickDone: true }, failed: true }
++  return { schedule, ctx: { ...ctx, quickDone: quickRowAfter(rows as { created_at: string; check_kind: string }[], schedule.last_assessed_at) }, failed: false }
++}
+diff --git a/app/src/lib/quickCheckWindow.test.ts b/app/src/lib/quickCheckWindow.test.ts
+new file mode 100644
+index 0000000..6797f78
+--- /dev/null
++++ b/app/src/lib/quickCheckWindow.test.ts
+@@ -0,0 +1,111 @@
++// P1-06: client window matches Avery's server guard (romrxbjj-v2 c9bf74ed rejectQuickWindow, 832056dd rejectQuickSavedRow).
++// Device zone set far from New York so a test passes only if the stored zone / America/New_York rule is used.
++process.env.TZ = 'Asia/Tokyo'
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import {
++  QUICK_CHECK_ON, QUICK_CHECK_COPY as Q, isQuickCheckDue, nextCheckLineInCycle, quickCheckPageGate, quickSubmitOutcome,
++  resolveTz, localDayNumber, quickRowAfter, GENERIC_ERROR, QUICK_NOT_SCHEDULED_ERROR, DEFAULT_TZ,
++} from './quickCheck'
++
++// Full assessment Sun Nov 1, 2026, 10:00 AM ET (15:00Z). Rule 1: next_check_at +7 days, next_retest_at +42 days.
++const row = {
++  last_assessed_at: '2026-11-01T15:00:00.000Z',
++  next_check_at: '2026-11-08T15:00:00.000Z',
++  next_retest_at: '2026-12-13T15:00:00.000Z',
++  check_joints: ['hip_er_r'],
++}
++const at = (iso: string) => new Date(iso)
++const day6late = at('2026-11-08T04:30:00Z')   // Sat Nov 7, 11:30 PM ET
++const day7early = at('2026-11-08T05:30:00Z')  // Sun Nov 8, 12:30 AM ET (before next_check_at's clock time)
++const day14late = at('2026-11-16T04:30:00Z')  // Sun Nov 15, 11:30 PM ET
++const day15early = at('2026-11-16T05:30:00Z') // Mon Nov 16, 12:30 AM ET, before the hourly roll runs
++
++describe('P1-06 quick check window (c9bf74ed and 832056dd rules)', () => {
++  it('feature stays off', () => { expect(QUICK_CHECK_ON).toBe(false) })
++
++  it('day numbers: day 0 is the local date of last_assessed_at, in New York when no zone is stored', () => {
++    expect(localDayNumber(row.last_assessed_at, day6late, resolveTz(null))).toBe(6)
++    expect(localDayNumber(row.last_assessed_at, day7early, resolveTz(null))).toBe(7)
++    expect(localDayNumber(row.last_assessed_at, day14late, resolveTz(null))).toBe(14)
++    expect(localDayNumber(row.last_assessed_at, day15early, resolveTz(null))).toBe(15)
++  })
++
++  it('day 6 hidden', () => { expect(isQuickCheckDue(row, day6late)).toBe(false) })
++  it('day 7 shown (from local midnight, like the server)', () => { expect(isQuickCheckDue(row, day7early)).toBe(true) })
++  it('day 14 late shown', () => { expect(isQuickCheckDue(row, day14late)).toBe(true) })
++  it('day 15 before the roll hidden (next_check_at not rolled yet)', () => {
++    expect(row.next_check_at).not.toBe(row.next_retest_at)
++    expect(isQuickCheckDue(row, day15early)).toBe(false)
++    expect(nextCheckLineInCycle(row, day15early)).toBe('Your next check: Sunday, December 13')
++  })
++  it('before the window the line names the quick check date; inside it says ready now', () => {
++    expect(nextCheckLineInCycle(row, day6late)).toBe('Your next check: Sunday, November 8')
++    expect(nextCheckLineInCycle(row, day7early)).toBe(Q.nextCheckDue)
++  })
++
++  it('quick check already done this cycle hidden: by a quick row after the full assessment, or by the schedule', () => {
++    // 832056dd: created_at strictly after last_assessed_at; a previous cycle's quick row and a full row do not count.
++    const rows = [{ created_at: '2026-11-09T14:00:00Z', check_kind: 'quick' }]
++    expect(quickRowAfter(rows, row.last_assessed_at)).toBe(true)
++    expect(quickRowAfter([{ created_at: '2026-10-20T14:00:00Z', check_kind: 'quick' }], row.last_assessed_at)).toBe(false)
++    expect(quickRowAfter([{ created_at: row.last_assessed_at, check_kind: 'quick' }], row.last_assessed_at)).toBe(false)
++    expect(quickRowAfter([{ created_at: '2026-11-09T14:00:00Z', check_kind: 'full' }], row.last_assessed_at)).toBe(false)
++    expect(quickRowAfter([{ assessed_at: '2026-11-09T14:00:00Z', check_kind: 'quick' } as never], row.last_assessed_at)).toBe(false)
++    expect(isQuickCheckDue(row, at('2026-11-10T15:00:00Z'), { quickDone: true })).toBe(false)
++    expect(isQuickCheckDue({ ...row, next_check_at: row.next_retest_at }, at('2026-11-10T15:00:00Z'))).toBe(false)
++    expect(nextCheckLineInCycle(row, at('2026-11-10T15:00:00Z'), { quickDone: true })).toBe('Your next check: Sunday, December 13')
++  })
++
++  it('no zone (null, empty, invalid) falls back to America/New_York, not the device zone', () => {
++    expect(DEFAULT_TZ).toBe('America/New_York')
++    for (const tz of [null, undefined, '', 'Not/AZone']) expect(resolveTz(tz)).toBe('America/New_York')
++    // Tokyo device would already be Nov 16 afternoon (day 15) at day14late; New York rule keeps it day 14.
++    expect(isQuickCheckDue(row, day14late, { tz: '' })).toBe(true)
++    expect(isQuickCheckDue(row, day15early, { tz: 'Not/AZone' })).toBe(false)
++  })
++  it('a stored zone wins: Los Angeles is still day 14 when New York is day 15', () => {
++    expect(resolveTz('America/Los_Angeles')).toBe('America/Los_Angeles')
++    expect(isQuickCheckDue(row, day15early, { tz: 'America/Los_Angeles' })).toBe(true)
++    expect(isQuickCheckDue(row, at('2026-11-16T08:30:00Z'), { tz: 'America/Los_Angeles' })).toBe(false)
++  })
++
++  it('page load: not due redirects to Today with no form; due shows the intro', () => {
++    expect(quickCheckPageGate(row, day6late)).toBe('today')
++    expect(quickCheckPageGate(row, day15early)).toBe('today')
++    expect(quickCheckPageGate(row, day7early, { quickDone: true })).toBe('today')
++    expect(quickCheckPageGate(null, day7early)).toBe('today')
++    expect(quickCheckPageGate(row, day7early)).toBe('intro')
++    const page = readFileSync(join(process.cwd(), 'src', 'pages', 'QuickCheck.tsx'), 'utf8')
++    expect(page).toContain("if (!s || !load || load.failed || quickCheckPageGate(s, new Date(), load.ctx) !== 'intro') { setGone(true); return }")
++    expect(page).toContain('if (gone) return <Navigate to={TODAY} replace />')
++  })
++
++  it('400 No quick re-check is scheduled goes to Today (no loop); other failures show the generic line', () => {
++    expect(QUICK_NOT_SCHEDULED_ERROR).toBe('No quick re-check is scheduled')
++    expect(quickSubmitOutcome(400, { error: 'No quick re-check is scheduled' })).toEqual({ kind: 'today' })
++    expect(quickSubmitOutcome(400, { error: 'Quick re-check only accepts the scheduled joints' })).toEqual({ kind: 'error', message: GENERIC_ERROR })
++    expect(quickSubmitOutcome(500, { ok: false })).toEqual({ kind: 'error', message: GENERIC_ERROR })
++    expect(quickSubmitOutcome(200, { ok: true })).toEqual({ kind: 'result' })
++    const page = readFileSync(join(process.cwd(), 'src', 'pages', 'QuickCheck.tsx'), 'utf8')
++    expect(page).toContain("if (outcome.kind === 'today') { navigate(TODAY, { replace: true }); return }")
++    expect(page).not.toContain('data.error}') // the raw server text is never shown
++  })
++
++  it('no sign-in token shows the existing generic line', () => {
++    expect(GENERIC_ERROR).toBe('Something went wrong. Please try again.')
++    const assessment = readFileSync(join(process.cwd(), 'src', 'pages', 'Assessment.tsx'), 'utf8')
++    expect(assessment).toContain("setError('Something went wrong. Please try again.')") // existing, already cleared line
++    const page = readFileSync(join(process.cwd(), 'src', 'pages', 'QuickCheck.tsx'), 'utf8')
++    expect(page).toContain('if (!session?.access_token) { setError(GENERIC_ERROR); return }')
++  })
++
++  it('only the one gate read selects quick rows; it fails closed', () => {
++    const loader = readFileSync(join(process.cwd(), 'src', 'lib', 'quickCheckLoad.ts'), 'utf8')
++    expect(loader).toContain(".eq('check_kind', 'quick')")
++    expect(loader).toContain(".gt('created_at', schedule.last_assessed_at)")
++    expect(loader).not.toContain("gt('assessed_at'")
++    expect(loader).toContain('if (qErr) return { schedule, ctx: { ...ctx, quickDone: true }, failed: true }')
++  })
++})
+diff --git a/app/src/pages/AssessmentMeasureScreen.tsx b/app/src/pages/AssessmentMeasureScreen.tsx
+index f65fec2..7a45173 100644
+--- a/app/src/pages/AssessmentMeasureScreen.tsx
++++ b/app/src/pages/AssessmentMeasureScreen.tsx
+@@ -3,17 +3,18 @@ import { StepVideo } from '../components/StepVideo'
+ import { SAVE_STATUS_FAILED, SAVE_STATUS_SAVED } from '../lib/assessmentDraftCopy'
+ import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, AlertTriangle, SkipForward } from 'lucide-react'
+ import { cn } from '../lib/cn'
+-import { STEPS } from './assessmentSteps'
++import { STEPS as ALL_STEPS } from './assessmentSteps'
+ import { MeasureInput } from './AssessmentMeasure'
+ import { HIP_FLEX_LEFT_RIGHT_DIFFERENT, HIP_FLEX_RANGE_SOURCE, HIP_FLEX_TYPICAL_RANGE, SHOW_SLR_TYPICAL_RANGE, hipFlexScreenCopy } from '../lib/hipFlexCopy'
+ import { useState, type Dispatch, type SetStateAction } from 'react'
+ import { PhoneMeter } from '../components/PhoneMeter'
+ import { meterLikelyAvailable } from '../lib/meterSensor'
+ import { METER_COPY, MEASUREMENTS_HEADER, MORE_HELP_LABEL } from '../lib/meterCopy'
+-import type { Field } from './assessmentMeta'
++import type { Field, Step } from './assessmentMeta'
+ import { STOP_LINE } from '../lib/stopLine'
+ /** Whole-flow count (Jim, Oct 26 2026 8:10 PM ET): setup (1) and ROMood (2) come before the measure steps. */
+ const STEPS_BEFORE_MEASURE = 2
++const DEFAULT_BEFORE_MEASURE = STEPS_BEFORE_MEASURE
+ 
+ /** Safety, not-medical-advice or warm-up wording that must never fold under More help (Stacy, Oct 6). */
+ export const SAFETY_TEXT = /pain|stop if|hurt|medical|advice|warm[ -]?up|injur|doctor/i
+@@ -32,8 +33,17 @@ export function AssessmentMeasureScreen(p: {
+   saveStatus?: 'idle' | 'saved' | 'failed'
+   /** Profile gender, when signed in. Only male or female counts as sex known. */
+   gender?: string | null
++  /** P1-06 quick check: measure only these steps (default: the full assessment). */
++  steps?: Step[]
++  /** P1-06: screens shown before measuring, for the counter (default 2: setup and mood). */
++  beforeMeasure?: number
++  /** P1-06: Back on the first step (default: back to the mood screen). */
++  onBackFirst?: () => void
+ }) {
+   const { stepIdx, values, loading, error } = p
++  const STEPS = p.steps ?? ALL_STEPS
++  // P1-06: the quick check passes 1 (its intro screen); the full assessment keeps 2 (setup and mood).
++  const STEPS_BEFORE_MEASURE = p.beforeMeasure ?? DEFAULT_BEFORE_MEASURE
+   const step = STEPS[stepIdx]
+   const isHip = step.id === 'hip_flex'
+   const hipCopy = hipFlexScreenCopy(p.gender, parseFloat(values.hip_flex_l ?? ''), parseFloat(values.hip_flex_r ?? ''))
+@@ -236,7 +246,7 @@ export function AssessmentMeasureScreen(p: {
+             <div className="flex items-center justify-between pt-2">
+               <button
+                 type="button"
+-                onClick={() => { if (stepIdx > 0) { p.setStepIdx(s => s - 1); window.scrollTo({ top: 0 }) } else p.setPhase('mood') }}
++                onClick={() => { if (stepIdx > 0) { p.setStepIdx(s => s - 1); window.scrollTo({ top: 0 }) } else if (p.onBackFirst) p.onBackFirst(); else p.setPhase('mood') }}
+                 className="flex items-center gap-1 text-sm text-slate-500 hover:text-cobalt px-3 py-2 rounded-card hover:bg-cobalt-light transition-colors"
+               >
+                 <ChevronLeft size={15} /> Back
+diff --git a/app/src/pages/MyProtocol.tsx b/app/src/pages/MyProtocol.tsx
+index bc652f4..7e4e545 100644
+--- a/app/src/pages/MyProtocol.tsx
++++ b/app/src/pages/MyProtocol.tsx
+@@ -20,6 +20,7 @@ import { WEEKLY_GOAL_COPY } from '../lib/weeklyGoal'
+ import { GuidedPlayer } from '../components/GuidedPlayer'
+ import { PLAYER_COPY } from '../lib/guidedPlayer'
+ import { SoloChallenge } from '../components/SoloChallenge'
++import { QuickCheckBanner } from '../components/QuickCheckBanner'
+ import {
+   bandFull,
+   jointBandsForAssessment,
+@@ -40,6 +41,7 @@ import {
+   BAND_TONE,
+   type BandScore,
+ } from '../lib/mobilityBands'
++import { skipQuick } from '../lib/assessmentReads'
+ import {
+   AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, Circle,
+   ClipboardList, Dumbbell, Flame, PersonStanding,
+@@ -498,10 +500,11 @@ function TodayCard({ ranked, rxLibrary, assessedAt, userId, assessmentId }: Toda
+ 
+   useEffect(() => {
+     if (!userId) return
+-    supabase
++    // P1-06b: the cycle starts at the latest full assessment, never a quick check (needs migration 20261116031000)
++    skipQuick(supabase
+       .from('assessments')
+       .select('assessed_at')
+-      .eq('user_id', userId)
++      .eq('user_id', userId))
+       .order('assessed_at', { ascending: false })
+       .limit(1)
+       .maybeSingle()
+@@ -739,6 +742,8 @@ function TodayCard({ ranked, rxLibrary, assessedAt, userId, assessmentId }: Toda
+       )}
+ 
+       <div className="px-5 pb-5">
++        {/* P1-06: quick check banner or "Your next check" line (hidden while QUICK_CHECK_ON is false) */}
++        <div className="mb-3 empty:hidden"><QuickCheckBanner userId={userId} /></div>
+         {completedToday ? (
+           <div className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-50 border border-green-200 py-3.5 text-green-700 font-semibold text-sm">
+             <CheckCircle2 size={16} fill="currentColor" strokeWidth={0} />
+diff --git a/app/src/pages/QuickCheck.tsx b/app/src/pages/QuickCheck.tsx
+new file mode 100644
+index 0000000..572995d
+--- /dev/null
++++ b/app/src/pages/QuickCheck.tsx
+@@ -0,0 +1,163 @@
++// P1-06 quick check screen (/dashboard/quick-check). Behind QUICK_CHECK_ON (false): see lib/quickCheck.ts for the ship gate
++// (Avery romrxbjj-v2 final set, tip 47aad435: guard c9bf74ed, saved quick row check 832056dd, server reads 3b30ab57).
++import { useEffect, useMemo, useState } from 'react'
++import { Navigate, useNavigate } from 'react-router-dom'
++import { useAuth } from '../hooks/useAuth'
++import { useProfile } from '../hooks/useProfile'
++import { supabase } from '../lib/supabase'
++import { track } from '../lib/track'
++import { Spinner } from '../components/Spinner'
++import { STOP_LINE } from '../lib/stopLine'
++import { STEPS } from './assessmentSteps'
++import { AssessmentMeasureScreen } from './AssessmentMeasureScreen'
++import { loadQuickContext } from '../lib/quickCheckLoad'
++import {
++  QUICK_CHECK_ON, QUICK_CHECK_COPY as Q, quickCheckSteps, jointName, jointList, formatValue, compareLine,
++  nextCheckLineInCycle, quickSubmitBody, dayOneAssessment, SCHEDULE_COLUMNS, quickCheckPageGate, quickSubmitOutcome, GENERIC_ERROR,
++  type QuickContext, type Schedule,
++} from '../lib/quickCheck'
++
++const SUBMIT_ASSESSMENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-assessment`
++const TODAY = '/dashboard/my-protocol'
++
++type Phase = 'loading' | 'intro' | 'measure' | 'result'
++
++export function QuickCheck() {
++  if (!QUICK_CHECK_ON) return <Navigate to={TODAY} replace />
++  return <QuickCheckInner />
++}
++
++function QuickCheckInner() {
++  const { session, user } = useAuth()
++  const { profile } = useProfile(user?.id)
++  const navigate = useNavigate()
++  const [phase, setPhase] = useState<Phase>('loading')
++  const [schedule, setSchedule] = useState<Schedule | null>(null)
++  const [ctx, setCtx] = useState<QuickContext>({})
++  const [day1, setDay1] = useState<Record<string, unknown> | null>(null)
++  const [stepIdx, setStepIdx] = useState(0)
++  const [values, setValues] = useState<Record<string, string>>({})
++  const [loading, setLoading] = useState(false)
++  const [error, setError] = useState('')
++  const [gone, setGone] = useState(false)
++
++  useEffect(() => {
++    if (!user?.id) return
++    let cancelled = false
++    ;(async () => {
++      const [load, { data: rows }] = await Promise.all([
++        loadQuickContext(user.id).catch(() => null),
++        supabase.from('assessments').select('*').eq('user_id', user.id).order('assessed_at', { ascending: false }).limit(10),
++      ])
++      if (cancelled) return
++      const s = load && !load.failed ? load.schedule : null
++      // Gate (Avery c9bf74ed window and 832056dd quick row): outside local days 7 to 14, or a quick check already done this cycle, go to Today with no form.
++      if (!s || !load || load.failed || quickCheckPageGate(s, new Date(), load.ctx) !== 'intro') { setGone(true); return }
++      setCtx(load.ctx)
++      setSchedule(s)
++      // Assessments read with select('*') and filtered in code, so it works before and after 20261116031000 adds check_kind.
++      setDay1(dayOneAssessment((rows ?? []) as Record<string, unknown>[], s.last_assessment_id))
++      setPhase('intro')
++    })()
++    return () => { cancelled = true }
++  }, [user?.id])
++
++  const steps = useMemo(() => quickCheckSteps(STEPS, schedule?.check_joints), [schedule])
++  const names = useMemo(() => steps.flatMap(s => s.fields.map(f => jointName(s, f))), [steps])
++
++  if (gone) return <Navigate to={TODAY} replace />
++  if (phase === 'loading') return <Spinner />
++
++  const submit = async () => {
++    // v4: no sign-in token shows the existing generic line instead of doing nothing.
++    if (!session?.access_token) { setError(GENERIC_ERROR); return }
++    if (!schedule?.check_joints) return
++    setLoading(true); setError('')
++    try {
++      const res = await fetch(SUBMIT_ASSESSMENT_URL, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          'Authorization': `Bearer ${session.access_token}`,
++          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
++        },
++        body: JSON.stringify(quickSubmitBody(values, schedule.check_joints)),
++      })
++      const data = await res.json().catch(() => ({ ok: false }))
++      setLoading(false)
++      // 47aad435: 200 { ok: true, check_kind: 'quick', ... }. The window 400 'No quick re-check is scheduled'
++      // goes to Today (no retry loop); any other failure shows the existing generic line.
++      const outcome = quickSubmitOutcome(res.status, data)
++      if (outcome.kind === 'today') { navigate(TODAY, { replace: true }); return }
++      if (outcome.kind === 'error') { setError(outcome.message); return }
++      track('quick_check_completed', { joints: schedule.check_joints.length })
++      const { data: sch } = await supabase.from('user_mobility_schedule').select(SCHEDULE_COLUMNS).eq('user_id', user!.id).maybeSingle()
++      if (sch) setSchedule(sch as Schedule)
++      setPhase('result')
++    } catch {
++      setLoading(false)
++      setError(GENERIC_ERROR)
++    }
++  }
++
++  if (phase === 'measure') {
++    return (
++      <AssessmentMeasureScreen
++        steps={steps}
++        beforeMeasure={1}
++        onBackFirst={() => setPhase('intro')}
++        stepIdx={stepIdx}
++        values={values}
++        loading={loading}
++        error={error}
++        setPhase={() => setPhase('intro')}
++        setStepIdx={setStepIdx}
++        handleChange={(k, v) => setValues(p => ({ ...p, [k]: v }))}
++        handleNext={() => { if (stepIdx < steps.length - 1) { setStepIdx(i => i + 1); window.scrollTo({ top: 0 }) } else submit() }}
++        gender={profile?.gender}
++      />
++    )
++  }
++
++  if (phase === 'result') {
++    const next = nextCheckLineInCycle(schedule, new Date(), { ...ctx, quickDone: true })
++    return (
++      <div className="max-w-lg mx-auto px-4 py-6 space-y-4" data-testid="quick-check-result">
++        <h1 className="font-display font-bold text-2xl text-cobalt-ink">{Q.resultTitle}</h1>
++        <div className="space-y-3">
++          {steps.flatMap(s => s.fields.map(f => {
++            const before = typeof day1?.[f.key] === 'number' ? (day1[f.key] as number) : null
++            const nowV = values[f.key] ? parseFloat(values[f.key]) : null
++            return (
++              <div key={f.key} className="rounded-card bg-white border border-slate-200 p-4">
++                <p className="text-sm font-semibold text-cobalt-ink">{jointName(s, f)}</p>
++                <p className="text-sm text-slate-600 mt-1">
++                  <span className="mr-4">{Q.day1(before === null ? '' : formatValue(before, f.unit))}</span>
++                  <span>{Q.now(nowV === null ? '' : formatValue(nowV, f.unit))}</span>
++                </p>
++                {before !== null && nowV !== null && <p className="text-xs text-slate-500 mt-1">{compareLine(before, nowV, f.unit)}</p>}
++              </div>
++            )
++          }))}
++        </div>
++        <p className="text-xs text-slate-500">{Q.note}</p>
++        {next && <p className="text-sm font-semibold text-cobalt-ink">{next}</p>}
++        <button type="button" className="btn-primary w-full" onClick={() => navigate(TODAY, { replace: true })}>{Q.back}</button>
++        {/* "Add to my calendar" stays hidden until P1-12 is live (Stacy D). */}
++      </div>
++    )
++  }
++
++  return (
++    <div className="max-w-lg mx-auto px-4 py-6 space-y-4" data-testid="quick-check-intro">
++      <h1 className="font-display font-bold text-2xl text-cobalt-ink">{Q.introTitle}</h1>
++      <p className="text-sm text-slate-600 leading-relaxed">{Q.introBody(jointList(names))}</p>
++      <p className="text-sm text-slate-600 leading-relaxed">{Q.introSecond}</p>
++      <p className="text-sm font-semibold text-cobalt-ink">{STOP_LINE}</p>
++      <div className="flex gap-3">
++        <button type="button" className="btn-primary flex-1" onClick={() => { setStepIdx(0); setPhase('measure') }}>{Q.start}</button>
++        <button type="button" className="btn-ghost flex-1" onClick={() => navigate(TODAY)}>{Q.notNow}</button>
++      </div>
++    </div>
++  )
++}
+diff --git a/app/src/pages/ResultsPreview.tsx b/app/src/pages/ResultsPreview.tsx
+index 691b066..c43c118 100644
+--- a/app/src/pages/ResultsPreview.tsx
++++ b/app/src/pages/ResultsPreview.tsx
+@@ -27,6 +27,7 @@ import { checkoutErrorMessage } from '../lib/checkoutErrors'
+ import { CARD_LINE_SHORT, CARD_LINE_SHORT_NODATE } from '../lib/cardLine'
+ import { ReminderOptIn } from '../components/ReminderOptIn'
+ import { WHAT_CHANGED_COPY, WHAT_CHANGED_PATH, takeJustAssessed } from '../lib/whatChanged'
++import { skipQuick } from '../lib/assessmentReads'
+ 
+ // P1-03: after the results (unlock, or an active user finishing an assessment) the next screen is today's session.
+ export const TODAY_PATH = '/dashboard/my-protocol'
+@@ -140,10 +141,11 @@ export function ResultsPreview() {
+       let data: Record<string, number | null> | null = null
+       for (let attempt = 0; attempt < 4 && !data; attempt++) {
+         if (attempt > 0) await new Promise(r => setTimeout(r, 750))
+-        const res = await supabase
++        // P1-06b: skip quick-check rows (needs migration 20261116031000)
++        const res = await skipQuick(supabase
+           .from('assessments')
+           .select('*')
+-          .eq('user_id', user.id)
++          .eq('user_id', user.id))
+           .order('assessed_at', { ascending: false })
+           .limit(1)
+           .maybeSingle()
+diff --git a/app/src/pages/Settings.tsx b/app/src/pages/Settings.tsx
+index d404b48..a3504e0 100644
+--- a/app/src/pages/Settings.tsx
++++ b/app/src/pages/Settings.tsx
+@@ -36,6 +36,7 @@ import {
+   CheckCircle2, XCircle,
+ } from 'lucide-react'
+ import { AGE_BUCKETS, isAllowedAgeBucket } from '../lib/ageBuckets'
++import { skipQuick } from '../lib/assessmentReads'
+ 
+ const PORTAL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`
+ 
+@@ -171,9 +172,10 @@ export function Settings() {
+   useEffect(() => {
+     if (!user?.id) return
+     setHistoryLoading(true)
+-    supabase.from('assessments')
++    // P1-06b: skip quick-check rows (needs migration 20261116031000)
++    skipQuick(supabase.from('assessments')
+       .select('*')
+-      .eq('user_id', user.id)
++      .eq('user_id', user.id))
+       .order('assessed_at', { ascending: false })
+       .then(async ({ data }) => {
+         const rows = (data ?? []) as Assessment[]

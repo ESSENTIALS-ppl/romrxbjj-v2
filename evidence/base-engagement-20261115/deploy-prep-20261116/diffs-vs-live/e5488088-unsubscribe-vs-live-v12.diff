@@ -1,0 +1,72 @@
+diff --git a/live/_shared/unsub_token.ts b/staged/_shared/unsub_token.ts
+index f0a0c8e..75d35b8 100644
+--- a/live/_shared/unsub_token.ts
++++ b/staged/_shared/unsub_token.ts
+@@ -2,8 +2,15 @@
+ // A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
+ // switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
+ // Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
+-export type UnsubScope = "retest" | "protocol" | "digest" | "all";
+-export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all"];
++export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "lapsed";
++export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "lapsed"];
++/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
++export type SettingScope = "retest" | "protocol" | "digest";
++/** Which settings toggle each scope switches off. The lapsed link already says "Turn off plan day reminders"
++ *  (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). No new words. */
++export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
++  retest: "retest", protocol: "protocol", digest: "digest", lapsed: "protocol",
++};
+ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ 
+ const enc = new TextEncoder();
+diff --git a/live/source/index.ts b/staged/source/index.ts
+index a1c3021..66b93b1 100644
+--- a/live/source/index.ts
++++ b/staged/source/index.ts
+@@ -1,4 +1,5 @@
+ // unsubscribe v9 (2026-11-02, FG-09/10/11): adds the scoped signed-token path (?t=...) for lifecycle emails on top of v8.
++// Lapsed scope (2026-11-15, BUILD ONLY, standalone on live v12): a lapsed token verifies and switches off the toggle its email names (SCOPE_SETTING).
+ // The v8 email path below is UNCHANGED (kept verbatim from live v8, see v8_index_reference.ts.txt).
+ // Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (>= 32 chars). With no secret, tokens never verify (fail closed).
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+@@ -6,6 +7,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
+ import { enforceRateLimit } from "../_shared/rate_limit.ts";
+ import { logEvent } from "../_shared/events.ts";
+ import { handleTokenRequest, needsRateLimit, SCOPE_COLUMN } from "./token_path.ts";
++import { SCOPE_SETTING } from "../_shared/unsub_token.ts";
+ 
+ const CORS = {
+   "Access-Control-Allow-Origin": "*",
+@@ -44,7 +46,7 @@ Deno.serve(async (req: Request) => {
+         if (p.error) throw new Error("preferences update failed");
+         n += p.data?.length ?? 0;
+       } else {
+-        const p = await a.from("notification_preferences").update({ [SCOPE_COLUMN[scope]]: false }).eq("user_id", userId).select("id");
++        const p = await a.from("notification_preferences").update({ [SCOPE_COLUMN[SCOPE_SETTING[scope]]]: false }).eq("user_id", userId).select("id");
+         if (p.error) throw new Error("preferences update failed");
+         n += p.data?.length ?? 0;
+       }
+diff --git a/live/source/token_path.ts b/staged/source/token_path.ts
+index bc44b1f..5818342 100644
+--- a/live/source/token_path.ts
++++ b/staged/source/token_path.ts
+@@ -2,7 +2,7 @@
+ // A signed scoped token (HMAC-SHA256, see _shared/unsub_token.ts) switches off exactly one lifecycle email kind, or all of them.
+ // POST responses: 200 {ok:true} only for a valid signed token whose opt-out applied; 400 {ok:false,error:"invalid_token"} for a bad, forged, expired or unknown token;
+ // 503 {ok:false,error:"unavailable"} when the write failed or the signing secret is missing. GET only redirects and never reveals token validity.
+-import { type UnsubScope, verifyUnsubToken } from "../_shared/unsub_token.ts";
++import { type SettingScope, type UnsubScope, verifyUnsubToken } from "../_shared/unsub_token.ts";
+ 
+ export interface TokenDeps {
+   secret: string | undefined;
+@@ -11,7 +11,8 @@ export interface TokenDeps {
+   log: (userId: string, scope: UnsubScope) => Promise<void>;
+ }
+ /** Column switched off per scope. "all" also sets users.marketing_opt_out and push_reminders (handled by the caller's apply). */
+-export const SCOPE_COLUMN: Record<Exclude<UnsubScope, "all">, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
++/** lapsed (standalone, BUILD ONLY) reaches email_reminders through SCOPE_SETTING ("Turn off plan day reminders"). */
++export const SCOPE_COLUMN: Record<SettingScope, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
+   retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
+ };
+ 

@@ -1,0 +1,28 @@
+Check supabase/functions/submit-assessment/schedule.test.ts
+Check supabase/functions/submit-assessment/mood_block.test.ts
+running 14 tests from ./supabase/functions/submit-assessment/schedule.test.ts
+P1-07: 42-day retest and 7-day check from assessed_at ... ok (884µs)
+P1-06: full schedule row includes 1-2 check_joints ... ok (260µs)
+P1-06: computed worst when worst_joints empty; hip_flex and lumbar ignored ... ok (195µs)
+P1-06 rule 2: a quick check sets next_check_at = next_retest_at (any day); retest untouched ... ok (50µs)
+P1-07 rule 1: a full save on day 42 resets next_check_at to +7 and next_retest_at to +42 ... ok (39µs)
+P1-06: quick submit rejects extra joints, empty schedule, and missing scheduled values ... ok (127µs)
+P1-06 v4: DEFAULT_TZ is America/New_York; invalid tz falls back there; a valid stored tz is kept ... ok (13ms)
+P1-06 v4 guard: day 6 rejected 400 no_schedule; day 7 accepted; day 14 late evening accepted; day 15 rejected ... ok (495ms)
+P1-06 v4 guard: day 14 late evening is accepted in the user's local tz (not UTC) ... ok (220ms)
+P1-06 v4 guard: invalid or missing tz uses NY day boundaries (not the stored Chicago tz) ... ok (216ms)
+P1-06 v4 guard: second quick check in the same cycle is rejected 400 no_schedule ... ok (91ms)
+P1-06 v4 guard: a new full assessment resets the cycle ... ok (599ms)
+P1-06 v4: quick row saved and schedule not updated: second quick attempt is rejected 400 no_schedule ... ok (181ms)
+P1-06 v4: a quick row from a previous cycle (created_at before last_assessed_at) does not block ... ok (317ms)
+running 7 tests from ./supabase/functions/submit-assessment/mood_block.test.ts
+gate: env flag, saving on, valid tick, current consent all required ... ok (429µs)
+summary: count and rounded averages; empty is null ... ok (491µs)
+window: later of previous assessment and opt-in tick ... ok (140µs)
+block: Stacy text verbatim, numbers only, no words, omitted at 0 ... ok (137µs)
+block: count 1 reads '1 time', 2 reads '2 times' ... ok (54µs)
+buildMoodBlockForUser: scoped to the user, averages only, omitted when gated off ... ok (345µs)
+index.ts: mood never in subject, tags, URLs or events ... ok (790µs)
+
+ok | 21 passed | 0 failed (2s)
+

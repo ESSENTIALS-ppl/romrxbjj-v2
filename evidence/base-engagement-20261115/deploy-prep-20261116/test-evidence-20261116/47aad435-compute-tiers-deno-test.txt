@@ -1,0 +1,17 @@
+Check supabase/functions/compute-tiers/test/hip_flex_migration.test.ts
+Check supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts
+Check supabase/functions/compute-tiers/test/minimums_rescale.test.ts
+Check supabase/functions/compute-tiers/test/range_reset_pooled.test.ts
+Check supabase/functions/compute-tiers/test/rescore_saved.test.ts
+Check supabase/functions/compute-tiers/test/shoulder_er_85.test.ts
+Check supabase/functions/compute-tiers/test/steady_targets.test.ts
+Check supabase/functions/compute-tiers/test/t1_narrow_config.test.ts
+TS2305 [ERROR]: Module '"file:///tmp/arch-47aad435/supabase/functions/compute-tiers/joint_totals.ts"' has no exported member 'HIP_FLEX_UNSCORED'.
+import { HIP_FLEX_UNSCORED, isUnscoredJoint, romTotal, worstJointKeys } from "../joint_totals.ts";
+         ~~~~~~~~~~~~~~~~~
+    at file:///tmp/arch-47aad435/supabase/functions/compute-tiers/test/hip_flex_unscored.test.ts:2:10
+
+error: Type checking failed.
+
+  info: The program failed type-checking, but it still might work correctly.
+  hint: Re-run with --no-check to skip type-checking.
