@@ -1,0 +1,30 @@
+{
+ "at": "2026-11-16T14:39:14.173683+00:00",
+ "col": {
+  "type": "text",
+  "nullable": "NO",
+  "default": "'full'::text"
+ },
+ "values": [
+  {
+   "k": "full",
+   "n": 22
+  }
+ ],
+ "constraint": "CHECK ((check_kind = ANY (ARRAY['full'::text, 'quick'::text])))",
+ "index": "CREATE INDEX assessments_user_check_kind_assessed_at_idx ON public.assessments USING btree (user_id, check_kind, assessed_at DESC)",
+ "comment": "full = complete assessment (default). quick = scheduled 1-2 joint re-check; does not move next_retest_at.",
+ "assessments": 22,
+ "triggers": [
+  "assessments",
+  "assessments_clear_draft_ai",
+  "trg_assessments_autofill_athlete_id",
+  "zz_pe_assessment_inserted"
+ ],
+ "cron_md5_all": "2fa1e843681ee3c1d91f926be9c15159",
+ "cron_md5_1_12": "08757cf075ed473abc9b9f06e10bffd6",
+ "stored_version": "20261116143905",
+ "stored_stmt_md5": "5da9313a98dc82cfe2370070ffd7e6e5",
+ "n_migrations": 181,
+ "head": "20261116143905"
+}
