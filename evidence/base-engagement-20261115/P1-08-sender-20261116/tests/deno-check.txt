@@ -1,0 +1,2 @@
+Check supabase/functions/lifecycle-emails/source/index.ts
+Check supabase/functions/unsubscribe/source/index.ts

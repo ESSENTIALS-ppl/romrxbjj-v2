@@ -1,0 +1,101 @@
+Check supabase/functions/lifecycle-emails/test/day7-day14.test.ts
+Check supabase/functions/lifecycle-emails/test/default-tz-ny.test.ts
+Check supabase/functions/lifecycle-emails/test/deletion.test.ts
+Check supabase/functions/lifecycle-emails/test/lifecycle.test.ts
+Check supabase/functions/lifecycle-emails/test/p1-08-v4.test.ts
+Check supabase/functions/lifecycle-emails/test/score.test.ts
+Check supabase/functions/lifecycle-emails/test/sender-romrx.test.ts
+Check supabase/functions/lifecycle-emails/test/skip-quick.test.ts
+Check supabase/functions/lifecycle-emails/test/unsub-scopes.test.ts
+running 4 tests from ./supabase/functions/lifecycle-emails/test/day7-day14.test.ts
+P1-08 check7 and check14: due on the local due date and one grace day, once per assessment ... ok (14ms)
+P1-08 check7 counts from the schedule's last full assessment when present ... ok (780µs)
+P1-08 v2: P1-07 roll / quick check (next_check_at = next_retest_at) does not move check7 or flip day-14 to version B ... ok (2ms)
+P1-08 Stacy final words: day 7, day 14 A and B, exact subjects and lines, no scores or em dash ... ok (574µs)
+running 1 test from ./supabase/functions/lifecycle-emails/test/default-tz-ny.test.ts
+P1-08 v4 tz: invalid or missing timezone falls back to America/New_York; a stored timezone stays first ... ok (3ms)
+running 6 tests from ./supabase/functions/lifecycle-emails/test/deletion.test.ts
+no request anywhere: false, and the open-status filter is exactly requested + in_progress ... ok (718µs)
+open request in the new log: true ... ok (129µs)
+only the older client_feedback record exists: true ... ok (171µs)
+log table missing (42P01, before the migration): falls back to client_feedback, which still protects ... ok (170µs)
+any other error or exception fails closed (true = do not email) ... ok (163µs)
+the loader uses the real check, not a constant ... ok (878µs)
+running 31 tests from ./supabase/functions/lifecycle-emails/test/lifecycle.test.ts
+flag fail-safe: only exact lowercase 'on' ... ok (309µs)
+audience: only exact 'all' opens everyone ... ok (43µs)
+explicit opt-in: toggle true AND marker present; nothing else counts ... ok (121µs)
+audience: default-on, touched-but-unmarked and plain-saved rows get nothing in any kind ... ok (1ms)
+send time follows reminder_time and timezone (two timezones) ... ok (1ms)
+retry window: hour 0 to 2 after target, not 3 and not before ... ok (575µs)
+bad reminder_time or timezone fall back to 09:00 America/New_York ... ok (460µs)
+opt-outs: marketing_opt_out, deletion request, no/invalid email, not canary, no pref ... ok (290µs)
+retest: day 42 to 48 after the latest assessment, once per assessment id ... ok (922µs)
+protocol: skipped when a session is already logged that local date ... ok (512µs)
+digest delta is against the previous assessment, not last week; one assessment = no delta ... ok (807µs)
+digest: Sunday 09:00 local only, score change and streak only ... ok (515µs)
+email: no scores/health words in subject or preheader, no pixels, no em dash, headers and both opt-outs ... ok (724µs)
+digest body holds score change and streak only ... ok (68µs)
+token: sign, verify, scope bound, tamper, no/short secret fail closed ... ok (1ms)
+handler: no cron secret = 403 ... ok (5ms)
+handler: default is dry run with masked emails, no claims, no sends ... ok (1ms)
+handler: send flag values other than exact 'on' stay dry ... ok (5ms)
+handler: ?dry_run=1 beats the send flag ... ok (2ms)
+handler: live test-stage (no audience=all) mails only canary-listed users ... ok (1ms)
+handler: flag on with no 'all' and no canary list sends nothing ... ok (170µs)
+handler: already claimed = no send; send failure releases the claim; missing signing secret sends nothing ... ok (1ms)
+handler: LIFECYCLE_SUPPRESS_USER_IDS blocks a user even when everything else says send ... ok (175µs)
+Base From/Reply-To are ROMRx <hello@romrx.io> (P1-08, ROMRX_SENDER); sport-pack senders are unchanged ... ok (48µs)
+handler: footer links go to the brand confirm page, the one-click header goes to the POST endpoint with the brand ... ok (454µs)
+P1-16 lapsed: 14 local days quiet, skipped when day-14 check would also be due ... ok (1ms)
+P1-16 Stacy final words: exact subject and lines, no scores or em dash ... ok (228µs)
+P1-16 lapsed: protocol opt-in only, no plan skipped, recent sign-in is not quiet ... ok (474µs)
+P1-15 digest includes sessions this week and days to next check (Stacy CLEAR words) ... ok (341µs)
+P1-15 digest: omit next-check line when the schedule table/row is absent; today and 1-day wording ... ok (735µs)
+W1: digest and lapsed give the same next-check answer on days 1, 8, 20, 42, and 43 after assessment ... ok (1ms)
+running 2 tests from ./supabase/functions/lifecycle-emails/test/p1-08-v4.test.ts
+P1-08 v4: check14 sends on day 14 late local evening and not on day 15 ... ok (3ms)
+P1-08 v4: check7 is skipped when a quick check exists in the current cycle, and sent when none exists or the quick is from a previous cycle ... ok (2ms)
+running 6 tests from ./supabase/functions/lifecycle-emails/test/score.test.ts
+score: every assessment column the score reads is pinned in SCORE_COLUMNS ... ok (446µs)
+score: all joints at target = 100, half of target = 50, same function the apps use ... ok (1ms)
+score: hip flexion counts only for assessments at or after the cutover (as the apps gate it) ... ok (184µs)
+email number and label are exactly what the app shows (label per brand, delta vs previous assessment) ... ok (240µs)
+labels match the app source when the app worktrees are present (skipped elsewhere) ...
+------- post-test output -------
+  (6 app files compared)
+----- post-test output end -----
+labels match the app source when the app worktrees are present (skipped elsewhere) ... ok (3ms)
+digest copy never says last week ... ok (95µs)
+running 15 tests from ./supabase/functions/lifecycle-emails/test/sender-romrx.test.ts
+P1-08 sender constant is exactly ROMRx <hello@romrx.io> / hello@romrx.io and is the Base brand's sender ... ok (629µs)
+the six kinds are every kind the function sends ... ok (80µs)
+P1-08 sender: retest for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (9ms)
+P1-08 sender: retest for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (835µs)
+P1-08 sender: protocol for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (609µs)
+P1-08 sender: protocol for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (620µs)
+P1-08 sender: digest for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (915µs)
+P1-08 sender: digest for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (607µs)
+P1-08 sender: lapsed for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (1ms)
+P1-08 sender: lapsed for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (862µs)
+P1-08 sender: check7 for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (2ms)
+P1-08 sender: check7 for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (1ms)
+P1-08 sender: check14 for a Base user (active_sport null) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (1ms)
+P1-08 sender: check14 for a Base user (active_sport general) is From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io ... ok (882µs)
+sport-pack brands keep their own senders (not part of P1-08) ... ok (881µs)
+running 2 tests from ./supabase/functions/lifecycle-emails/test/skip-quick.test.ts
+must-fix b: latest/previous skip quick rows (NULL counts as full) ... ok (1ms)
+must-fix b: before check_kind exists, falls back to the old unfiltered read ... ok (94µs)
+running 9 tests from ./supabase/functions/lifecycle-emails/test/unsub-scopes.test.ts
+P1 scopes: every send kind has a scope (a P1 send can no longer fail closed for lack of one) ... ok (527µs)
+fixtures: each kind is due on its own scenario with a fully opted-in user ... ok (3ms)
+P1 scope check7: the email sends with a signed check7 token; unsubscribing stops it (and only its toggle's emails) ... ok (10ms)
+P1 scope check14: the email sends with a signed check14 token; unsubscribing stops it (and only its toggle's emails) ... ok (2ms)
+P1 scope lapsed: the email sends with a signed lapsed token; unsubscribing stops it (and only its toggle's emails) ... ok (3ms)
+regression: the four existing scopes switch off exactly what they did in v12 ... ok (7ms)
+'all' blocks check7, check14, lapsed and every other P1 kind (also each half alone: marketing_opt_out, toggles off) ... ok (2ms)
+tampered or unknown scope is still rejected; nothing is switched off ... ok (5ms)
+no signing secret: P1 kinds still fail closed (no email without opt-out links) ... ok (2ms)
+
+ok | 76 passed | 0 failed (746ms)
+
