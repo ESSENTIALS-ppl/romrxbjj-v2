@@ -8,8 +8,8 @@
 //  - Nothing is sent to users with marketing_opt_out, with a pending deletion request, or with no email.
 //  - No scores in reminders. The digest holds the overall score change and the streak count only.
 
-export type Kind = "retest" | "protocol" | "digest" | "lapsed";
-export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed"];
+export type Kind = "retest" | "protocol" | "digest" | "lapsed" | "check7" | "check14";
+export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed", "check7", "check14"];
 
 /** Fail-safe flag rule: ON only when the value is exactly the lowercase string "on". */
 export function flagOn(v: string | null | undefined): boolean { return v === "on"; }
@@ -57,6 +57,8 @@ export interface Candidate {
   schedule?: { last_assessment_id: string | null; last_assessed_at: string | null; next_retest_at: string | null; next_check_at: string | null } | null;
   /** auth.users.last_sign_in_at, when loaded. */
   last_sign_in_at?: string | null;
+  /** True when a check_kind=quick assessment exists after the last full one (loader; fail-soft if the column is missing). */
+  has_quick_check?: boolean;
 }
 export interface Due {
   kind: Kind; user_id: string; email: string; first_name: string; active_sport: string | null;
@@ -73,6 +75,7 @@ export interface Due {
 const FIELD: Record<Kind, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
   retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
   lapsed: "email_reminders",
+  check7: "retest_reminders", check14: "retest_reminders",
 };
 
 export function validTz(tz: string | null | undefined): tz is string {
@@ -102,6 +105,7 @@ export function reminderHour(t: string | null | undefined): number {
 const MARKER: Record<Kind, "retest_opt_in_at" | "protocol_opt_in_at" | "digest_opt_in_at"> = {
   retest: "retest_opt_in_at", protocol: "protocol_opt_in_at", digest: "digest_opt_in_at",
   lapsed: "protocol_opt_in_at",
+  check7: "retest_opt_in_at", check14: "retest_opt_in_at",
 };
 /** True only for a toggle that is true AND carries an explicit opt-in marker (set only by set_reminder_opt_in when the user turned it on).
  *  A default-on row, a plain save of the form, or an old "touched" row has no marker and gets nothing. */
@@ -146,14 +150,14 @@ export function assessmentLocalDate(c: Candidate, tz: string | null | undefined)
   if (!Number.isFinite(t)) return null;
   return localParts(new Date(t), tz).date;
 }
-/** True when the user's local date is on the check due day or the one grace day after it. */
+export function assessmentIdOf(c: Candidate): string | null {
+  const id = c.schedule?.last_assessment_id || c.latest_assessment?.id;
+  return id ? String(id) : null;
+}
+/** True when the user's local date is on the check due day or the one grace day after it.
+ *  Both checks count from the last FULL assessment's local date (+7 / +14). Not from schedule.next_check_at: after the P1-07
+ *  roll (rule 3) or a quick check (rule 2) next_check_at equals the retest date, which would move check7 to ~day 42. */
 export function checkDueOn(kind: "check7" | "check14", nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
-  if (kind === "check7" && c.schedule?.next_check_at) {
-    const dueAt = Date.parse(c.schedule.next_check_at);
-    if (!Number.isFinite(dueAt)) return false;
-    const due = localParts(new Date(dueAt), tz).date;
-    return nowDate >= due && nowDate < ymdAdd(due, CHECK_GRACE_DAYS + 1);
-  }
   const start = assessmentLocalDate(c, tz);
   if (!start) return false;
   const due = ymdAdd(start, kind === "check7" ? CHECK7_DAYS : CHECK14_DAYS);
@@ -243,6 +247,21 @@ export function lapsedNextLine(c: Candidate, tz: string | null | undefined, now:
 }
 
 
+/** Day-14 email version B only when a real quick row exists after the last full assessment (loader sets has_quick_check).
+ *  No schedule fallback: after the P1-07 roll next_check_at = next_retest_at for everyone, so it no longer means "quick done". */
+export function quickCheckDone(c: Candidate): boolean {
+  return c.has_quick_check === true;
+}
+
+function retestIsoOf(c: Candidate): string | null {
+  if (c.schedule?.next_retest_at) return c.schedule.next_retest_at;
+  const a = c.schedule?.last_assessed_at || c.latest_assessment?.assessed_at;
+  if (!a) return null;
+  const t = Date.parse(a);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + RETEST_DAYS * 86400000).toISOString();
+}
+
 export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string> }) {
   const due: Due[] = [];
   const skipped: Partial<Record<SkipReason, number>> = {};
@@ -273,6 +292,18 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       if (checkDueOn("check14", lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
       const last = lastActivityLocalDate(c, c.pref.timezone) ?? lp.date;
       due.push({ ...base, email_id: `lc-lapsed-${last}`, next_check_line: lapsedNextLine(c, c.pref.timezone, now, lp.date) });
+    } else if (kind === "check7" || kind === "check14") {
+      const id = assessmentIdOf(c);
+      if (!id || (!c.latest_assessment && !c.schedule?.last_assessed_at)) { skip("no_assessment"); continue; }
+      if (!checkDueOn(kind, lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
+      const done = quickCheckDone(c);
+      due.push({
+        ...base,
+        email_id: `lc-${kind}-${id}`,
+        retest_date: friendlyDate(retestIsoOf(c), c.pref.timezone, now),
+        next_check_date: friendlyDate(c.schedule?.next_retest_at ?? retestIsoOf(c), c.pref.timezone, now),
+        quick_check_done: done,
+      });
     } else if (kind === "protocol") {
       if (!PROTOCOL_DAYS.includes(lp.dow)) { skip("wrong_weekday"); continue; }
       if (!c.has_protocol) { skip("no_protocol"); continue; }

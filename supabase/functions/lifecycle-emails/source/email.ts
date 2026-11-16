@@ -55,14 +55,61 @@ export const ALL_OFF_TEXT = "Turn off all ROMRx emails except account and billin
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+export const QUICK_CHECK_PATH = "/dashboard/quick-check"; // must match Jules P1-06 route
 
 export interface CopySpec {
   subject: string; preheader: string; lines: string[]; button: string; path: string;
   why: string; off: string; afterButton?: string[]; sentTo: boolean;
 }
 
-/** Stacy P1-16 final words, used exactly. Jim wording yes still required before any send. */
+/** Stacy P1-16 final words, used exactly. Jim wording yes still required before any send.
+ *  Stacy P1-08 day 7 / day 14 A+B words, used exactly. */
 export function copyFor(d: Due, brand?: Brand): CopySpec {
+  if (d.kind === "check7") {
+    const retest = d.retest_date ? `Your full retest is still at 6 weeks, on ${d.retest_date}.` : "Your full retest is still at 6 weeks.";
+    return {
+      subject: "Your ROMRx quick check is ready",
+      preheader: "See your day 1 results next to today's.",
+      lines: [
+        "It has been a week since your ROMRx assessment. Your quick check is ready.",
+        "It re-measures 1 or 2 of your focus areas and shows them next to your day 1 results.",
+        retest,
+      ],
+      button: "Start my quick check", path: QUICK_CHECK_PATH,
+      why: "You're getting this because Check reminders is on in your ROMRx settings.",
+      off: "Turn off check reminders", sentTo: true,
+    };
+  }
+  if (d.kind === "check14" && d.quick_check_done) {
+    const next = d.next_check_date ? `Your next check: ${d.next_check_date}` : null;
+    return {
+      subject: "Two weeks of ROMRx",
+      preheader: "Your next check date is set.",
+      lines: [
+        "You did your quick check. Nice work.",
+        ...(next ? [next] : []),
+        "Until then, your plan is ready each day in the app.",
+      ],
+      button: "Open today's session", path: "/dashboard/my-protocol",
+      why: "You're getting this because Check reminders is on in your ROMRx settings.",
+      off: "Turn off check reminders", sentTo: true,
+    };
+  }
+  if (d.kind === "check14") {
+    const retest = d.retest_date ? `Your full retest is on ${d.retest_date}.` : "Your full retest is still at 6 weeks.";
+    return {
+      subject: "Your quick check is waiting",
+      preheader: "Two weeks in. See where you are now.",
+      lines: [
+        "It has been two weeks since your ROMRx assessment. Your quick check is ready when you are.",
+        "It shows your day 1 results next to today's for 1 or 2 of your focus areas.",
+        retest,
+      ],
+      button: "Start my quick check", path: QUICK_CHECK_PATH,
+      why: "You're getting this because Check reminders is on in your ROMRx settings.",
+      off: "Turn off check reminders", sentTo: true,
+    };
+  }
   if (d.kind === "lapsed") {
     const settings = brand ? `${brand.appBase}${brand.settingsPath}` : "/dashboard/settings";
     return {

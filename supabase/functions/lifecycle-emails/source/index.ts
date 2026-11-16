@@ -1,4 +1,4 @@
-// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
+// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed + P1-08 day 7 / day 14. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
 // Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed). Dry run unless LIFECYCLE_EMAILS_SEND === "on".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -56,17 +56,25 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
     try {
       const { data: sch, error: schErr } = await sb.from("user_mobility_schedule").select("last_assessment_id, last_assessed_at, next_retest_at, next_check_at").eq("user_id", p.user_id).maybeSingle();
       if (!schErr && sch) schedule = sch as Candidate["schedule"];
-    } catch { schedule = null; } // table may not exist yet; nextCheck omits the line in both emails
+    } catch { schedule = null; } // table may not exist until the P1-07 030000 migration is applied; nextCheck omits the line
     let lastSignIn: string | null = null;
     try {
       const { data: au } = await sb.auth.admin.getUserById(p.user_id);
       lastSignIn = au?.user?.last_sign_in_at ?? null;
     } catch { lastSignIn = null; }
+    let hasQuick = false;
+    try {
+      const since = schedule?.last_assessed_at ?? a?.assessed_at; // quick rows after the last full assessment only
+      if (since) {
+        const { data: q, error: qErr } = await sb.from("assessments").select("id").eq("user_id", p.user_id).eq("check_kind", "quick").gt("assessed_at", since).limit(1);
+        if (!qErr && q && q.length) hasQuick = true;
+      }
+    } catch { hasQuick = false; } // column may not exist until the P1-06 check_kind migration is applied
     out.push({
       user_id: p.user_id, email: u.email, full_name: u.full_name, active_sport: u.active_sport, marketing_opt_out: u.marketing_opt_out,
       deletion_requested: await deletionRequested(sb, p.user_id), pref: p as never, latest_assessment: a, latest_score: latestScore, previous_score: previousScore,
       session_dates: (s ?? []).map((r) => String(r.session_date)), has_protocol: (count ?? 0) > 0,
-      schedule, last_sign_in_at: lastSignIn,
+      schedule, last_sign_in_at: lastSignIn, has_quick_check: hasQuick,
     });
   }
   return out;
