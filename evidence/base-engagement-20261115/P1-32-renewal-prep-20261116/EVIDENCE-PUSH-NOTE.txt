@@ -1,0 +1,4 @@
+P1-32 renewal deploy prep, evidence copy (2026-11-16, Avery). Not listed in SHA256SUMS.
+Source folder: /workspace/process/batches/base-engagement-20261115/P1-32-renewal-prep-20261116/ (SHA256SUMS sha256 2c91adc76f76999f19b67703e1837d141040441362d3258deccaca5517d7feb2, 49 entries).
+Pushed: the files here (16), checked with sha256sum -c --ignore-missing.
+Kept local only (34), because they contain addresses other than hello@romrx.io, reid@romrx.io and user@example.com: the sport sender addresses in the diffs, patch, live v26 index.ts and all render/ files; the approved file's own placeholder recipient in harness/*.ts. previews/*.request.json are also kept local (the address scan flags a JSON "\n" escape next to hello@romrx.io).

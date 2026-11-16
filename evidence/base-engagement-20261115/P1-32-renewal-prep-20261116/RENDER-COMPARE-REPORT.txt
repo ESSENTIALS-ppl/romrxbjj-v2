@@ -1,0 +1,16 @@
+approved file sha256=2bf843e394c2f685aec83d844aaad1a8b9b10962afb0fb99e3305ea49d4a6e92 (expect 2bf843e3...)
+BYTE_MATCH_VS_2bf843e3=true (rebuilt 3766 bytes, approved 3766 bytes, rebuilt sha256=2bf843e394c2f685aec83d844aaad1a8b9b10962afb0fb99e3305ea49d4a6e92)
+from=ROMRx <hello@romrx.io> FROM_OK=true
+reply_to=hello@romrx.io REPLY_TO_OK=true (2bf843e3 line 6 says "Reply-To: hello@romrx.io")
+base 45 days: subject="Your ROMRx Base membership renews in 45 days" SECTION_MATCH_VS_2bf843e3=true HTML_CARRIES_ALL_TEXT_LINES=true HTML_SAME_AS_VERA_PASSED_PREVIEW(recipient swapped)=true html_sha256=6b9a694fa734 text_sha256=5ed3d0b20394
+base 30 days: subject="Your ROMRx Base membership renews in 30 days" SECTION_MATCH_VS_2bf843e3=true HTML_CARRIES_ALL_TEXT_LINES=true HTML_SAME_AS_VERA_PASSED_PREVIEW(recipient swapped)=true html_sha256=041e155485af text_sha256=1234b9e03680
+base 2 days: subject="Your ROMRx Base membership renews in 2 days: last chance to cancel" SECTION_MATCH_VS_2bf843e3=true HTML_CARRIES_ALL_TEXT_LINES=true HTML_SAME_AS_VERA_PASSED_PREVIEW(recipient swapped)=true html_sha256=f8f7422d5453 text_sha256=44cb8eb77550
+bjj 45 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 bdafb64626a9)
+bjj 30 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 e66adc8581fd)
+bjj 2 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 62f0a6f2cb39)
+bodybuilding 45 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 cc4f25594c8e)
+bodybuilding 30 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 ae5121185b0f)
+bodybuilding 2 days: html IDENTICAL, subject IDENTICAL, from/reply_to IDENTICAL, resend request body IDENTICAL (html sha256 06718259a624)
+SPORT_ALL_IDENTICAL_VS_LIVE_V26=true
+ROUTING null->base ""->base "general"->base "base"->base "Base"->base "BJJ"->base " bjj"->base "Bodybuilding"->base "yoga"->base "bjj"->bjj "bodybuilding"->bodybuilding ROUTING_OK=true
+ALL_OK=true

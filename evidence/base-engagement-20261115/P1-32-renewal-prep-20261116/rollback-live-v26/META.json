@@ -1,0 +1,13 @@
+{
+ "id": "891d3add-5646-4f98-84c1-c062454fdea0",
+ "slug": "send-renewal-reminders",
+ "name": "send-renewal-reminders",
+ "status": "ACTIVE",
+ "version": 26,
+ "created_at": 1779994599102,
+ "updated_at": 1793674592530,
+ "verify_jwt": false,
+ "import_map": false,
+ "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_891d3add-5646-4f98-84c1-c062454fdea0_25/source/source/index.ts",
+ "ezbr_sha256": "dece2cb78932a506618281454dad3fb9f7d15ffb50d69ed5663d31edfe615dda"
+}
