@@ -1,0 +1,18 @@
+{
+  "slug": "unsubscribe",
+  "status": "ACTIVE",
+  "version": 13,
+  "ezbr_sha256": "cfb084bb0afa91b1399a0fa8e269ad736ae445bd46f535cfd7aeb5c92fba7157",
+  "updated_at": 1794837450073,
+  "verify_jwt": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_d7eaa2d5-647f-4936-a879-e3ff25e8db2b_13/source/source/index.ts",
+  "updated_at_et": "Mon Nov 16, 2026 8:57:30 AM ET",
+  "files": [
+    "source/index.ts",
+    "_shared/rate_limit.ts",
+    "_shared/events.ts",
+    "source/token_path.ts",
+    "_shared/unsub_token.ts"
+  ],
+  "read_at_et": "Mon Nov 16, 2026 8:57:41 AM ET"
+}

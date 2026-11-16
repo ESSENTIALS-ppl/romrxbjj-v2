@@ -1,0 +1,23 @@
+{
+  "slug": "lifecycle-emails",
+  "status": "ACTIVE",
+  "version": 3,
+  "ezbr_sha256": "d68e443bbcefeafc523b1452bd5fcee82aed76e546e0074e1e78213dbafaf91e",
+  "updated_at": 1794837533365,
+  "verify_jwt": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_612296fe-7b65-4062-919f-d6a6bcc14657_3/source/source/index.ts",
+  "updated_at_et": "Mon Nov 16, 2026 8:58:53 AM ET",
+  "files": [
+    "source/index.ts",
+    "source/handler.ts",
+    "source/logic.ts",
+    "source/email.ts",
+    "source/score.ts",
+    "_shared/mobility/mobilityBands.ts",
+    "_shared/mobility/lumbarFlag.ts",
+    "_shared/email_footer.ts",
+    "_shared/unsub_token.ts",
+    "source/deletion.ts"
+  ],
+  "read_at_et": "Mon Nov 16, 2026 8:59:03 AM ET"
+}
