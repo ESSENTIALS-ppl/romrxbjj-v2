@@ -8,6 +8,10 @@ import { APP_PATH } from "./logic.ts";
  *  (lifecycle-emails/source/email.ts). Defined here so this function does not depend on that deploy. A test pins the two equal
  *  whenever lifecycle-emails exports it. HELD with P1-08: no send before Jim's sender yes is relayed. */
 export const ROMRX_SENDER = { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" } as const;
+/** P1-17 Reply-To (Grant 9:42 AM ET Nov 16, citing ledger file line 695, Oct 20: support replies come from reid@romrx.io;
+ *  hello@romrx.io stays the general inbound address). The From stays ROMRX_SENDER.from. The footer contact line keeps
+ *  hello@romrx.io as the general inbound address. */
+export const CHECKIN_REPLY_TO = "reid@romrx.io";
 export const BASE_BRAND = { key: "base", name: "ROMRx", appBase: "https://romrx.io/app" } as const;
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -36,7 +40,7 @@ ${p(r.line3)}
     `${FOOTER.why} ${FOOTER.off}: ${links.offKind}`, `${FOOTER.allOff}: ${links.offAll}`, "", postalLine, ROMRX_SENDER.replyTo, sentTo,
   ].join("\n");
   return {
-    from: ROMRX_SENDER.from, replyTo: ROMRX_SENDER.replyTo, subject: r.subject, html, text,
+    from: ROMRX_SENDER.from, replyTo: CHECKIN_REPLY_TO, subject: r.subject, html, text,
     headers: { "List-Unsubscribe": `<${links.oneClick}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
   };
 }

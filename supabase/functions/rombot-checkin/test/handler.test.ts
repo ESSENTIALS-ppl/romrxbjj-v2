@@ -3,7 +3,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { type Deps, handle, type NoteInsert } from "../source/handler.ts";
 import type { Built } from "../source/email.ts";
-import { ROMRX_SENDER } from "../source/email.ts";
+import { CHECKIN_REPLY_TO, ROMRX_SENDER } from "../source/email.ts";
 import { verifyUnsubToken } from "../_shared/unsub_token.ts";
 import { handleTokenRequest, ONE_CLICK_BODY, SCOPE_COLUMN } from "../../unsubscribe/source/token_path.ts";
 import { SCOPE_SETTING } from "../../unsubscribe/_shared/unsub_token.ts";
@@ -68,13 +68,15 @@ Deno.test("one check-in per assessment: a second run is a no-op", async () => {
   assertEquals(j2.results.already, 1);
   assertEquals([log.notes.length, log.sends.length], [1, 1]);
 });
-Deno.test("email fallback: Base sender ROMRx <hello@romrx.io>, Stacy subject, opener, one-click unsubscribe", async () => {
+Deno.test("email fallback: From ROMRx <hello@romrx.io>, Reply-To reid@romrx.io (Grant 9:42 AM, L695), Stacy subject, opener, one-click unsubscribe", async () => {
   const { d, log } = deps(ON);
   const j = await (await handle(req(), d)).json();
   assertEquals(j.results.emails_sent, 1);
   const { to, b } = log.sends[0];
   assertEquals(to, "user@example.com");
-  assertEquals([b.from, b.replyTo], ["ROMRx <hello@romrx.io>", "hello@romrx.io"]);
+  assertEquals([b.from, b.replyTo], ["ROMRx <hello@romrx.io>", "reid@romrx.io"]);
+  assertEquals(CHECKIN_REPLY_TO, "reid@romrx.io");
+  assert(b.html.includes('href="mailto:hello@romrx.io"')); // footer contact stays the general inbound address
   assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
   assertEquals(b.subject, "Your plan is ready, Sam");
   assert(b.text.startsWith("ROMBot here.\n\nHey Sam, ROMBot here."));
