@@ -1,0 +1,182 @@
+[
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-04",
+    "day": 3,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-11-08T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-08",
+    "day": 7,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-11-08T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-09",
+    "day": 8,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-11-08T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-11",
+    "day": 10,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-11-08T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "quick on day 10",
+    "today": "2026-11-11",
+    "day": 10,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-12-13T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-15",
+    "day": 14,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-11-08T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-16",
+    "day": 15,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-12-13T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-11-21",
+    "day": 20,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-12-13T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "quick on day 10",
+    "today": "2026-11-21",
+    "day": 20,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-12-13T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "no quick check",
+    "today": "2026-12-13",
+    "day": 42,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-11-01T12:00:00.000Z",
+      "next_check_at": "2026-12-13T12:00:00.000Z",
+      "next_retest_at": "2026-12-13T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "full retest day 42",
+    "today": "2026-12-13",
+    "day": 0,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-12-13T12:00:00.000Z",
+      "next_check_at": "2026-12-20T12:00:00.000Z",
+      "next_retest_at": "2027-01-24T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "full retest day 42",
+    "today": "2026-12-20",
+    "day": 7,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-12-13T12:00:00.000Z",
+      "next_check_at": "2026-12-20T12:00:00.000Z",
+      "next_retest_at": "2027-01-24T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "full retest day 42",
+    "today": "2026-12-21",
+    "day": 8,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-12-13T12:00:00.000Z",
+      "next_check_at": "2026-12-20T12:00:00.000Z",
+      "next_retest_at": "2027-01-24T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "full retest day 42",
+    "today": "2026-12-27",
+    "day": 14,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-12-13T12:00:00.000Z",
+      "next_check_at": "2026-12-20T12:00:00.000Z",
+      "next_retest_at": "2027-01-24T12:00:00.000Z"
+    }
+  },
+  {
+    "scenario": "full retest day 42",
+    "today": "2026-12-28",
+    "day": 15,
+    "tz": "America/Chicago",
+    "schedule": {
+      "last_assessment_id": "a",
+      "last_assessed_at": "2026-12-13T12:00:00.000Z",
+      "next_check_at": "2027-01-24T12:00:00.000Z",
+      "next_retest_at": "2027-01-24T12:00:00.000Z"
+    }
+  }
+]
