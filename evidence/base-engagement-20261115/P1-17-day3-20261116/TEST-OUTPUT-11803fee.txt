@@ -1,0 +1,84 @@
+Check rombot-checkin/test/crisis.test.ts
+Check rombot-checkin/test/email-words.test.ts
+Check rombot-checkin/test/emails.test.ts
+Check rombot-checkin/test/handler.test.ts
+Check rombot-checkin/test/logic.test.ts
+Check rombot-checkin/test/shared.test.ts
+Check rombot-checkin/test/words.test.ts
+running 2 tests from ./rombot-checkin/test/crisis.test.ts
+live ai-chat v96 crisis route answers pain or red-flag replies in the check-in conversation; benign replies go to ROMBot ... ok (73ms)
+the check-in chat is owned by the user, so ai-chat's ownership check (FG-06) lets replies in and the crisis route runs ... ok (247µs)
+running 8 tests from ./rombot-checkin/test/email-words.test.ts
+email words equal Stacy's 9d8fe291 items 3 and 4 byte for byte; B and C change ONLY the last line ... ok (853µs)
+no day count in any email: no "3 days", no digit+day phrasing (text, html, subject; every branch, name, n and area) ... ok (1ms)
+no "tell me here" in any email; every email's last line says "open ROMBot and tell me" (Open at sentence start) ... ok (650µs)
+Branch A email still says "ROMBot here." exactly once; B and C keep the 6fd272b6 email opener ... ok (1ms)
+in-app notes: all three branches (named and no-name) are byte-unchanged vs 35b2b00e, and keep "tell me here" wording ... ok (1ms)
+{today_area} is worked out on the send day: the area changes between note and email, and the email uses the new one ... ok (1ms)
+area allowlist still holds in every rendered email and note ... ok (3ms)
+Stacy's 9d8fe291 file itself: sha256 matches and items 3 and 4 are re-read from it byte for byte ... ok (1ms)
+running 12 tests from ./rombot-checkin/test/emails.test.ts
+constants: wait at least 24 h, window closes 72 h after the note ... ok (750µs)
+23h59m after the note: no send (too_soon), even at the reminder hour ... ok (451µs)
+24 h+ after the note with no activity, at the reminder hour on a plan day: send, branch A words for today ... ok (1ms)
+the hourly run that lands 1 s short of 24 h waits, and the next run in the window sends ... ok (365µs)
+activity since the note, each kind: no send, ever ... ok (784µs)
+wrong hour: waits (outside_send_window), then sends at the next day's reminder hour inside 72 h ... ok (463µs)
+non-plan day: waits (not_plan_day), then sends on the next plan day at the reminder hour ... ok (440µs)
+window closes: more than 72 h after the note, no send ... ok (84µs)
+at most one email per note: email_already skips ... ok (53µs)
+no note yet: nothing planned and nothing counted ... ok (53µs)
+every other gate stays: P1-01 opt-in, marketing opt-out, address, Base brand, audience, Base active, test, deletion ... ok (207µs)
+send hour rule is the note's: empty reminder_time and no zone means 9:00 New York ... ok (306µs)
+running 14 tests from ./rombot-checkin/test/handler.test.ts
+cron secret required ... ok (6ms)
+dry by default: no switch set = plan only, no claim, no note, no email, emails masked ... ok (6ms)
+canary audience with no ids writes nothing ... ok (233µs)
+in-app note: assistant message in a new Base ROMBot chat, no title, button in context_snapshot; no email in the same run ... ok (610µs)
+Q4: the in-app note is written for non opt-ins, marketing opt-outs and sport-pack brands too ... ok (1ms)
+one check-in per assessment: a second run is a no-op ... ok (777µs)
+email fallback in a later run: Base sender ROMRx <hello@romrx.io>, Stacy subject, Branch A no extra opener, one-click unsubscribe ... ok (2ms)
+at most one email per note: a second later run is a no-op ... ok (1ms)
+LIFECYCLE_EMAILS_SEND not on: email held, not claimed, not sent ... ok (1ms)
+activity since the note, or a non opt-in: no email ... ok (1ms)
+no signing secret: no email (fail closed), nothing claimed ... ok (569µs)
+failed note insert releases the note claim; failed send releases the email claim ... ok (2ms)
+suppress list is treated as a pending deletion request (no note, no email) ... ok (192µs)
+unsubscribe: links carry live scopes only (protocol and all); the live unsubscribe path turns off Plan day reminders ... ok (2ms)
+running 15 tests from ./rombot-checkin/test/logic.test.ts
+send-time: reminder_time set wins (stored zone) ... ok (1ms)
+send-time: empty reminder_time with a stored zone gives 9:00 in that zone ... ok (556µs)
+send-time: empty reminder_time and no zone gives 9:00 America/New_York (no Chicago fallback) ... ok (360µs)
+send-time: a saved 07:00 is the user's choice and is honored (Grant: leave the Settings pre-fill alone) ... ok (51µs)
+send-time drives the window: 7:30 ET sends for 07:00, not for an empty time (9:00) ... ok (2ms)
+day 3 only: local assessment date + 3, nothing on day 2 or day 4 ... ok (422µs)
+branch selection: 0 = A, 1 to 2 = B, 3 or more = C ... ok (1ms)
+branch C: skipped after a session in the last 12 hours, and when next_check_at is unknown or not in the future ... ok (920µs)
+{next_check_date} format is Stacy's "Monday, Dec 28" ... ok (180µs)
+plan days are every weekday today ... ok (93µs)
+Q4: the in-app note goes to every eligible Base user whatever their email opt-in, marketing setting, address or brand ... ok (1ms)
+stop rules: audience, Base active, test account, deletion, first full assessment only, red flag, plan, recent ROMBot message ... ok (1ms)
+today_area follows MyProtocol ROTATION on the user's local weekday, body part names only ... ok (101µs)
+first name: plain first word only, else the no-name copy (HTML-safe for ROMBot.tsx) ... ok (347µs)
+note claim id: one note per assessment ... ok (390µs)
+running 4 tests from ./rombot-checkin/test/shared.test.ts
+vendored files are byte-identical to lifecycle-emails (unsub_token, email_footer, deletion) ... ok (1ms)
+plan days are lifecycle-emails PROTOCOL_DAYS ... ok (109µs)
+P1-01 consent rule equals lifecycle-emails explicitOn(pref, "protocol") ... ok (140µs)
+sender equals b19b13dc ROMRX_SENDER (and lifecycle-emails' export, once that deploy is in this tree) ... ok (1ms)
+running 12 tests from ./rombot-checkin/test/words.test.ts
+branch A: line 1, button and line 3 equal Stacy's final copy byte for byte ... ok (546µs)
+branch B: line 1, button and line 3 equal Stacy's final copy byte for byte ... ok (43µs)
+branch C: line 1, button and line 3 equal Stacy's final copy byte for byte ... ok (17µs)
+remaining word, email opener and subject no-name rule are Stacy's ... ok (127µs)
+sign-off is plain ROMBot: no "Jim's ROMBot" and no Reid draft words anywhere in the copy ... ok (540µs)
+no em dashes, en dashes or spaced hyphens in any user-facing string ... ok (187µs)
+rendered examples, named and no-name, every branch ... ok (253µs)
+a missing placeholder value throws instead of sending a broken message ... ok (352µs)
+footer strings are the live lifecycle-emails ones (no new footer words) ... ok (1ms)
+email opener: Branch A says "ROMBot here." exactly once (text and html, named and no-name); B and C open with it ... ok (467µs)
+area words: everything the code can emit is one of hips, shoulders, neck, ankles (plain words, no clinical terms, degrees or bands) ... ok (977µs)
+Stacy's file itself: sha256 matches and every string is re-read from it byte for byte ... ok (807µs)
+
+ok | 67 passed | 0 failed (615ms)
+

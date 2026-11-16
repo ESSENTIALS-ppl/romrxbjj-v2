@@ -1,0 +1,164 @@
+===== Branch A (named, n=0) =====
+-- in-app ai_messages.content --
+Hey Sam, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?
+If something got in the way, tell me here and I'll help you find an easier way in.
+-- in-app button (context_snapshot, needs client) -- Start today's session
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: Your plan is ready, Sam
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+Hey Sam, ROMBot here. Your plan is ready whenever you are. Today's focus is your hips. It's short, and you can do it now. Want to start?
+
+Start today's session: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+If something got in the way, open ROMBot and tell me. I'll help you find an easier way in.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
+===== Branch A (no name, n=0) =====
+-- in-app ai_messages.content --
+Hey there, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?
+If something got in the way, tell me here and I'll help you find an easier way in.
+-- in-app button (context_snapshot, needs client) -- Start today's session
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: Your plan is ready
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+Hey there, ROMBot here. Your plan is ready whenever you are. Today's focus is your hips. It's short, and you can do it now. Want to start?
+
+Start today's session: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+If something got in the way, open ROMBot and tell me. I'll help you find an easier way in.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
+===== Branch B (named, n=1) =====
+-- in-app ai_messages.content --
+Nice work, Sam. You've done 1 session since your assessment. Two more and you reach your week 1 goal of 3 sessions. Today's focus is your shoulders.
+Anything feel too easy or too hard? Tell me and I'll help you adjust how you do it.
+-- in-app button (context_snapshot, needs client) -- Start today's session
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: 1 done. Two more for your week 1 goal
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+ROMBot here.
+
+Nice work, Sam. You've done 1 session since your assessment. Two more and you reach your week 1 goal of 3 sessions. Today's focus is your shoulders.
+
+Start today's session: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+Anything feel too easy or too hard? Open ROMBot and tell me, and I'll help you adjust how you do it.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
+===== Branch B (no name, n=2) =====
+-- in-app ai_messages.content --
+Nice work. You've done 2 sessions since your assessment. One more and you reach your week 1 goal of 3 sessions. Today's focus is your neck.
+Anything feel too easy or too hard? Tell me and I'll help you adjust how you do it.
+-- in-app button (context_snapshot, needs client) -- Start today's session
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: 2 done. One more for your week 1 goal
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+ROMBot here.
+
+Nice work. You've done 2 sessions since your assessment. One more and you reach your week 1 goal of 3 sessions. Today's focus is your neck.
+
+Start today's session: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+Anything feel too easy or too hard? Open ROMBot and tell me, and I'll help you adjust how you do it.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
+===== Branch C (named, n=4) =====
+-- in-app ai_messages.content --
+Sam, 4 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Friday, Nov 20. That's when you measure again and see where you are.
+If any move doesn't feel right, tell me here.
+-- in-app button (context_snapshot, needs client) -- See my plan
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: Strong start, Sam
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+ROMBot here.
+
+Sam, 4 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Friday, Nov 20. That's when you measure again and see where you are.
+
+See my plan: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+If any move doesn't feel right, open ROMBot and tell me.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
+===== Branch C (no name, n=3) =====
+-- in-app ai_messages.content --
+3 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Friday, Nov 20. That's when you measure again and see where you are.
+If any move doesn't feel right, tell me here.
+-- in-app button (context_snapshot, needs client) -- See my plan
+-- email headers --
+From: ROMRx <hello@romrx.io>
+Reply-To: hello@romrx.io
+To: user@example.com
+Subject: Strong start
+List-Unsubscribe: <<signed protocol-scope one-click URL>>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+-- email text part --
+ROMBot here.
+
+3 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Friday, Nov 20. That's when you measure again and see where you are.
+
+See my plan: https://romrx.io/app/dashboard/my-protocol?src=checkin-d3
+
+If any move doesn't feel right, open ROMBot and tell me.
+
+You're getting this because Plan day reminders is on in your ROMRx settings. Turn off plan day reminders: <signed protocol-scope confirm link>
+Turn off all ROMRx emails except account and billing notices: <signed all-scope confirm link>
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+hello@romrx.io
+This message was sent to user@example.com.
+
