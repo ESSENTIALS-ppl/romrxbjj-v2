@@ -1,0 +1,24 @@
+{
+ "at": "2026-11-16T14:40:07.887463+00:00",
+ "fn_md5": "cac00772b1236dd1fe99c8a4e6fb032b",
+ "fn_has_quick": true,
+ "fn_def": "CREATE OR REPLACE FUNCTION public.tg_pe_assessment_inserted()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_measured int; v_prior int;\nbegin\n  select count(*) into v_measured from jsonb_each_text(to_jsonb(new)) e\n   where e.value is not null and (e.key like 'hip_%' or e.key like 'shoulder_%' or e.key like 'ankle_%' or e.key like 'cervical_%' or e.key like 'lumbar_%' or e.key like 'thoracic_%' or e.key like 'balance_%');\n  if new.check_kind is not distinct from 'quick' then\n    perform public.log_product_event(new.user_id, 'quick_recheck_submitted',\n      jsonb_build_object('assessment_id', new.id, 'measured_fields', v_measured),\n      new.sport);\n    return new;\n  end if;\n  select count(*) into v_prior from public.assessments a\n   where a.user_id = new.user_id and a.id <> new.id and a.check_kind is distinct from 'quick';\n  perform public.log_product_event(new.user_id, 'assessment_submitted',\n    jsonb_build_object('assessment_id', new.id, 'measured_fields', v_measured, 'is_reassessment', v_prior > 0, 'prior_count', v_prior),\n    new.sport);\n  return new;\nend; $function$\n",
+ "secdef": true,
+ "config": [
+  "search_path=public"
+ ],
+ "acl": "{postgres=X/postgres,service_role=X/postgres}",
+ "anon_exec": false,
+ "auth_exec": false,
+ "trigger": {
+  "name": "zz_pe_assessment_inserted",
+  "enabled": "O",
+  "def": "CREATE TRIGGER zz_pe_assessment_inserted AFTER INSERT ON public.assessments FOR EACH ROW EXECUTE FUNCTION tg_pe_assessment_inserted()"
+ },
+ "product_events": 9603,
+ "cron_md5_all": "2fa1e843681ee3c1d91f926be9c15159",
+ "stored_version": "20261116143959",
+ "stored_stmt_md5": "236f30fb61f4ab570e547941f8268293",
+ "n_migrations": 182,
+ "head": "20261116143959"
+}
