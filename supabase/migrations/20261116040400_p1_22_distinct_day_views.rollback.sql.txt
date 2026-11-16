@@ -1,0 +1,5 @@
+-- ROLLBACK for 20261116040400_p1_22_distinct_day_views (UNAPPLIED companion).
+-- Drops only the two views this migration creates. Stored protocol_completions rows are kept.
+-- 040000 objects (including ops.value_actions and ops.retention_daily) are left in place.
+DROP VIEW IF EXISTS ops.retention_m3;
+DROP VIEW IF EXISTS ops.protocol_completion_days;
