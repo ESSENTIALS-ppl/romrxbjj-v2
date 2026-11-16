@@ -86,7 +86,7 @@ export interface ScheduleRead {
 }
 
 /** Grant rule 2 (Nov 15, 9:38 PM ET): after a saved quick check, next_check_at = next_retest_at.
- *  Rule 1 (full save, scheduleRow) resets both; rule 3 (SQL roll_next_check_at) rolls after local day 7 if no quick check. */
+ *  Rule 1 (full save, scheduleRow) resets both; the quick-check window runs through the end of local day 14, and rule 3 (SQL roll_next_check_at) rolls after that if no quick check. */
 export function nextCheckAfterQuick(s: Pick<ScheduleRead, "next_retest_at"> | null | undefined): string | null {
   return s?.next_retest_at ?? null;
 }
