@@ -97,10 +97,32 @@ WHERE e.user_id IS NOT NULL
 COMMENT ON VIEW ops.user_actions IS
   'P1-22 M-1. Reid allowlist of user-caused events. New UI events must be added here when they ship. Not a split on source.';
 
+-- Distinct completion days: one row per user_id + local date, however many completion rows
+-- (trigger session-level row + writer 41b947e7 per-movement rows) landed that day. Local date =
+-- the user's valid notification_preferences.timezone, else America/New_York (same rule as the
+-- zz_pc_protocol_session skip). Stored rows are not changed; metrics read this view.
+CREATE OR REPLACE VIEW ops.protocol_completion_days AS
+SELECT c.user_id,
+  (c.completed_at AT TIME ZONE z.tz)::date AS local_date,
+  z.tz AS tz_used,
+  count(*) AS raw_rows,
+  min(c.completed_at) AS first_at,
+  max(c.completed_at) AS last_at
+FROM public.protocol_completions c
+CROSS JOIN LATERAL (SELECT COALESCE((SELECT np.timezone FROM public.notification_preferences np
+                    WHERE np.user_id = c.user_id
+                      AND np.timezone IN (SELECT tz.name FROM pg_catalog.pg_timezone_names tz)
+                    ORDER BY np.updated_at DESC NULLS LAST LIMIT 1), 'America/New_York') AS tz) z
+GROUP BY c.user_id, (c.completed_at AT TIME ZONE z.tz)::date, z.tz;
+
+COMMENT ON VIEW ops.protocol_completion_days IS
+  'P1-22 M-3: one row per user_id and local date (user tz, else America/New_York). raw_rows shows how many completion rows collapsed into that day.';
+
 CREATE OR REPLACE VIEW ops.value_actions AS
 SELECT user_id, logged_at AS at, 'protocol_session'::text AS kind FROM public.protocol_sessions
 UNION ALL
-SELECT user_id, completed_at, 'protocol_completion' FROM public.protocol_completions
+-- One row per user + local completion day (last_at keeps every EXISTS (at >= X) answer of the per-row version).
+SELECT user_id, last_at, 'protocol_completion' FROM ops.protocol_completion_days
 UNION ALL
 SELECT user_id, assessed_at, 'assessment' FROM public.assessments;
 
@@ -140,6 +162,27 @@ LEFT JOIN LATERAL (
     AND p.logged_at < r.t0 + interval '7 days'
 ) s ON true;
 
+-- M-3: protocol completion DAYS (distinct user_id + local date), never raw completion rows.
+CREATE OR REPLACE VIEW ops.retention_m3 AS
+SELECT count(*) FILTER (WHERE r.t0 <= now() - interval '7 days') AS eligible,
+  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND w.days_wk1 >= 1) AS completion_days_wk1_1plus,
+  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND w.days_wk1 >= 3) AS completion_days_wk1_3plus,
+  COALESCE(sum(a.days_all), 0)::bigint AS completion_days_all,
+  COALESCE(sum(a.rows_all), 0)::bigint AS completion_rows_all
+FROM ops.v_real_assessed r
+LEFT JOIN LATERAL (
+  SELECT count(*) AS days_wk1
+  FROM ops.protocol_completion_days d
+  WHERE d.user_id = r.user_id
+    AND d.last_at >= r.t0
+    AND d.first_at < r.t0 + interval '7 days'
+) w ON true
+LEFT JOIN LATERAL (
+  SELECT count(*) AS days_all, sum(d.raw_rows) AS rows_all
+  FROM ops.protocol_completion_days d
+  WHERE d.user_id = r.user_id
+) a ON true;
+
 CREATE OR REPLACE VIEW ops.retention_m4 AS
 SELECT
   count(*) FILTER (WHERE r.t0 <= now() - interval '56 days') AS eligible_56d,
@@ -175,12 +218,14 @@ SELECT 'M1'::text AS metric_id, to_jsonb(m) AS payload FROM ops.retention_m1 m
 UNION ALL
 SELECT 'M2', to_jsonb(m) FROM ops.retention_m2 m
 UNION ALL
+SELECT 'M3', to_jsonb(m) FROM ops.retention_m3 m
+UNION ALL
 SELECT 'M4', to_jsonb(m) FROM ops.retention_m4 m
 UNION ALL
 SELECT 'M5', to_jsonb(m) FROM ops.retention_m5 m;
 
-GRANT SELECT ON ops.user_actions, ops.value_actions, ops.v_real_assessed,
-  ops.retention_m1, ops.retention_m2, ops.retention_m4, ops.retention_m5,
+GRANT SELECT ON ops.user_actions, ops.protocol_completion_days, ops.value_actions, ops.v_real_assessed,
+  ops.retention_m1, ops.retention_m2, ops.retention_m3, ops.retention_m4, ops.retention_m5,
   ops.retention_daily TO service_role, postgres;
 
 -- =====================================================================

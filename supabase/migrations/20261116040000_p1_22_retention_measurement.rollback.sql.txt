@@ -11,12 +11,14 @@ DROP INDEX IF EXISTS public.protocol_completions_session_only_uidx;
 -- ALTER TABLE public.protocol_completions DROP COLUMN IF EXISTS protocol_session_id;
 
 DROP VIEW IF EXISTS ops.retention_daily;
+DROP VIEW IF EXISTS ops.retention_m3;
 DROP VIEW IF EXISTS ops.retention_m5;
 DROP VIEW IF EXISTS ops.retention_m4;
 DROP VIEW IF EXISTS ops.retention_m2;
 DROP VIEW IF EXISTS ops.retention_m1;
 DROP VIEW IF EXISTS ops.v_real_assessed;
 DROP VIEW IF EXISTS ops.value_actions;
+DROP VIEW IF EXISTS ops.protocol_completion_days;
 DROP VIEW IF EXISTS ops.user_actions;
 DROP VIEW IF EXISTS ops.checkout_completed_deduped;
 DROP INDEX IF EXISTS public.product_events_checkout_session_id_uidx;
