@@ -1,0 +1,264 @@
+diff --git a/supabase/functions/submit-assessment/index.ts b/supabase/functions/submit-assessment/index.ts
+index 1b30e76..50c560e 100644
+--- a/supabase/functions/submit-assessment/index.ts
++++ b/supabase/functions/submit-assessment/index.ts
+@@ -1,4 +1,4 @@
+-// submit-assessment from live v44 plus P1-07 schedule and P1-06 quick re-check. BRANCH ONLY, not deployed. Migrations UNAPPLIED.
++// submit-assessment from live v44 plus P1-07 schedule, P1-06 quick re-check, and v4 day 7-14 server guard. BRANCH ONLY, not deployed. Migrations UNAPPLIED.
+ // - v31: marketing opt-out now read from public.users (the `profiles` table never existed, so the
+ //        opt-out was silently ignored). Removed the v1 BJJ-flavored users upsert (platforms ['bjj'],
+ //        subscription_status 'pending' which the check constraint rejects). Logs product_events.
+@@ -10,7 +10,7 @@ import { logEvent } from "../_shared/events.ts";
+ import { POSTAL_LINE } from "../_shared/email_footer.ts";
+ import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
+ import { buildMoodBlockForUser } from "./mood_block.ts";
+-import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, type ScheduleRead, scheduleRow } from "./schedule.ts";
++import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, rejectQuickWindow, type ScheduleRead, scheduleRow } from "./schedule.ts";
+ const CORS = {
+   "Access-Control-Allow-Origin": "*",
+   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+@@ -261,7 +261,12 @@ Deno.serve(async (req) => {
+     if (!schErr && sch) sched = sch as unknown as ScheduleRead;
+   } catch { sched = null; }
+   if (checkKind === "quick") {
+-    const rejected = rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
++    let userTz: string | null = null;
++    try {
++      const { data: pref } = await admin.from("notification_preferences").select("timezone").eq("user_id", user.id).maybeSingle();
++      if (pref && typeof (pref as { timezone?: unknown }).timezone === "string") userTz = (pref as { timezone: string }).timezone;
++    } catch { /* resolveTz falls back; single DEFAULT_TZ in schedule.ts */ }
++    const rejected = rejectQuickWindow(sched, new Date(), userTz) ?? rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
+     if (rejected) return json({ error: QUICK_ERRORS[rejected] }, 400);
+     row.check_kind = "quick"; // omit on full submits so insert still works before the unapplied check_kind migration
+   }
+diff --git a/supabase/functions/submit-assessment/schedule.test.ts b/supabase/functions/submit-assessment/schedule.test.ts
+index f632459..b263cb7 100644
+--- a/supabase/functions/submit-assessment/schedule.test.ts
++++ b/supabase/functions/submit-assessment/schedule.test.ts
+@@ -2,14 +2,21 @@ import { assertEquals } from "jsr:@std/assert@1";
+ import {
+   CHECK_DAYS,
+   CHECK14_DAYS,
++  DEFAULT_TZ,
+   RETEST_DAYS,
+   computeCheckJoints,
++  localYmd,
+   nextCheckAfterQuick,
+   parseCheckKind,
+   pickCheckJoints,
++  QUICK_ERRORS,
+   rejectQuickSubmit,
++  rejectQuickWindow,
++  resolveTz,
+   scheduleFromAssessedAt,
+   scheduleRow,
++  ymdAdd,
++  type ScheduleRead,
+ } from "./schedule.ts";
+ 
+ const NUMERIC = ["hip_er_l", "hip_er_r", "ankle_df_l", "ankle_df_r", "shoulder_flex_l"];
+@@ -77,3 +84,119 @@ Deno.test("P1-06: quick submit rejects extra joints, empty schedule, and missing
+   assertEquals(rejectQuickSubmit({}, ["hip_er_l"], NUMERIC), "missing_scheduled_joints");
+   assertEquals(rejectQuickSubmit({ hip_er_l: 20 }, ["hip_er_l"], NUMERIC), null);
+ });
++
++const TZ = "America/Chicago";
++/** 2026-11-01 16:00 CT (CST, UTC-6) — local day 0. */
++const LAST_FULL = "2026-11-01T22:00:00.000Z";
++function schedAt(last = LAST_FULL, joints = ["hip_er_l"], nextCheck?: string, nextRetest?: string): ScheduleRead {
++  const row = scheduleRow("u", "a", last, last, joints);
++  return {
++    last_assessed_at: last,
++    next_retest_at: nextRetest ?? row.next_retest_at,
++    next_check_at: nextCheck ?? row.next_check_at,
++    check_joints: joints,
++  };
++}
++/** Instant that is `day` local days after last, at a local clock time in tz. */
++function atLocal(lastIso: string, day: number, localHHmm: string, tz: string): Date {
++  const [hh, mm] = localHHmm.split(":").map((x) => parseInt(x, 10));
++  const start = localYmd(lastIso, tz);
++  if (!start) throw new Error(`bad lastIso ${lastIso}`);
++  const target = ymdAdd(start, day);
++  // Scan 14h before UTC midnight of the target date through 14h after the next UTC midnight.
++  const begin = Date.parse(`${target}T00:00:00.000Z`) - 14 * 3600000;
++  for (let delta = 0; delta <= 52 * 3600000; delta += 60000) {
++    const inst = new Date(begin + delta);
++    const fp = new Intl.DateTimeFormat("en-US", {
++      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
++    }).formatToParts(inst);
++    const gg = (t: string) => fp.find((p) => p.type === t)?.value ?? "";
++    if (`${gg("year")}-${gg("month")}-${gg("day")}` === target && parseInt(gg("hour"), 10) === hh && parseInt(gg("minute"), 10) === mm) {
++      return inst;
++    }
++  }
++  throw new Error(`no instant for ${target} ${localHHmm} ${tz}`);
++}
++
++Deno.test("P1-06 v4: DEFAULT_TZ is America/New_York; invalid tz falls back there; a valid stored tz is kept", () => {
++  assertEquals(DEFAULT_TZ, "America/New_York");
++  assertEquals(resolveTz(null), "America/New_York");
++  assertEquals(resolveTz(""), "America/New_York");
++  assertEquals(resolveTz("Not/AZone"), "America/New_York");
++  assertEquals(resolveTz("America/New_York"), "America/New_York");
++  assertEquals(resolveTz("America/Chicago"), "America/Chicago");
++  assertEquals(resolveTz("Asia/Tokyo"), "Asia/Tokyo");
++});
++
++Deno.test("P1-06 v4 guard: day 6 rejected 400 no_schedule; day 7 accepted; day 14 late evening accepted; day 15 rejected", () => {
++  const s = schedAt();
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 6, "23:59", TZ), TZ), "no_schedule");
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 7, "00:00", TZ), TZ), null);
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 7, "12:00", TZ), TZ), null);
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 14, "23:30", TZ), TZ), null);
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 15, "00:00", TZ), TZ), "no_schedule");
++  assertEquals(QUICK_ERRORS.no_schedule, "No quick re-check is scheduled");
++});
++
++Deno.test("P1-06 v4 guard: day 14 late evening is accepted in the user's local tz (not UTC)", () => {
++  // 2026-11-15 23:30 America/Los_Angeles = 2026-11-16 07:30Z (already 16 Nov UTC). Must still be day 14 local.
++  const pacific = "America/Los_Angeles";
++  const s = schedAt();
++  const late = atLocal(LAST_FULL, 14, "23:30", pacific);
++  assertEquals(late.toISOString().startsWith("2026-11-16"), true);
++  assertEquals(rejectQuickWindow(s, late, pacific), null);
++  // Same instant in Chicago is already local day 15 (01:30 CST on Nov 16) and must reject.
++  assertEquals(rejectQuickWindow(s, late, TZ), "no_schedule");
++  // Tokyo day 14 23:30 and day 15 00:00.
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 14, "23:30", "Asia/Tokyo"), "Asia/Tokyo"), null);
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 15, "00:00", "Asia/Tokyo"), "Asia/Tokyo"), "no_schedule");
++});
++
++Deno.test("P1-06 v4 guard: invalid or missing tz uses NY day boundaries (not the stored Chicago tz)", () => {
++  const s = schedAt();
++  const ny = "America/New_York";
++  // Nov 8 00:30 ET is local day 7 in NY, still day 6 (23:30 CT) in Chicago.
++  const day7Ny = atLocal(LAST_FULL, 7, "00:30", ny);
++  assertEquals(rejectQuickWindow(s, day7Ny, ny), null);
++  assertEquals(rejectQuickWindow(s, day7Ny, TZ), "no_schedule");
++  for (const tz of [null, "", "Not/AZone", undefined]) {
++    assertEquals(rejectQuickWindow(s, day7Ny, tz as string | null | undefined), null);
++  }
++  // Nov 16 00:30 ET is local day 15 in NY, still day 14 (23:30 CT) in Chicago.
++  const day15Ny = atLocal(LAST_FULL, 15, "00:30", ny);
++  assertEquals(rejectQuickWindow(s, day15Ny, ny), "no_schedule");
++  assertEquals(rejectQuickWindow(s, day15Ny, TZ), null);
++  for (const tz of [null, "", "Not/AZone", undefined]) {
++    assertEquals(rejectQuickWindow(s, day15Ny, tz as string | null | undefined), "no_schedule");
++  }
++  // Day 14 late evening Eastern is still accepted under the NY fallback.
++  assertEquals(rejectQuickWindow(s, atLocal(LAST_FULL, 14, "23:30", ny), null), null);
++});
++
++Deno.test("P1-06 v4 guard: second quick check in the same cycle is rejected 400 no_schedule", () => {
++  const first = schedAt();
++  const afterQuick = {
++    ...first,
++    next_check_at: first.next_retest_at,
++  };
++  const day10 = atLocal(LAST_FULL, 10, "12:00", TZ);
++  assertEquals(rejectQuickWindow(first, day10, TZ), null);
++  assertEquals(rejectQuickWindow(afterQuick, day10, TZ), "no_schedule");
++  assertEquals(QUICK_ERRORS.no_schedule, "No quick re-check is scheduled");
++});
++
++Deno.test("P1-06 v4 guard: a new full assessment resets the cycle", () => {
++  // First cycle: quick already done on day 10.
++  const used = { ...schedAt(), next_check_at: scheduleRow("u", "a", LAST_FULL, LAST_FULL).next_retest_at };
++  const day10 = atLocal(LAST_FULL, 10, "12:00", TZ);
++  assertEquals(rejectQuickWindow(used, day10, TZ), "no_schedule");
++  // New full assessment on day 10 of the old cycle starts a new window from that local date.
++  const newFullIso = atLocal(LAST_FULL, 10, "12:00", TZ).toISOString();
++  const reset = schedAt(newFullIso);
++  assertEquals(reset.next_check_at === reset.next_retest_at, false);
++  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 0, "12:01", TZ), TZ), "no_schedule");
++  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 6, "23:59", TZ), TZ), "no_schedule");
++  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 7, "00:00", TZ), TZ), null);
++  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 14, "23:30", TZ), TZ), null);
++  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 15, "00:00", TZ), TZ), "no_schedule");
++});
+diff --git a/supabase/functions/submit-assessment/schedule.ts b/supabase/functions/submit-assessment/schedule.ts
+index 8a4926c..4981c25 100644
+--- a/supabase/functions/submit-assessment/schedule.ts
++++ b/supabase/functions/submit-assessment/schedule.ts
+@@ -2,6 +2,10 @@
+ export const RETEST_DAYS = 42;
+ export const CHECK_DAYS = 7;
+ export const CHECK14_DAYS = 14;
++// Grant (Nov 15): unified timezone fallback is America/New_York. Stored user tz
++// (notification_preferences.timezone) is used first; only invalid or missing falls back here.
++// Single constant — do not add another fallback value.
++export const DEFAULT_TZ = "America/New_York";
+ 
+ // Field targets mirrored from compute-tiers JOINT_TARGETS (Nov 2026). Used only to pick 1-2
+ // provisional check_joints when assessments.worst_joints is still empty at submit time.
+@@ -121,3 +125,69 @@ export const QUICK_ERRORS: Record<string, string> = {
+   unexpected_joint: "Quick re-check only accepts the scheduled joints",
+   missing_scheduled_joints: "Quick re-check needs a measurement for a scheduled joint",
+ };
++
++/** The one timezone fallback. Invalid or missing tz uses DEFAULT_TZ (America/New_York). */
++export function resolveTz(tz: string | null | undefined): string {
++  if (!tz || typeof tz !== "string" || tz.length > 64) return DEFAULT_TZ;
++  try {
++    new Intl.DateTimeFormat("en-US", { timeZone: tz });
++    return tz;
++  } catch {
++    return DEFAULT_TZ;
++  }
++}
++
++/** User's local calendar date (YYYY-MM-DD) for an instant. */
++export function localYmd(at: Date | string, tz?: string | null): string | null {
++  const t = typeof at === "string" ? Date.parse(at) : at.getTime();
++  if (!Number.isFinite(t)) return null;
++  const zone = resolveTz(tz);
++  const parts = new Intl.DateTimeFormat("en-US", {
++    timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
++  }).formatToParts(new Date(t));
++  const g = (typ: string) => parts.find((p) => p.type === typ)?.value ?? "";
++  const y = g("year"), m = g("month"), d = g("day");
++  if (!y || !m || !d) return null;
++  return `${y}-${m}-${d}`;
++}
++
++/** Calendar-day add on a YYYY-MM-DD string (UTC date arithmetic, no timezone shift). */
++export function ymdAdd(date: string, days: number): string {
++  const [y, m, d] = date.split("-").map((x) => parseInt(x, 10));
++  if (!y || !m || !d) return date;
++  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
++}
++
++/** Local day number of `now` relative to last full assessment: day 0 is that assessment's local date. */
++export function localDayOffset(lastAssessedAt: string, now: Date, tz?: string | null): number | null {
++  const start = localYmd(lastAssessedAt, tz);
++  const today = localYmd(now, tz);
++  if (!start || !today) return null;
++  const [ys, ms, ds] = start.split("-").map((x) => parseInt(x, 10));
++  const [yt, mt, dt] = today.split("-").map((x) => parseInt(x, 10));
++  const a = Date.UTC(ys, ms - 1, ds);
++  const b = Date.UTC(yt, mt - 1, dt);
++  return Math.round((b - a) / 86400000);
++}
++
++/** Rule 2 signal: after a saved quick check, next_check_at equals next_retest_at (a full save resets both). */
++export function quickAlreadyDoneThisCycle(s: Pick<ScheduleRead, "next_check_at" | "next_retest_at"> | null | undefined): boolean {
++  if (!s?.next_check_at || !s?.next_retest_at) return false;
++  const a = Date.parse(s.next_check_at);
++  const b = Date.parse(s.next_retest_at);
++  return Number.isFinite(a) && Number.isFinite(b) && a === b;
++}
++
++/** Grant (a): a quick check is accepted only on local days 7 to 14 after the last full assessment,
++ *  and only if the user has not already done one this cycle. Outside that, existing no_schedule error. */
++export function rejectQuickWindow(
++  sched: ScheduleRead | null | undefined,
++  now: Date,
++  tz?: string | null,
++): "no_schedule" | null {
++  if (!sched?.last_assessed_at) return "no_schedule";
++  if (quickAlreadyDoneThisCycle(sched)) return "no_schedule";
++  const day = localDayOffset(sched.last_assessed_at, now, tz);
++  if (day === null || day < CHECK_DAYS || day > CHECK14_DAYS) return "no_schedule";
++  return null;
++}

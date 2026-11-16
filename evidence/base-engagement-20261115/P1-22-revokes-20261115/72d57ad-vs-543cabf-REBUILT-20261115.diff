@@ -1,0 +1,1452 @@
+diff --git a/docs/p1-22/BUILD-NOTES.md b/docs/p1-22/BUILD-NOTES.md
+new file mode 100644
+index 0000000..ef67c02
+--- /dev/null
++++ b/docs/p1-22/BUILD-NOTES.md
+@@ -0,0 +1,36 @@
++# P1-22 BUILD-NOTES — retention measurement
++
++STARTED: Sun Nov 15, 2026, 8:52 PM ET (America/New_York). Built on branches only. Nothing applied or deployed.
++
++## Branches (local, not pushed)
++
++- romrxbjj-v2 `fix/p1-22-retention-measurement-20261115` — UNAPPLIED migration `20261116040000_p1_22_retention_measurement.sql`, views, unique index, exclusion hook, `record_protocol_completions` RPC + trigger + backfill, SPEC-FOR-REID, PGlite harness.
++- romrxbjj-v2 `fix/p1-22-checkout-session-id-stripe-webhook-20261115` — **separate branch**. `stripe-webhook: deploy needs Jim's own yes`. Does not touch `create-checkout-session`.
++- romrx-io-web `fix/p1-22-protocol-completions-writer-20261115` — Today-card writer in `MyProtocol.tsx` (existing columns only).
++
++## Hunks
++
++### Measurement migration (UNAPPLIED)
++- `ops.internal_accounts` (empty; user_id only — staff list hook for Jim) + `ops.is_excluded_from_metrics(user_id)` = live `public.is_test_account(email)` OR that table.
++- `public.product_event_kind()`, views `ops.user_actions`, `ops.value_actions`, `ops.v_real_assessed`, `ops.retention_m1/m2/m4/m5`, `ops.retention_daily`.
++- Unique index `product_events_checkout_session_id_uidx` on `props->>'stripe_checkout_session_id'` where event = checkout_completed and that key is present.
++- View `ops.checkout_completed_deduped`: prefer `props.stripe_checkout_session_id`; else gaps-and-islands on `user_id + purpose + 2-hour window` (new group when gap > 2 hours; keep latest). Purpose is kept so a Base checkout and a sport unlock close together are not collapsed. This **disagrees** with Reid's user+purpose+ET-day fallback; documented in SPEC-FOR-REID.md.
++- Window rationale: Stripe retries usually arrive minutes to a couple of hours apart; a calendar-day rule can split a late-ET retry or merge two real checkouts on the same date.
++- `protocol_completions.protocol_session_id`; unique partial indexes; `record_protocol_completions` (SECURITY INVOKER, existence checks — cannot ON CONFLICT a partial unique index); trigger `zz_pc_protocol_session` writes a fallback row only if that session has no completions yet; backfill of existing `protocol_sessions`.
++
++### App writer
++- `TodayCard` takes `assessmentId`. After a successful `protocol_sessions` upsert, best-effort insert of one `protocol_completions` row per Today-card movement (exercises[0], stretches[0], foam[0]). Failures log and do not undo the session. `session_date` still uses UTC `toISOString().slice(0, 10)` (P1-05 / M-10 is Jules).
++
++### stripe-webhook (separate branch + live-v53 artifact)
++- Both `checkout_completed` logEvents add `stripe_checkout_session_id` (`obj.id` when it is a string, else null).
++- After entitlement upserts (which always run), skip the Jim PAID alert and the event when that session id was already logged. Helper takes `supabase` as an argument (client is handler-scoped).
++- Intended deploy baseline is live v53, not origin/main. See `P1-22-webhook/DEPLOY-HOLD.md` and `live-v53.patch`.
++
++## Harness
++`P1-22/harness/` (also `docs/p1-22/harness/` on the v2 branch). Live schema stub + this migration, PGlite, synthetic fixtures only (`jim+romrx-harness@romrx.io` and random UUIDs). Never account `7c71e421`.
++
++## Not in this item
++M-4..M-10 except the completions writer; P1-05 date logic; applying the migration; deploying the webhook; filling `ops.internal_accounts`.
++
++## Harness result
++All checks passed, 9:06 PM ET Nov 15, 2026. See harness/RESULTS.md. Nested window functions in the first checkout-view draft were rewritten as two CTEs (required by Postgres).
+diff --git a/docs/p1-22/SPEC-FOR-REID.md b/docs/p1-22/SPEC-FOR-REID.md
+new file mode 100644
+index 0000000..3a8884a
+--- /dev/null
++++ b/docs/p1-22/SPEC-FOR-REID.md
+@@ -0,0 +1,39 @@
++# SPEC-FOR-REID.md — P1-22 retention measurement
++
++Avery, Sun Nov 15, 2026, about 8:57 PM ET (America/New_York). Built against Reid's MEASUREMENT-PLAN.md and sql/ drafts. Migration is UNAPPLIED. Nothing deployed, published, sent, or written to live data.
++
++Companion branches (local only, not pushed):
++- romrxbjj-v2 `fix/p1-22-retention-measurement-20261115` — this migration, views, exclusion hook, completions RPC/trigger/backfill, scratch harness.
++- romrx-io-web `fix/p1-22-protocol-completions-writer-20261115` — Mark Complete writes one `protocol_completions` row per Today-card movement (existing columns, so it can work before the migration).
++- romrxbjj-v2 `fix/p1-22-checkout-session-id-stripe-webhook-20261115` — **SEPARATE branch.** Adds `props.stripe_checkout_session_id` and skips a repeat event/alert when that id already exists. **stripe-webhook: deploy needs Jim's own yes.** Does not touch `create-checkout-session`.
++
++## What was built (maps to Reid section 6)
++
++| Reid | What shipped in this package |
++|---|---|
++| M-0 Internal account list | Empty table `ops.internal_accounts (user_id, note, added_at)`. No emails. Function `ops.is_excluded_from_metrics(user_id)` is true if the user is in that table **or** `public.is_test_account(email)` (existing rule: `jim+romrx-...@romrx.io` AND `raw_app_meta_data.test_fixture = true`). Metric views use funnel `is_test = false` AND this hook. Leave the table empty until Jim names staff accounts (your JIM-ONLY-STEPS.md item 1). |
++| M-1 `ops.user_actions` + retention views | `ops.user_actions` is your Section 5 allowlist, including the reserved future event names. Also `ops.value_actions`, `ops.v_real_assessed`, `ops.retention_m1`, `ops.retention_m2`, `ops.retention_m4`, `ops.retention_m5`, and `ops.retention_daily` (union with `metric_id`). Classify by event name, not by `source`. |
++| M-2 checkout_completed session id | Unique index on `props->>'stripe_checkout_session_id'` for new rows, plus view `ops.checkout_completed_deduped`. Historic rows have no session id (confirmed tonight: 6 raw, 3 after your user+purpose+ET day rule; prop keys are purpose, pending_sport, amount_total, currency, discount only). Fallback, when no session id is present, is user + purpose + a **2-hour timestamp window** (gaps-and-islands: a new window starts when the gap from the previous row for that user and purpose is greater than 2 hours; the latest row is kept). Purpose is kept so a Base unlock and a sport-pack unlock close together are not collapsed. This replaces your ET calendar-day fallback (see disagreements). The webhook writer is on the **separate** branch above. |
++| M-3 protocol_completions | 0 rows live. No writer was in live Base `b52546f`. App branch writes one row per Today-card movement (`exercises[0]`, `stretches[0]`, `foam[0]` when present) with `assessment_id` and `joint`. Migration adds `protocol_session_id`, RPC `record_protocol_completions`, fallback trigger `zz_pc_protocol_session` (writes a session-level row only if none exist for that session), and a backfill of current `protocol_sessions` as session-level rows (exercise_id null) so value_actions start counting as soon as the migration is applied. |
++| M-4 to M-10 | Not in this item. M-4 (`reminder_opt_in_set` inside `set_reminder_opt_in`), M-5 to M-9 UI events, and M-10 (local session_date, P1-05) stay with their owners. The allowlist already accepts those event names so they count once Jules ships them. |
++
++## Scratch-DB harness
++
++`harness/README.md`. PGlite (or Postgres) with a stub of the live tables, this migration, and write-path checks you can run without touching production. No live credentials.
++
++## Disagreements / notes vs your plan
++
++1. **Agree** on classifying by the user-event allowlist, not by `product_events.source`. I also added `public.product_event_kind()` (`system` vs `user`) matching your M8 system list. `event_kind = 'user'` is wider than `ops.user_actions` (it includes any event not on the system list). **Use `ops.user_actions` for return metrics**, as you wrote. Do not switch M1 to `event_kind = 'user'`.
++2. **Checkout fallback window (change from your plan).** You specified user + purpose + ET calendar day for historic rows. After a later ruling, the fallback when no Stripe session id is present is **user + purpose + a 2-hour timestamp window** (documented on the view). Tonight's 6-raw / 3-deduped counts still hold under both rules for the current rows, but a retry that crosses midnight ET, or two real checkouts on the same ET day, would be treated differently. New rows will also carry `stripe_checkout_session_id` and prefer it. I did not put the webhook change on this branch.
++3. **M-3 shape.** You asked for one row per exercise done, with assessment_id and joint. The Today card marks the whole session complete and shows up to three movements. The app writer uses those three (not every exercise in the Full list). Historic backfill cannot recover exercise ids, so those rows are session-level (`exercise_id` null, `joint` = `protocol_day` such as `P1`). Your `value_actions` uses `EXISTS`, so several completion rows on the same day still count as one return. The fallback trigger will not add a fourth row if the app already wrote exercise rows for that session.
++4. **P1-05 / M-10.** I did **not** change `session_date` to the local calendar date. The app writer uses the same `toISOString().slice(0, 10)` as the current session upsert so the two stay consistent until Jules's P1-05 fix. Avery already confirmed that bug in P1-05 notes.
++5. **`ops.retention_daily`** is a union of M1, M2, M4, M5 payloads, not a per-user daily fact table. Your draft SQL files remain the source of truth for the shapes; the views copy them and add the exclusion hook.
++6. **M-4, M-8** (server event on opt-in, email link tagging) are not in this commit. Flag if you want them folded into a follow-up on this branch before the gate.
++7. **Staff list.** The hook is `user_id` only. I will not seed it. When Jim names accounts, that is a separate yes, and we should resolve ids without putting emails in the repo or in this spec.
++8. Account `7c71e421` was not queried or flagged.
++
++## How to check after apply (still later, gated)
++
++- `select count(*) from protocol_completions;` should equal current `protocol_sessions` after backfill, then rise as people tap Mark Complete (more than one row per session once the app writer is live).
++- `select * from ops.checkout_completed_deduped;` should stay at 3 rows until new paid checkouts carry a session id.
++- `select * from ops.retention_m1;` should match your tonight baselines once exclusions are the same (funnel `is_test` already covered fixtures; internal_accounts is empty).
+diff --git a/docs/p1-22/harness/README.md b/docs/p1-22/harness/README.md
+new file mode 100644
+index 0000000..16dfa53
+--- /dev/null
++++ b/docs/p1-22/harness/README.md
+@@ -0,0 +1,26 @@
++# P1-22 scratch-DB harness (for Reid)
++
++Local write-path checks only. This is not production and it does not connect to Supabase project cqzvqzwwevnflinxgnpp.
++
++## What it covers
++
++- Event split: `ops.user_actions` vs `product_event_kind`.
++- checkout_completed: prefer stripe_checkout_session_id; historic fallback is user + purpose + a 2-hour timestamp window (gaps-and-islands). Unique index on the session id for new rows.
++- protocol_completions: RPC writer and the fallback trigger + backfill.
++- Exclusions: `is_test_account` (jim+romrx- pattern AND test_fixture) and the empty `ops.internal_accounts` hook.
++
++## Run (PGlite)
++
++```bash
++cd harness
++npm install
++node test.mjs
++```
++
++The test loads `@electric-sql/pglite/contrib/pgcrypto` so `gen_random_uuid()` works. The schema stub also creates the `anon`, `authenticated`, and `service_role` roles the live migration GRANTs to. Do not commit `node_modules`.
++
++The test creates an in-memory PGlite database, loads `schema-stub.sql` (a small copy of the live tables this item uses), applies `p1_22_migration.sql` (the UNAPPLIED migration, with a couple of trigger-syntax adjustments for PGlite), and runs the assertions in `test.mjs`.
++
++A local Postgres works too: `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f schema-stub.sql -f p1_22_migration.sql`, then run the same assertions as `test.mjs`.
++
++No secrets, no live credentials, no user emails (only obviously fake fixture addresses in the test).
+diff --git a/docs/p1-22/harness/RESULTS.md b/docs/p1-22/harness/RESULTS.md
+new file mode 100644
+index 0000000..25215ad
+--- /dev/null
++++ b/docs/p1-22/harness/RESULTS.md
+@@ -0,0 +1,20 @@
++# P1-22 harness results
++
++Ran: Sun Nov 15, 2026, 9:06 PM ET (America/New_York).
++Command: `node test.mjs` in `P1-22/harness` with `@electric-sql/pglite` 0.5.16 (pgcrypto contrib) and synthetic fixtures only.
++
++All checks passed:
++- fixture email+flag is_test_account / non-fixture is not
++- fixture excluded via is_test_account; real user not excluded
++- internal_accounts hook excludes staff user_id
++- v_real_assessed keeps only the real user
++- user_actions allowlist excludes system events
++- product_event_kind split
++- unique index rejects a second row with the same stripe session id
++- two base windows more than 2 hours apart stay distinct
++- sport_unlock in the same hour is not collapsed into base
++- session-id row appears once in the deduped view
++- fallback trigger writes one session-level completion
++- RPC writes one row per exercise id; no extra fallback row after exercise-level writes
++
++Checkout view fix found by this run: an earlier draft nested `SUM() OVER` around `lag()`; Postgres rejects nested window functions. The migration now flags a new window in one CTE and sums it in the next.
+diff --git a/docs/p1-22/harness/p1_22_migration.sql b/docs/p1-22/harness/p1_22_migration.sql
+new file mode 100644
+index 0000000..33e9051
+--- /dev/null
++++ b/docs/p1-22/harness/p1_22_migration.sql
+@@ -0,0 +1,424 @@
++-- P1-22 retention measurement (UNAPPLIED)
++-- Written 2026-11-15, Avery. Numbered after live supabase_migrations max 20261116024102 (renumbered from 20261116013000; P1-07/P1-06 lane is 0300xx).
++-- Do not apply until Margot has a sha gate line and Vera's precheck PASS, relayed by Grant.
++-- No live writes in this commit. Never stores user emails.
++
++-- =====================================================================
++-- M-0 Exclusions: existing is_test_account (jim+romrx-...@romrx.io AND
++-- test_fixture=true) plus a hook table for the staff list Jim will name.
++-- =====================================================================
++
++CREATE TABLE IF NOT EXISTS ops.internal_accounts (
++  user_id uuid PRIMARY KEY,
++  note text,
++  added_at timestamptz NOT NULL DEFAULT now()
++);
++
++COMMENT ON TABLE ops.internal_accounts IS
++  'P1-22 M-0 hook. Leave empty until Jim names staff or personal Base accounts to exclude from retention metrics. Store user_id only, never an email. Added rows need their own Jim yes.';
++
++ALTER TABLE ops.internal_accounts ENABLE ROW LEVEL SECURITY;
++-- No policies: service-role / postgres only (same pattern as other ops tables).
++
++CREATE OR REPLACE FUNCTION ops.is_excluded_from_metrics(p_user_id uuid)
++RETURNS boolean
++LANGUAGE sql
++STABLE
++SECURITY DEFINER
++SET search_path TO 'pg_catalog', 'ops', 'public', 'auth', 'pg_temp'
++AS $$
++  SELECT
++    p_user_id IS NOT NULL
++    AND (
++      EXISTS (SELECT 1 FROM ops.internal_accounts i WHERE i.user_id = p_user_id)
++      OR EXISTS (
++        SELECT 1
++        FROM auth.users u
++        WHERE u.id = p_user_id
++          AND public.is_test_account(u.email)
++      )
++    );
++$$;
++
++COMMENT ON FUNCTION ops.is_excluded_from_metrics(uuid) IS
++  'True when the user is a flagged test fixture (is_test_account = jim+romrx- pattern AND test_fixture) or is in ops.internal_accounts (staff hook, empty until Jim names accounts).';
++
++REVOKE ALL ON FUNCTION ops.is_excluded_from_metrics(uuid) FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION ops.is_excluded_from_metrics(uuid) TO service_role, postgres;
++
++-- =====================================================================
++-- M-1 Event split and metric views (Reid MEASUREMENT-PLAN.md)
++-- Classify by event-name allowlist, not by product_events.source.
++-- =====================================================================
++
++CREATE OR REPLACE FUNCTION public.product_event_kind(p_event text)
++RETURNS text
++LANGUAGE sql
++IMMUTABLE
++PARALLEL SAFE
++SET search_path TO 'pg_catalog', 'pg_temp'
++AS $$
++  SELECT CASE
++    WHEN p_event IN (
++      'email_sent',
++      'base_status_changed',
++      'base_activated',
++      'checkout_completed',
++      'checkout_packs_closed',
++      'checkout_packs_closed_sport_dropped',
++      'sport_entitlement_changed',
++      'signup_completed',
++      'lead_assessment_submitted',
++      'assessment_lead_gate_shown',
++      'unsubscribed'
++    ) THEN 'system'
++    ELSE 'user'
++  END;
++$$;
++
++REVOKE ALL ON FUNCTION public.product_event_kind(text) FROM PUBLIC;
++GRANT EXECUTE ON FUNCTION public.product_event_kind(text) TO service_role, postgres;
++
++CREATE OR REPLACE VIEW ops.user_actions AS
++SELECT e.user_id, e.created_at, e.event, e.props, e.source, e.path, e.sport, e.id
++FROM public.product_events e
++WHERE e.user_id IS NOT NULL
++  AND e.event IN (
++    'page_view','results_viewed','results_unlock_clicked','assessment_started',
++    'assessment_step_completed','assessment_completed_ui','assessment_submitted',
++    'protocol_session_logged','rombot_message_sent','fuel_nutrition_calculated',
++    'fuel_hydration_calculated','login_redirected_to_assessment','checkout_started',
++    'signup_submitted','consent_signed',
++    'today_session_started','session_completed','quick_recheck_started',
++    'quick_recheck_submitted','reminder_opt_in_shown','reminder_opt_in_set',
++    'retest_started','retest_results_viewed','rombot_checkin_opened','email_link_opened'
++  );
++
++COMMENT ON VIEW ops.user_actions IS
++  'P1-22 M-1. Reid allowlist of user-caused events. New UI events must be added here when they ship. Not a split on source.';
++
++CREATE OR REPLACE VIEW ops.value_actions AS
++SELECT user_id, logged_at AS at, 'protocol_session'::text AS kind FROM public.protocol_sessions
++UNION ALL
++SELECT user_id, completed_at, 'protocol_completion' FROM public.protocol_completions
++UNION ALL
++SELECT user_id, assessed_at, 'assessment' FROM public.assessments;
++
++CREATE OR REPLACE VIEW ops.v_real_assessed AS
++SELECT f.user_id, f.first_assessment_at AS t0
++FROM ops.base_onboarding_funnel f
++WHERE NOT COALESCE(f.is_test, false)
++  AND f.first_assessment_at IS NOT NULL
++  AND NOT COALESCE(ops.is_excluded_from_metrics(f.user_id), false);
++
++COMMENT ON VIEW ops.v_real_assessed IS
++  'Real assessed users for retention metrics: funnel is_test = false (is_test_account / test_fixture / jim+romrx- pattern) AND not in ops.internal_accounts.';
++
++CREATE OR REPLACE VIEW ops.retention_m1 AS
++SELECT n AS day_n,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)) AS eligible,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)
++    AND EXISTS (SELECT 1 FROM ops.user_actions u WHERE u.user_id = r.user_id
++                AND u.created_at >= r.t0 + make_interval(days => n))) AS returned_any_action,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)
++    AND EXISTS (SELECT 1 FROM ops.value_actions v WHERE v.user_id = r.user_id
++                AND v.at >= r.t0 + make_interval(days => n))) AS returned_value_action
++FROM ops.v_real_assessed r
++CROSS JOIN (VALUES (1),(7),(14),(30)) d(n)
++GROUP BY n;
++
++CREATE OR REPLACE VIEW ops.retention_m2 AS
++SELECT count(*) FILTER (WHERE r.t0 <= now() - interval '7 days') AS eligible,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND s.days_wk1 >= 1) AS had_1plus,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND s.days_wk1 >= 3) AS had_3plus
++FROM ops.v_real_assessed r
++LEFT JOIN LATERAL (
++  SELECT count(DISTINCT p.session_date) AS days_wk1
++  FROM public.protocol_sessions p
++  WHERE p.user_id = r.user_id
++    AND p.logged_at >= r.t0
++    AND p.logged_at < r.t0 + interval '7 days'
++) s ON true;
++
++CREATE OR REPLACE VIEW ops.retention_m4 AS
++SELECT
++  count(*) FILTER (WHERE r.t0 <= now() - interval '56 days') AS eligible_56d,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '56 days' AND EXISTS (
++    SELECT 1 FROM public.assessments a
++    WHERE a.user_id = r.user_id
++      AND a.assessed_at > r.t0 + interval '1 day'
++      AND a.assessed_at <= r.t0 + interval '56 days')) AS retested_by_d56,
++  count(*) FILTER (WHERE EXISTS (
++    SELECT 1 FROM public.assessments a
++    WHERE a.user_id = r.user_id AND a.assessed_at > r.t0 + interval '1 day')) AS retested_ever,
++  count(*) FILTER (WHERE EXISTS (
++    SELECT 1 FROM ops.user_actions u
++    WHERE u.user_id = r.user_id
++      AND u.event = 'assessment_started'
++      AND u.created_at > r.t0 + interval '1 day')) AS retest_started_ever
++FROM ops.v_real_assessed r;
++
++CREATE OR REPLACE VIEW ops.retention_m5 AS
++SELECT
++  (SELECT count(*) FROM ops.v_real_assessed) AS real_assessed,
++  count(*) FILTER (WHERE (np.retest_reminders AND np.retest_opt_in_at IS NOT NULL)
++                    OR (np.email_reminders AND np.protocol_opt_in_at IS NOT NULL)
++                    OR (np.weekly_digest AND np.digest_opt_in_at IS NOT NULL)) AS opted_in_any,
++  count(*) FILTER (WHERE np.retest_reminders AND np.retest_opt_in_at IS NULL) AS retest_default_on_no_marker,
++  count(*) FILTER (WHERE np.push_subscription IS NOT NULL) AS push_pref_rows
++FROM ops.v_real_assessed r
++LEFT JOIN public.notification_preferences np ON np.user_id = r.user_id;
++
++-- Convenience union for Reid (metric_id, payload as jsonb).
++CREATE OR REPLACE VIEW ops.retention_daily AS
++SELECT 'M1'::text AS metric_id, to_jsonb(m) AS payload FROM ops.retention_m1 m
++UNION ALL
++SELECT 'M2', to_jsonb(m) FROM ops.retention_m2 m
++UNION ALL
++SELECT 'M4', to_jsonb(m) FROM ops.retention_m4 m
++UNION ALL
++SELECT 'M5', to_jsonb(m) FROM ops.retention_m5 m;
++
++GRANT SELECT ON ops.user_actions, ops.value_actions, ops.v_real_assessed,
++  ops.retention_m1, ops.retention_m2, ops.retention_m4, ops.retention_m5,
++  ops.retention_daily TO service_role, postgres;
++
++-- =====================================================================
++-- M-2 checkout_completed dedupe
++-- New rows (after the stripe-webhook branch is deployed with Jim's yes)
++-- carry props.stripe_checkout_session_id and dedupe on it.
++-- Historic rows have no session id: fall back to user + purpose + a 2-hour
++-- timestamp window (gaps-and-islands). This replaces Reid's ET calendar-day
++-- fallback; see SPEC-FOR-REID.md.
++-- The stripe-webhook emitter is on a SEPARATE branch and must not be deployed
++-- without Jim's own yes. This migration does not change any edge function.
++-- =====================================================================
++
++CREATE UNIQUE INDEX IF NOT EXISTS product_events_checkout_session_id_uidx
++  ON public.product_events ((props->>'stripe_checkout_session_id'))
++  WHERE event = 'checkout_completed'
++    AND props ? 'stripe_checkout_session_id'
++    AND length(props->>'stripe_checkout_session_id') > 0;
++
++CREATE OR REPLACE VIEW ops.checkout_completed_deduped AS
++WITH base AS (
++  SELECT e.*,
++         NULLIF(e.props->>'stripe_checkout_session_id', '') AS _sid,
++         COALESCE(e.props->>'purpose', '') AS _purpose
++  FROM public.product_events e
++  WHERE e.event = 'checkout_completed'
++),
++with_sid AS (
++  SELECT DISTINCT ON (_sid)
++         id, user_id, anon_id, session_id, event, props, sport, source, path, created_at
++  FROM base
++  WHERE _sid IS NOT NULL
++  ORDER BY _sid, created_at DESC
++),
++no_sid_flagged AS (
++  SELECT b.*,
++         CASE
++           WHEN lag(created_at) OVER (PARTITION BY user_id, _purpose ORDER BY created_at) IS NULL
++             OR created_at - lag(created_at) OVER (PARTITION BY user_id, _purpose ORDER BY created_at)
++                > INTERVAL '2 hours'
++           THEN 1 ELSE 0
++         END AS _new_grp
++  FROM base b
++  WHERE _sid IS NULL
++),
++no_sid_grouped AS (
++  SELECT f.*,
++         SUM(_new_grp) OVER (PARTITION BY user_id, _purpose ORDER BY created_at) AS _grp
++  FROM no_sid_flagged f
++),
++no_sid AS (
++  SELECT DISTINCT ON (user_id, _purpose, _grp)
++         id, user_id, anon_id, session_id, event, props, sport, source, path, created_at
++  FROM no_sid_grouped
++  ORDER BY user_id, _purpose, _grp, created_at DESC
++)
++SELECT * FROM with_sid
++UNION ALL
++SELECT * FROM no_sid;
++
++COMMENT ON VIEW ops.checkout_completed_deduped IS
++  'P1-22. Prefer props.stripe_checkout_session_id when present. Fallback (no session id): one row per user_id + purpose + 2-hour timestamp window (gaps-and-islands; a new window starts when the gap from the previous row for that user and purpose is greater than 2 hours). Latest row in the window is kept. Purpose is kept so a Base unlock and a sport-pack unlock close together are not collapsed. Window is 2 hours because Stripe webhook retries for one checkout usually arrive minutes to a couple of hours apart; a calendar-day rule can split a late-ET retry or merge two real checkouts on the same date.';
++
++GRANT SELECT ON ops.checkout_completed_deduped TO service_role, postgres;
++
++-- =====================================================================
++-- M-3 protocol_completions writer (backend)
++-- App on the companion romrx-io-web branch writes one row per Today-card
++-- exercise using existing columns (works even before this migration).
++-- This migration adds a session link, an RPC the app can call, a fallback
++-- trigger so a session upsert still records a completion if the app did
++-- not, and a backfill of the existing protocol_sessions (0 completions today).
++-- =====================================================================
++
++ALTER TABLE public.protocol_completions
++  ADD COLUMN IF NOT EXISTS protocol_session_id uuid REFERENCES public.protocol_sessions(id) ON DELETE SET NULL;
++
++CREATE UNIQUE INDEX IF NOT EXISTS protocol_completions_session_exercise_uidx
++  ON public.protocol_completions (protocol_session_id, exercise_id)
++  WHERE protocol_session_id IS NOT NULL AND exercise_id IS NOT NULL;
++
++CREATE UNIQUE INDEX IF NOT EXISTS protocol_completions_session_only_uidx
++  ON public.protocol_completions (protocol_session_id)
++  WHERE protocol_session_id IS NOT NULL AND exercise_id IS NULL;
++
++CREATE OR REPLACE FUNCTION public.record_protocol_completions(
++  p_session_id uuid,
++  p_assessment_id uuid,
++  p_joint text,
++  p_exercise_ids uuid[]
++) RETURNS integer
++LANGUAGE plpgsql
++SECURITY INVOKER
++SET search_path TO 'pg_catalog', 'public', 'pg_temp'
++AS $$
++DECLARE
++  uid uuid := auth.uid();
++  n integer := 0;
++  eid uuid;
++  sid uuid;
++BEGIN
++  IF uid IS NULL THEN
++    RAISE EXCEPTION 'not authenticated' USING ERRCODE = '42501';
++  END IF;
++  IF p_session_id IS NULL THEN
++    RETURN 0;
++  END IF;
++  SELECT s.id INTO sid
++  FROM public.protocol_sessions s
++  WHERE s.id = p_session_id AND s.user_id = uid;
++  IF sid IS NULL THEN
++    RAISE EXCEPTION 'session not found' USING ERRCODE = '42501';
++  END IF;
++
++  IF p_exercise_ids IS NULL OR cardinality(p_exercise_ids) = 0 THEN
++    IF NOT EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.protocol_session_id = sid AND c.exercise_id IS NULL
++    ) THEN
++      INSERT INTO public.protocol_completions (
++        user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++      ) VALUES (uid, p_assessment_id, NULL, p_joint, sid, now());
++      n := 1;
++    END IF;
++    RETURN n;
++  END IF;
++
++  FOREACH eid IN ARRAY p_exercise_ids LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.protocol_session_id = sid AND c.exercise_id = eid
++    ) THEN
++      INSERT INTO public.protocol_completions (
++        user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++      ) VALUES (uid, p_assessment_id, eid, p_joint, sid, now());
++      n := n + 1;
++    END IF;
++  END LOOP;
++  RETURN n;
++END;
++$$;
++
++COMMENT ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) IS
++  'P1-22 M-3. Signed-in user records completions for their own protocol session. One row per exercise id, or one session-level row when the array is empty.';
++
++GRANT EXECUTE ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) TO authenticated, service_role, postgres;
++
++CREATE OR REPLACE FUNCTION public.tg_protocol_session_completion()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path TO 'pg_catalog', 'public', 'pg_temp'
++AS $$
++DECLARE
++  aid uuid;
++BEGIN
++  -- Fallback only: if the app (or RPC) already wrote rows for this session, do nothing.
++  IF EXISTS (SELECT 1 FROM public.protocol_completions c WHERE c.protocol_session_id = NEW.id) THEN
++    RETURN NEW;
++  END IF;
++  -- FK-safe: protocol_completions.user_id references public.users(id). Skip users
++  -- with no public.users row instead of failing the session save.
++  IF NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id = NEW.user_id) THEN
++    RETURN NEW;
++  END IF;
++  BEGIN
++    -- Skip when completions already exist for this user on the session's local date
++    -- (Base web writer 41b947e7 inserts per-exercise rows with no protocol_session_id).
++    -- Local date: user's notification_preferences.timezone if valid, else America/New_York.
++    IF EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.user_id = NEW.user_id
++        AND (c.completed_at AT TIME ZONE COALESCE(
++              (SELECT np.timezone FROM public.notification_preferences np
++                WHERE np.user_id = NEW.user_id
++                  AND np.timezone IN (SELECT tz.name FROM pg_catalog.pg_timezone_names tz)
++                ORDER BY np.updated_at DESC NULLS LAST LIMIT 1),
++              'America/New_York'))::date = NEW.session_date
++    ) THEN
++      RETURN NEW;
++    END IF;
++    SELECT a.id INTO aid
++    FROM public.assessments a
++    WHERE a.user_id = NEW.user_id
++    ORDER BY a.assessed_at DESC NULLS LAST
++    LIMIT 1;
++    INSERT INTO public.protocol_completions (
++      user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++    ) VALUES (
++      NEW.user_id,
++      aid,
++      NULL,
++      NEW.protocol_day,
++      NEW.id,
++      COALESCE(NEW.logged_at, now())
++    );
++  EXCEPTION WHEN others THEN
++    -- Never block a protocol_sessions save.
++    RAISE WARNING 'zz_pc_protocol_session: completion not recorded for session % (%: %)', NEW.id, SQLSTATE, SQLERRM;
++  END;
++  RETURN NEW;
++END;
++$$;
++
++DROP TRIGGER IF EXISTS zz_pc_protocol_session ON public.protocol_sessions;
++CREATE TRIGGER zz_pc_protocol_session
++  AFTER INSERT OR UPDATE OF session_date, protocol_day ON public.protocol_sessions
++  FOR EACH ROW
++  EXECUTE FUNCTION public.tg_protocol_session_completion();
++
++-- Backfill existing sessions that have no completion row. Session-level only
++-- (exercise_id is unknown historically). Safe to re-run.
++-- FK-safe: skip sessions whose user has no public.users row (FK target).
++INSERT INTO public.protocol_completions (
++  user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++)
++SELECT
++  ps.user_id,
++  (SELECT a.id FROM public.assessments a
++    WHERE a.user_id = ps.user_id
++    ORDER BY a.assessed_at DESC NULLS LAST LIMIT 1),
++  NULL,
++  ps.protocol_day,
++  ps.id,
++  COALESCE(ps.logged_at, now())
++FROM public.protocol_sessions ps
++WHERE NOT EXISTS (
++  SELECT 1 FROM public.protocol_completions c WHERE c.protocol_session_id = ps.id
++)
++  AND EXISTS (select 1 from public.users u where u.id = ps.user_id)
++  -- Skip sessions whose user already has completions on that local date (writer 41b947e7 rows).
++  AND NOT EXISTS (
++    SELECT 1 FROM public.protocol_completions c
++    WHERE c.user_id = ps.user_id
++      AND (c.completed_at AT TIME ZONE COALESCE(
++            (SELECT np.timezone FROM public.notification_preferences np
++              WHERE np.user_id = ps.user_id
++                AND np.timezone IN (SELECT tz.name FROM pg_catalog.pg_timezone_names tz)
++              ORDER BY np.updated_at DESC NULLS LAST LIMIT 1),
++            'America/New_York'))::date = ps.session_date
++  );
+diff --git a/docs/p1-22/harness/package.json b/docs/p1-22/harness/package.json
+new file mode 100644
+index 0000000..4846a49
+--- /dev/null
++++ b/docs/p1-22/harness/package.json
+@@ -0,0 +1,8 @@
++{
++  "name": "p1-22-harness",
++  "private": true,
++  "type": "module",
++  "description": "Local PGlite write-path checks for P1-22. No live credentials.",
++  "scripts": { "test": "node test.mjs" },
++  "dependencies": { "@electric-sql/pglite": "0.3.16" }
++}
+diff --git a/docs/p1-22/harness/schema-stub.sql b/docs/p1-22/harness/schema-stub.sql
+new file mode 100644
+index 0000000..297170b
+--- /dev/null
++++ b/docs/p1-22/harness/schema-stub.sql
+@@ -0,0 +1,118 @@
++-- P1-22 scratch schema (subset of live tables). Not a full production dump.
++CREATE EXTENSION IF NOT EXISTS pgcrypto;
++CREATE SCHEMA IF NOT EXISTS ops;
++CREATE SCHEMA IF NOT EXISTS auth;
++CREATE SCHEMA IF NOT EXISTS public;
++
++-- Roles that exist on live Supabase; created here so GRANT/REVOKE in the
++-- migration can run on a scratch PGlite/Postgres. Not part of the live migration.
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
++    CREATE ROLE anon;
++  END IF;
++  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
++    CREATE ROLE authenticated;
++  END IF;
++  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
++    CREATE ROLE service_role;
++  END IF;
++END $$;
++
++
++CREATE TABLE IF NOT EXISTS auth.users (
++  id uuid PRIMARY KEY,
++  email text,
++  raw_app_meta_data jsonb DEFAULT '{}'::jsonb
++);
++
++CREATE OR REPLACE FUNCTION auth.uid()
++RETURNS uuid
++LANGUAGE sql
++STABLE
++AS $$
++  SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
++$$;
++
++CREATE TABLE IF NOT EXISTS public.users (
++  id uuid PRIMARY KEY,
++  email text
++);
++
++CREATE OR REPLACE FUNCTION public.is_test_account(p_email text)
++RETURNS boolean
++LANGUAGE sql
++STABLE
++AS $$
++  SELECT lower(coalesce(p_email, '')) ~ '^jim\+romrx-[a-z0-9._-]+@romrx\.io$'
++     AND EXISTS (
++       SELECT 1 FROM auth.users u
++       WHERE lower(u.email) = lower(p_email)
++         AND u.raw_app_meta_data->>'test_fixture' = 'true'
++     );
++$$;
++
++CREATE TABLE IF NOT EXISTS public.assessments (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid,
++  assessed_at timestamptz
++);
++
++CREATE TABLE IF NOT EXISTS public.protocol_sessions (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid NOT NULL,
++  session_date date,
++  protocol_day text,
++  logged_at timestamptz DEFAULT now(),
++  sport text
++);
++CREATE UNIQUE INDEX IF NOT EXISTS protocol_sessions_user_date
++  ON public.protocol_sessions (user_id, session_date);
++
++CREATE TABLE IF NOT EXISTS public.protocol_completions (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid NOT NULL,
++  assessment_id uuid,
++  exercise_id uuid,
++  joint text,
++  completed_at timestamptz NOT NULL DEFAULT now(),
++  sets_completed integer,
++  reps_completed integer,
++  difficulty_rating integer,
++  pain_rating integer,
++  notes text
++);
++
++CREATE TABLE IF NOT EXISTS public.product_events (
++  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
++  user_id uuid,
++  anon_id text,
++  session_id text,
++  event text,
++  props jsonb DEFAULT '{}'::jsonb,
++  sport text,
++  source text,
++  path text,
++  created_at timestamptz DEFAULT now()
++);
++
++CREATE TABLE IF NOT EXISTS public.notification_preferences (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid,
++  email_reminders boolean,
++  push_reminders boolean,
++  reminder_time text,
++  timezone text,
++  push_subscription jsonb,
++  updated_at timestamptz DEFAULT now(),
++  retest_reminders boolean,
++  weekly_digest boolean,
++  retest_opt_in_at timestamptz,
++  protocol_opt_in_at timestamptz,
++  digest_opt_in_at timestamptz
++);
++
++CREATE TABLE IF NOT EXISTS ops.base_onboarding_funnel (
++  user_id uuid PRIMARY KEY,
++  is_test boolean DEFAULT false,
++  first_assessment_at timestamptz
++);
+diff --git a/docs/p1-22/harness/test.mjs b/docs/p1-22/harness/test.mjs
+new file mode 100644
+index 0000000..0c1e199
+--- /dev/null
++++ b/docs/p1-22/harness/test.mjs
+@@ -0,0 +1,174 @@
++// P1-22 write-path checks on a local PGlite scratch DB. No live credentials.
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++import { dirname, join } from "node:path";
++import { PGlite } from "@electric-sql/pglite";
++import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
++
++const here = dirname(fileURLToPath(import.meta.url));
++const schema = readFileSync(join(here, "schema-stub.sql"), "utf8");
++let migration = readFileSync(join(here, "p1_22_migration.sql"), "utf8");
++// PGlite accepts EXECUTE FUNCTION on PG16; fall back if needed.
++const db = new PGlite({ extensions: { pgcrypto } });
++let failed = 0;
++function assert(cond, msg) {
++  if (!cond) {
++    failed += 1;
++    console.error("FAIL", msg);
++  } else {
++    console.log("PASS", msg);
++  }
++}
++
++async function main() {
++  await db.exec(schema);
++  try {
++    await db.exec(migration);
++  } catch (e) {
++    const err = String(e);
++    if (/EXECUTE FUNCTION/i.test(err)) {
++      migration = migration.replace(/EXECUTE FUNCTION/g, "EXECUTE PROCEDURE");
++      await db.exec(migration);
++    } else {
++      throw e;
++    }
++  }
++
++  const realId = "00000000-0000-0000-0000-000000000001";
++  const fixtureId = "00000000-0000-0000-0000-000000000002";
++  const staffId = "00000000-0000-0000-0000-000000000003";
++  // Fake fixture address only (pattern + flag). Not a real person.
++  const fixtureEmail = "jim+romrx-harness@romrx.io";
++
++  await db.exec(`
++    INSERT INTO auth.users (id, email, raw_app_meta_data) VALUES
++      ('${realId}', 'real-user@example.com', '{}'),
++      ('${fixtureId}', '${fixtureEmail}', '{"test_fixture": true}'),
++      ('${staffId}', 'staff-hook@example.com', '{}');
++    INSERT INTO public.users (id, email) VALUES
++      ('${realId}', 'real-user@example.com'),
++      ('${fixtureId}', '${fixtureEmail}'),
++      ('${staffId}', 'staff-hook@example.com');
++    INSERT INTO public.assessments (id, user_id, assessed_at) VALUES
++      ('10000000-0000-0000-0000-000000000001', '${realId}', now() - interval '10 days');
++    INSERT INTO ops.base_onboarding_funnel (user_id, is_test, first_assessment_at) VALUES
++      ('${realId}', false, now() - interval '10 days'),
++      ('${fixtureId}', true, now() - interval '10 days'),
++      ('${staffId}', false, now() - interval '10 days');
++  `);
++
++  // is_test_account + staff hook
++  const t1 = await db.query(`SELECT public.is_test_account('${fixtureEmail}') AS v`);
++  assert(t1.rows[0].v === true, "fixture email+flag is_test_account");
++  const t2 = await db.query(`SELECT public.is_test_account('real-user@example.com') AS v`);
++  assert(t2.rows[0].v === false, "non-fixture is not is_test_account");
++  const t3 = await db.query(`SELECT ops.is_excluded_from_metrics('${fixtureId}') AS v`);
++  assert(t3.rows[0].v === true, "fixture excluded via is_test_account");
++  const t4 = await db.query(`SELECT ops.is_excluded_from_metrics('${realId}') AS v`);
++  assert(t4.rows[0].v === false, "real user not excluded");
++  await db.exec(`INSERT INTO ops.internal_accounts (user_id, note) VALUES ('${staffId}', 'hook test, not a live staff id')`);
++  const t5 = await db.query(`SELECT ops.is_excluded_from_metrics('${staffId}') AS v`);
++  assert(t5.rows[0].v === true, "internal_accounts hook excludes staff user_id");
++  const t6 = await db.query(`SELECT count(*)::int AS n FROM ops.v_real_assessed`);
++  assert(t6.rows[0].n === 1, "v_real_assessed keeps only the real user");
++
++  // event split
++  await db.exec(`
++    INSERT INTO public.product_events (user_id, event, source, created_at) VALUES
++      ('${realId}', 'page_view', 'web', now()),
++      ('${realId}', 'email_sent', 'edge', now()),
++      ('${realId}', 'checkout_completed', 'stripe', now() - interval '30 minutes');
++  `);
++  const t7 = await db.query(`SELECT event FROM ops.user_actions ORDER BY event`);
++  const ev = t7.rows.map((r) => r.event);
++  assert(ev.includes("page_view") && !ev.includes("email_sent") && !ev.includes("checkout_completed"),
++    "user_actions allowlist excludes system events");
++  const t8 = await db.query(`SELECT public.product_event_kind('email_sent') AS k, public.product_event_kind('page_view') AS u`);
++  assert(t8.rows[0].k === "system" && t8.rows[0].u === "user", "product_event_kind split");
++
++  // checkout dedupe: 2 hour window, same user+purpose, plus session id preference
++  const t0 = "2026-10-28 16:00:00+00";
++  await db.exec(`
++    INSERT INTO public.product_events (user_id, event, source, props, created_at) VALUES
++      ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"base"}', '${t0}'),
++      ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"base"}', '2026-10-28 16:20:00+00'),
++      ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"sport_unlock"}', '2026-10-28 16:25:00+00'),
++      ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"base"}', '2026-10-28 19:30:00+00'),
++      ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"base","stripe_checkout_session_id":"cs_test_aaa"}', '2026-11-01 12:00:00+00');
++  `);
++  let uniqueRejected = false;
++  try {
++    await db.exec(`
++      INSERT INTO public.product_events (user_id, event, source, props, created_at) VALUES
++        ('${realId}', 'checkout_completed', 'stripe', '{"purpose":"base","stripe_checkout_session_id":"cs_test_aaa"}', '2026-11-01 12:05:00+00');
++    `);
++  } catch (e) {
++    uniqueRejected = /product_events_checkout_session_id_uidx|duplicate key/i.test(String(e));
++  }
++  assert(uniqueRejected, "unique index rejects a second row with the same stripe session id");
++  const t9 = await db.query(`
++    SELECT count(*)::int AS n,
++           count(*) FILTER (WHERE props ? 'stripe_checkout_session_id')::int AS with_sid
++    FROM ops.checkout_completed_deduped
++    WHERE created_at >= '2026-10-28'
++  `);
++  // Expected: 2 historic base windows (16:00/16:20 together, 19:30 new window >2h),
++  // 1 sport_unlock, 1 cs_test_aaa (the two sid rows collapse), plus the earlier now()-30min row without sid.
++  // The now()-30min row is a separate window. Total with created_at >= Oct 28: 2 base windows + sport + sid = 4, plus maybe the earlier insert if it's after Oct 28.
++  const t9b = await db.query(`
++    SELECT coalesce(props->>'purpose','' ) AS purpose,
++           props->>'stripe_checkout_session_id' AS sid,
++           created_at
++    FROM ops.checkout_completed_deduped
++    ORDER BY created_at
++  `);
++  console.log("deduped rows", t9b.rows);
++  const purposes = t9b.rows.map((r) => (r.sid ? "sid:"+r.sid : r.purpose));
++  assert(purposes.filter((p) => p === "base").length >= 2, "two base windows more than 2 hours apart stay distinct");
++  assert(purposes.includes("sport_unlock"), "sport_unlock in the same hour is not collapsed into base");
++  assert(purposes.filter((p) => String(p).includes("cs_test_aaa")).length === 1, "session-id row appears once in the deduped view");
++
++  // completions: trigger backfill / fallback
++  const sess = await db.query(`
++    INSERT INTO public.protocol_sessions (user_id, session_date, protocol_day)
++    VALUES ('${realId}', '2026-11-10', 'P1')
++    RETURNING id
++  `);
++  const sessionId = sess.rows[0].id;
++  const c1 = await db.query(`SELECT count(*)::int AS n FROM public.protocol_completions WHERE protocol_session_id = '${sessionId}'`);
++  assert(c1.rows[0].n === 1, "fallback trigger writes one session-level completion");
++
++  // RPC: set auth.uid and add exercise-level rows for a new session
++  const sess2 = await db.query(`
++    INSERT INTO public.protocol_sessions (user_id, session_date, protocol_day)
++    VALUES ('${realId}', '2026-11-11', 'P2')
++    RETURNING id
++  `);
++  const sid2 = sess2.rows[0].id;
++  // trigger already wrote one fallback row; RPC should see it and not duplicate session-level,
++  // but can add exercise rows. Clear fallback to simulate app-first path:
++  await db.exec(`DELETE FROM public.protocol_completions WHERE protocol_session_id = '${sid2}'`);
++  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${realId}', false)`);
++  const rpc = await db.query(`
++    SELECT public.record_protocol_completions(
++      '${sid2}'::uuid,
++      '10000000-0000-0000-0000-000000000001'::uuid,
++      'hip_flex',
++      ARRAY['20000000-0000-0000-0000-000000000001'::uuid, '20000000-0000-0000-0000-000000000002'::uuid]
++    ) AS n
++  `);
++  assert(rpc.rows[0].n === 2, "RPC writes one row per exercise id");
++  const c2 = await db.query(`SELECT count(*)::int AS n FROM public.protocol_completions WHERE protocol_session_id = '${sid2}'`);
++  assert(c2.rows[0].n === 2, "no extra fallback row after exercise-level writes");
++
++  if (failed) {
++    console.error(`\n${failed} check(s) failed`);
++    process.exit(1);
++  }
++  console.log("\nAll P1-22 harness checks passed.");
++}
++
++main().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});
+diff --git a/supabase/migrations/20261116030659_p1_22_retention_measurement.rollback.sql.txt b/supabase/migrations/20261116030659_p1_22_retention_measurement.rollback.sql.txt
+new file mode 100644
+index 0000000..2ee7d04
+--- /dev/null
++++ b/supabase/migrations/20261116030659_p1_22_retention_measurement.rollback.sql.txt
+@@ -0,0 +1,26 @@
++-- ROLLBACK for 20261116040000_p1_22_retention_measurement (UNAPPLIED companion).
++-- Does not drop protocol_completions rows that were backfilled unless you
++-- uncomment the delete below. Does not touch stripe-webhook.
++
++DROP TRIGGER IF EXISTS zz_pc_protocol_session ON public.protocol_sessions;
++DROP FUNCTION IF EXISTS public.tg_protocol_session_completion();
++DROP FUNCTION IF EXISTS public.record_protocol_completions(uuid, uuid, text, uuid[]);
++DROP INDEX IF EXISTS public.protocol_completions_session_exercise_uidx;
++DROP INDEX IF EXISTS public.protocol_completions_session_only_uidx;
++-- Keep protocol_session_id column (nullable, safe). Uncomment to drop:
++-- ALTER TABLE public.protocol_completions DROP COLUMN IF EXISTS protocol_session_id;
++
++DROP VIEW IF EXISTS ops.retention_daily;
++DROP VIEW IF EXISTS ops.retention_m5;
++DROP VIEW IF EXISTS ops.retention_m4;
++DROP VIEW IF EXISTS ops.retention_m2;
++DROP VIEW IF EXISTS ops.retention_m1;
++DROP VIEW IF EXISTS ops.v_real_assessed;
++DROP VIEW IF EXISTS ops.value_actions;
++DROP VIEW IF EXISTS ops.user_actions;
++DROP VIEW IF EXISTS ops.checkout_completed_deduped;
++DROP INDEX IF EXISTS public.product_events_checkout_session_id_uidx;
++DROP FUNCTION IF EXISTS public.product_event_kind(text);
++DROP FUNCTION IF EXISTS ops.is_excluded_from_metrics(uuid);
++-- Keep ops.internal_accounts (may have Jim-named rows later). Uncomment to drop:
++-- DROP TABLE IF EXISTS ops.internal_accounts;
+diff --git a/supabase/migrations/20261116030659_p1_22_retention_measurement.sql b/supabase/migrations/20261116030659_p1_22_retention_measurement.sql
+new file mode 100644
+index 0000000..33e9051
+--- /dev/null
++++ b/supabase/migrations/20261116030659_p1_22_retention_measurement.sql
+@@ -0,0 +1,424 @@
++-- P1-22 retention measurement (UNAPPLIED)
++-- Written 2026-11-15, Avery. Numbered after live supabase_migrations max 20261116024102 (renumbered from 20261116013000; P1-07/P1-06 lane is 0300xx).
++-- Do not apply until Margot has a sha gate line and Vera's precheck PASS, relayed by Grant.
++-- No live writes in this commit. Never stores user emails.
++
++-- =====================================================================
++-- M-0 Exclusions: existing is_test_account (jim+romrx-...@romrx.io AND
++-- test_fixture=true) plus a hook table for the staff list Jim will name.
++-- =====================================================================
++
++CREATE TABLE IF NOT EXISTS ops.internal_accounts (
++  user_id uuid PRIMARY KEY,
++  note text,
++  added_at timestamptz NOT NULL DEFAULT now()
++);
++
++COMMENT ON TABLE ops.internal_accounts IS
++  'P1-22 M-0 hook. Leave empty until Jim names staff or personal Base accounts to exclude from retention metrics. Store user_id only, never an email. Added rows need their own Jim yes.';
++
++ALTER TABLE ops.internal_accounts ENABLE ROW LEVEL SECURITY;
++-- No policies: service-role / postgres only (same pattern as other ops tables).
++
++CREATE OR REPLACE FUNCTION ops.is_excluded_from_metrics(p_user_id uuid)
++RETURNS boolean
++LANGUAGE sql
++STABLE
++SECURITY DEFINER
++SET search_path TO 'pg_catalog', 'ops', 'public', 'auth', 'pg_temp'
++AS $$
++  SELECT
++    p_user_id IS NOT NULL
++    AND (
++      EXISTS (SELECT 1 FROM ops.internal_accounts i WHERE i.user_id = p_user_id)
++      OR EXISTS (
++        SELECT 1
++        FROM auth.users u
++        WHERE u.id = p_user_id
++          AND public.is_test_account(u.email)
++      )
++    );
++$$;
++
++COMMENT ON FUNCTION ops.is_excluded_from_metrics(uuid) IS
++  'True when the user is a flagged test fixture (is_test_account = jim+romrx- pattern AND test_fixture) or is in ops.internal_accounts (staff hook, empty until Jim names accounts).';
++
++REVOKE ALL ON FUNCTION ops.is_excluded_from_metrics(uuid) FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION ops.is_excluded_from_metrics(uuid) TO service_role, postgres;
++
++-- =====================================================================
++-- M-1 Event split and metric views (Reid MEASUREMENT-PLAN.md)
++-- Classify by event-name allowlist, not by product_events.source.
++-- =====================================================================
++
++CREATE OR REPLACE FUNCTION public.product_event_kind(p_event text)
++RETURNS text
++LANGUAGE sql
++IMMUTABLE
++PARALLEL SAFE
++SET search_path TO 'pg_catalog', 'pg_temp'
++AS $$
++  SELECT CASE
++    WHEN p_event IN (
++      'email_sent',
++      'base_status_changed',
++      'base_activated',
++      'checkout_completed',
++      'checkout_packs_closed',
++      'checkout_packs_closed_sport_dropped',
++      'sport_entitlement_changed',
++      'signup_completed',
++      'lead_assessment_submitted',
++      'assessment_lead_gate_shown',
++      'unsubscribed'
++    ) THEN 'system'
++    ELSE 'user'
++  END;
++$$;
++
++REVOKE ALL ON FUNCTION public.product_event_kind(text) FROM PUBLIC;
++GRANT EXECUTE ON FUNCTION public.product_event_kind(text) TO service_role, postgres;
++
++CREATE OR REPLACE VIEW ops.user_actions AS
++SELECT e.user_id, e.created_at, e.event, e.props, e.source, e.path, e.sport, e.id
++FROM public.product_events e
++WHERE e.user_id IS NOT NULL
++  AND e.event IN (
++    'page_view','results_viewed','results_unlock_clicked','assessment_started',
++    'assessment_step_completed','assessment_completed_ui','assessment_submitted',
++    'protocol_session_logged','rombot_message_sent','fuel_nutrition_calculated',
++    'fuel_hydration_calculated','login_redirected_to_assessment','checkout_started',
++    'signup_submitted','consent_signed',
++    'today_session_started','session_completed','quick_recheck_started',
++    'quick_recheck_submitted','reminder_opt_in_shown','reminder_opt_in_set',
++    'retest_started','retest_results_viewed','rombot_checkin_opened','email_link_opened'
++  );
++
++COMMENT ON VIEW ops.user_actions IS
++  'P1-22 M-1. Reid allowlist of user-caused events. New UI events must be added here when they ship. Not a split on source.';
++
++CREATE OR REPLACE VIEW ops.value_actions AS
++SELECT user_id, logged_at AS at, 'protocol_session'::text AS kind FROM public.protocol_sessions
++UNION ALL
++SELECT user_id, completed_at, 'protocol_completion' FROM public.protocol_completions
++UNION ALL
++SELECT user_id, assessed_at, 'assessment' FROM public.assessments;
++
++CREATE OR REPLACE VIEW ops.v_real_assessed AS
++SELECT f.user_id, f.first_assessment_at AS t0
++FROM ops.base_onboarding_funnel f
++WHERE NOT COALESCE(f.is_test, false)
++  AND f.first_assessment_at IS NOT NULL
++  AND NOT COALESCE(ops.is_excluded_from_metrics(f.user_id), false);
++
++COMMENT ON VIEW ops.v_real_assessed IS
++  'Real assessed users for retention metrics: funnel is_test = false (is_test_account / test_fixture / jim+romrx- pattern) AND not in ops.internal_accounts.';
++
++CREATE OR REPLACE VIEW ops.retention_m1 AS
++SELECT n AS day_n,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)) AS eligible,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)
++    AND EXISTS (SELECT 1 FROM ops.user_actions u WHERE u.user_id = r.user_id
++                AND u.created_at >= r.t0 + make_interval(days => n))) AS returned_any_action,
++  count(*) FILTER (WHERE r.t0 <= now() - make_interval(days => n)
++    AND EXISTS (SELECT 1 FROM ops.value_actions v WHERE v.user_id = r.user_id
++                AND v.at >= r.t0 + make_interval(days => n))) AS returned_value_action
++FROM ops.v_real_assessed r
++CROSS JOIN (VALUES (1),(7),(14),(30)) d(n)
++GROUP BY n;
++
++CREATE OR REPLACE VIEW ops.retention_m2 AS
++SELECT count(*) FILTER (WHERE r.t0 <= now() - interval '7 days') AS eligible,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND s.days_wk1 >= 1) AS had_1plus,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '7 days' AND s.days_wk1 >= 3) AS had_3plus
++FROM ops.v_real_assessed r
++LEFT JOIN LATERAL (
++  SELECT count(DISTINCT p.session_date) AS days_wk1
++  FROM public.protocol_sessions p
++  WHERE p.user_id = r.user_id
++    AND p.logged_at >= r.t0
++    AND p.logged_at < r.t0 + interval '7 days'
++) s ON true;
++
++CREATE OR REPLACE VIEW ops.retention_m4 AS
++SELECT
++  count(*) FILTER (WHERE r.t0 <= now() - interval '56 days') AS eligible_56d,
++  count(*) FILTER (WHERE r.t0 <= now() - interval '56 days' AND EXISTS (
++    SELECT 1 FROM public.assessments a
++    WHERE a.user_id = r.user_id
++      AND a.assessed_at > r.t0 + interval '1 day'
++      AND a.assessed_at <= r.t0 + interval '56 days')) AS retested_by_d56,
++  count(*) FILTER (WHERE EXISTS (
++    SELECT 1 FROM public.assessments a
++    WHERE a.user_id = r.user_id AND a.assessed_at > r.t0 + interval '1 day')) AS retested_ever,
++  count(*) FILTER (WHERE EXISTS (
++    SELECT 1 FROM ops.user_actions u
++    WHERE u.user_id = r.user_id
++      AND u.event = 'assessment_started'
++      AND u.created_at > r.t0 + interval '1 day')) AS retest_started_ever
++FROM ops.v_real_assessed r;
++
++CREATE OR REPLACE VIEW ops.retention_m5 AS
++SELECT
++  (SELECT count(*) FROM ops.v_real_assessed) AS real_assessed,
++  count(*) FILTER (WHERE (np.retest_reminders AND np.retest_opt_in_at IS NOT NULL)
++                    OR (np.email_reminders AND np.protocol_opt_in_at IS NOT NULL)
++                    OR (np.weekly_digest AND np.digest_opt_in_at IS NOT NULL)) AS opted_in_any,
++  count(*) FILTER (WHERE np.retest_reminders AND np.retest_opt_in_at IS NULL) AS retest_default_on_no_marker,
++  count(*) FILTER (WHERE np.push_subscription IS NOT NULL) AS push_pref_rows
++FROM ops.v_real_assessed r
++LEFT JOIN public.notification_preferences np ON np.user_id = r.user_id;
++
++-- Convenience union for Reid (metric_id, payload as jsonb).
++CREATE OR REPLACE VIEW ops.retention_daily AS
++SELECT 'M1'::text AS metric_id, to_jsonb(m) AS payload FROM ops.retention_m1 m
++UNION ALL
++SELECT 'M2', to_jsonb(m) FROM ops.retention_m2 m
++UNION ALL
++SELECT 'M4', to_jsonb(m) FROM ops.retention_m4 m
++UNION ALL
++SELECT 'M5', to_jsonb(m) FROM ops.retention_m5 m;
++
++GRANT SELECT ON ops.user_actions, ops.value_actions, ops.v_real_assessed,
++  ops.retention_m1, ops.retention_m2, ops.retention_m4, ops.retention_m5,
++  ops.retention_daily TO service_role, postgres;
++
++-- =====================================================================
++-- M-2 checkout_completed dedupe
++-- New rows (after the stripe-webhook branch is deployed with Jim's yes)
++-- carry props.stripe_checkout_session_id and dedupe on it.
++-- Historic rows have no session id: fall back to user + purpose + a 2-hour
++-- timestamp window (gaps-and-islands). This replaces Reid's ET calendar-day
++-- fallback; see SPEC-FOR-REID.md.
++-- The stripe-webhook emitter is on a SEPARATE branch and must not be deployed
++-- without Jim's own yes. This migration does not change any edge function.
++-- =====================================================================
++
++CREATE UNIQUE INDEX IF NOT EXISTS product_events_checkout_session_id_uidx
++  ON public.product_events ((props->>'stripe_checkout_session_id'))
++  WHERE event = 'checkout_completed'
++    AND props ? 'stripe_checkout_session_id'
++    AND length(props->>'stripe_checkout_session_id') > 0;
++
++CREATE OR REPLACE VIEW ops.checkout_completed_deduped AS
++WITH base AS (
++  SELECT e.*,
++         NULLIF(e.props->>'stripe_checkout_session_id', '') AS _sid,
++         COALESCE(e.props->>'purpose', '') AS _purpose
++  FROM public.product_events e
++  WHERE e.event = 'checkout_completed'
++),
++with_sid AS (
++  SELECT DISTINCT ON (_sid)
++         id, user_id, anon_id, session_id, event, props, sport, source, path, created_at
++  FROM base
++  WHERE _sid IS NOT NULL
++  ORDER BY _sid, created_at DESC
++),
++no_sid_flagged AS (
++  SELECT b.*,
++         CASE
++           WHEN lag(created_at) OVER (PARTITION BY user_id, _purpose ORDER BY created_at) IS NULL
++             OR created_at - lag(created_at) OVER (PARTITION BY user_id, _purpose ORDER BY created_at)
++                > INTERVAL '2 hours'
++           THEN 1 ELSE 0
++         END AS _new_grp
++  FROM base b
++  WHERE _sid IS NULL
++),
++no_sid_grouped AS (
++  SELECT f.*,
++         SUM(_new_grp) OVER (PARTITION BY user_id, _purpose ORDER BY created_at) AS _grp
++  FROM no_sid_flagged f
++),
++no_sid AS (
++  SELECT DISTINCT ON (user_id, _purpose, _grp)
++         id, user_id, anon_id, session_id, event, props, sport, source, path, created_at
++  FROM no_sid_grouped
++  ORDER BY user_id, _purpose, _grp, created_at DESC
++)
++SELECT * FROM with_sid
++UNION ALL
++SELECT * FROM no_sid;
++
++COMMENT ON VIEW ops.checkout_completed_deduped IS
++  'P1-22. Prefer props.stripe_checkout_session_id when present. Fallback (no session id): one row per user_id + purpose + 2-hour timestamp window (gaps-and-islands; a new window starts when the gap from the previous row for that user and purpose is greater than 2 hours). Latest row in the window is kept. Purpose is kept so a Base unlock and a sport-pack unlock close together are not collapsed. Window is 2 hours because Stripe webhook retries for one checkout usually arrive minutes to a couple of hours apart; a calendar-day rule can split a late-ET retry or merge two real checkouts on the same date.';
++
++GRANT SELECT ON ops.checkout_completed_deduped TO service_role, postgres;
++
++-- =====================================================================
++-- M-3 protocol_completions writer (backend)
++-- App on the companion romrx-io-web branch writes one row per Today-card
++-- exercise using existing columns (works even before this migration).
++-- This migration adds a session link, an RPC the app can call, a fallback
++-- trigger so a session upsert still records a completion if the app did
++-- not, and a backfill of the existing protocol_sessions (0 completions today).
++-- =====================================================================
++
++ALTER TABLE public.protocol_completions
++  ADD COLUMN IF NOT EXISTS protocol_session_id uuid REFERENCES public.protocol_sessions(id) ON DELETE SET NULL;
++
++CREATE UNIQUE INDEX IF NOT EXISTS protocol_completions_session_exercise_uidx
++  ON public.protocol_completions (protocol_session_id, exercise_id)
++  WHERE protocol_session_id IS NOT NULL AND exercise_id IS NOT NULL;
++
++CREATE UNIQUE INDEX IF NOT EXISTS protocol_completions_session_only_uidx
++  ON public.protocol_completions (protocol_session_id)
++  WHERE protocol_session_id IS NOT NULL AND exercise_id IS NULL;
++
++CREATE OR REPLACE FUNCTION public.record_protocol_completions(
++  p_session_id uuid,
++  p_assessment_id uuid,
++  p_joint text,
++  p_exercise_ids uuid[]
++) RETURNS integer
++LANGUAGE plpgsql
++SECURITY INVOKER
++SET search_path TO 'pg_catalog', 'public', 'pg_temp'
++AS $$
++DECLARE
++  uid uuid := auth.uid();
++  n integer := 0;
++  eid uuid;
++  sid uuid;
++BEGIN
++  IF uid IS NULL THEN
++    RAISE EXCEPTION 'not authenticated' USING ERRCODE = '42501';
++  END IF;
++  IF p_session_id IS NULL THEN
++    RETURN 0;
++  END IF;
++  SELECT s.id INTO sid
++  FROM public.protocol_sessions s
++  WHERE s.id = p_session_id AND s.user_id = uid;
++  IF sid IS NULL THEN
++    RAISE EXCEPTION 'session not found' USING ERRCODE = '42501';
++  END IF;
++
++  IF p_exercise_ids IS NULL OR cardinality(p_exercise_ids) = 0 THEN
++    IF NOT EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.protocol_session_id = sid AND c.exercise_id IS NULL
++    ) THEN
++      INSERT INTO public.protocol_completions (
++        user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++      ) VALUES (uid, p_assessment_id, NULL, p_joint, sid, now());
++      n := 1;
++    END IF;
++    RETURN n;
++  END IF;
++
++  FOREACH eid IN ARRAY p_exercise_ids LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.protocol_session_id = sid AND c.exercise_id = eid
++    ) THEN
++      INSERT INTO public.protocol_completions (
++        user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++      ) VALUES (uid, p_assessment_id, eid, p_joint, sid, now());
++      n := n + 1;
++    END IF;
++  END LOOP;
++  RETURN n;
++END;
++$$;
++
++COMMENT ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) IS
++  'P1-22 M-3. Signed-in user records completions for their own protocol session. One row per exercise id, or one session-level row when the array is empty.';
++
++GRANT EXECUTE ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) TO authenticated, service_role, postgres;
++
++CREATE OR REPLACE FUNCTION public.tg_protocol_session_completion()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path TO 'pg_catalog', 'public', 'pg_temp'
++AS $$
++DECLARE
++  aid uuid;
++BEGIN
++  -- Fallback only: if the app (or RPC) already wrote rows for this session, do nothing.
++  IF EXISTS (SELECT 1 FROM public.protocol_completions c WHERE c.protocol_session_id = NEW.id) THEN
++    RETURN NEW;
++  END IF;
++  -- FK-safe: protocol_completions.user_id references public.users(id). Skip users
++  -- with no public.users row instead of failing the session save.
++  IF NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id = NEW.user_id) THEN
++    RETURN NEW;
++  END IF;
++  BEGIN
++    -- Skip when completions already exist for this user on the session's local date
++    -- (Base web writer 41b947e7 inserts per-exercise rows with no protocol_session_id).
++    -- Local date: user's notification_preferences.timezone if valid, else America/New_York.
++    IF EXISTS (
++      SELECT 1 FROM public.protocol_completions c
++      WHERE c.user_id = NEW.user_id
++        AND (c.completed_at AT TIME ZONE COALESCE(
++              (SELECT np.timezone FROM public.notification_preferences np
++                WHERE np.user_id = NEW.user_id
++                  AND np.timezone IN (SELECT tz.name FROM pg_catalog.pg_timezone_names tz)
++                ORDER BY np.updated_at DESC NULLS LAST LIMIT 1),
++              'America/New_York'))::date = NEW.session_date
++    ) THEN
++      RETURN NEW;
++    END IF;
++    SELECT a.id INTO aid
++    FROM public.assessments a
++    WHERE a.user_id = NEW.user_id
++    ORDER BY a.assessed_at DESC NULLS LAST
++    LIMIT 1;
++    INSERT INTO public.protocol_completions (
++      user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++    ) VALUES (
++      NEW.user_id,
++      aid,
++      NULL,
++      NEW.protocol_day,
++      NEW.id,
++      COALESCE(NEW.logged_at, now())
++    );
++  EXCEPTION WHEN others THEN
++    -- Never block a protocol_sessions save.
++    RAISE WARNING 'zz_pc_protocol_session: completion not recorded for session % (%: %)', NEW.id, SQLSTATE, SQLERRM;
++  END;
++  RETURN NEW;
++END;
++$$;
++
++DROP TRIGGER IF EXISTS zz_pc_protocol_session ON public.protocol_sessions;
++CREATE TRIGGER zz_pc_protocol_session
++  AFTER INSERT OR UPDATE OF session_date, protocol_day ON public.protocol_sessions
++  FOR EACH ROW
++  EXECUTE FUNCTION public.tg_protocol_session_completion();
++
++-- Backfill existing sessions that have no completion row. Session-level only
++-- (exercise_id is unknown historically). Safe to re-run.
++-- FK-safe: skip sessions whose user has no public.users row (FK target).
++INSERT INTO public.protocol_completions (
++  user_id, assessment_id, exercise_id, joint, protocol_session_id, completed_at
++)
++SELECT
++  ps.user_id,
++  (SELECT a.id FROM public.assessments a
++    WHERE a.user_id = ps.user_id
++    ORDER BY a.assessed_at DESC NULLS LAST LIMIT 1),
++  NULL,
++  ps.protocol_day,
++  ps.id,
++  COALESCE(ps.logged_at, now())
++FROM public.protocol_sessions ps
++WHERE NOT EXISTS (
++  SELECT 1 FROM public.protocol_completions c WHERE c.protocol_session_id = ps.id
++)
++  AND EXISTS (select 1 from public.users u where u.id = ps.user_id)
++  -- Skip sessions whose user already has completions on that local date (writer 41b947e7 rows).
++  AND NOT EXISTS (
++    SELECT 1 FROM public.protocol_completions c
++    WHERE c.user_id = ps.user_id
++      AND (c.completed_at AT TIME ZONE COALESCE(
++            (SELECT np.timezone FROM public.notification_preferences np
++              WHERE np.user_id = ps.user_id
++                AND np.timezone IN (SELECT tz.name FROM pg_catalog.pg_timezone_names tz)
++              ORDER BY np.updated_at DESC NULLS LAST LIMIT 1),
++            'America/New_York'))::date = ps.session_date
++  );
+diff --git a/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.rollback.sql.txt b/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.rollback.sql.txt
+new file mode 100644
+index 0000000..d2e6c99
+--- /dev/null
++++ b/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.rollback.sql.txt
+@@ -0,0 +1,30 @@
++-- Rollback for 20261116040600_p1_22_revoke_anon_execute (NOT APPLIED).
++-- Restores the exact live EXECUTE grants read 2026-11-15 10:21 PM ET
++-- via execute_sql (read-only) after migration 20261116030659.
++-- The real id is stamped at apply via MCP; this file stays paired with
++-- the repo filename 20261116040600.
++-- Does not drop the functions or change their bodies.
++-- Privileges are cleared first, then re-granted in the live proacl order
++-- so the ACL text matches, not just the privilege set.
++
++-- public.product_event_kind(text)
++-- Live: {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++REVOKE ALL ON FUNCTION public.product_event_kind(text) FROM PUBLIC, anon, authenticated, service_role;
++GRANT EXECUTE ON FUNCTION public.product_event_kind(text) TO anon, authenticated, service_role;
++
++-- public.record_protocol_completions(uuid, uuid, text, uuid[])
++-- Live: {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++REVOKE ALL ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) FROM PUBLIC, anon, authenticated, service_role, postgres;
++GRANT EXECUTE ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) TO PUBLIC;
++GRANT EXECUTE ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) TO postgres, anon, authenticated, service_role;
++
++-- public.tg_protocol_session_completion()
++-- Live: {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++REVOKE ALL ON FUNCTION public.tg_protocol_session_completion() FROM PUBLIC, anon, authenticated, service_role, postgres;
++GRANT EXECUTE ON FUNCTION public.tg_protocol_session_completion() TO PUBLIC;
++GRANT EXECUTE ON FUNCTION public.tg_protocol_session_completion() TO postgres, anon, authenticated, service_role;
++
++-- ops.is_excluded_from_metrics(uuid)
++-- Live already: {postgres=X/postgres,service_role=X/postgres}
++REVOKE ALL ON FUNCTION ops.is_excluded_from_metrics(uuid) FROM PUBLIC, anon, authenticated, service_role;
++GRANT EXECUTE ON FUNCTION ops.is_excluded_from_metrics(uuid) TO service_role;
+diff --git a/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.sql b/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.sql
+new file mode 100644
+index 0000000..5356f32
+--- /dev/null
++++ b/supabase/migrations/20261116040600_p1_22_revoke_anon_execute.sql
+@@ -0,0 +1,55 @@
++-- P1-22 follow-up: revoke anon / PUBLIC (and unused authenticated) EXECUTE
++-- on the P1-22 functions (Vera W1 on 5162a3c3).
++-- Written 2026-11-15, Avery. Numbered 20261116040600 after the live-id
++-- P1-22 measurement migration 20261116030659 and after 040200/040400
++-- numbering reserved on other branches.
++-- BUILD ONLY. Do not apply until Margot has a sha gate line and Vera's
++-- precheck PASS, relayed by Grant. No live writes in this commit.
++-- The real migration id is stamped at apply via MCP apply_migration;
++-- 20261116040600 is the repo filename only.
++--
++-- Live EXECUTE grants read 2026-11-15 10:21 PM ET via execute_sql
++-- (read-only) on project cqzvqzwwevnflinxgnpp, after 20261116030659:
++--   ops.is_excluded_from_metrics(uuid)
++--     proacl {postgres=X/postgres,service_role=X/postgres}
++--     has_function_privilege: anon false, authenticated false,
++--     service_role true, postgres true. Already revoked.
++--   public.product_event_kind(text)
++--     proacl {postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++--     no PUBLIC grant (030659 revoked PUBLIC; pg_default_acl still
++--     granted anon and authenticated).
++--   public.record_protocol_completions(uuid, uuid, text, uuid[])
++--     proacl {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++--   public.tg_protocol_session_completion()
++--     proacl {=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}
++--
++-- Client / edge evidence (no RPC caller for any of the four):
++--   romrx-io-web 360510fe3a3d165d20fe11392715cfedec47eb9c (live):
++--     no .rpc('record_protocol_completions'|product_event_kind|
++--     tg_protocol_session_completion|is_excluded_from_metrics).
++--     MyProtocol.tsx:582-586 upserts protocol_sessions; :610 inserts
++--     protocol_completions directly (comment at :568).
++--   romrxbjj-v2 5366b22c (edge functions and src): no .rpc of those
++--     names. service_role and postgres keep EXECUTE on all four.
++
++-- public.product_event_kind: no client or edge RPC. Used from ops
++-- views as the view owner (postgres). Revoke PUBLIC, anon, authenticated.
++REVOKE ALL ON FUNCTION public.product_event_kind(text) FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION public.product_event_kind(text) TO service_role, postgres;
++
++-- public.record_protocol_completions: live Base writer does not call
++-- this RPC (MyProtocol.tsx inserts the table). No edge-function RPC.
++-- authenticated EXECUTE is unused. Revoke PUBLIC, anon, authenticated.
++REVOKE ALL ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION public.record_protocol_completions(uuid, uuid, text, uuid[]) TO service_role, postgres;
++
++-- public.tg_protocol_session_completion: trigger function. Caller
++-- EXECUTE is not required for the trigger to fire on a session insert.
++-- Revoke PUBLIC, anon, authenticated.
++REVOKE ALL ON FUNCTION public.tg_protocol_session_completion() FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION public.tg_protocol_session_completion() TO service_role, postgres;
++
++-- ops.is_excluded_from_metrics: already service_role + postgres only
++-- on live (030659 revoked PUBLIC, anon, authenticated). Idempotent.
++REVOKE ALL ON FUNCTION ops.is_excluded_from_metrics(uuid) FROM PUBLIC, anon, authenticated;
++GRANT EXECUTE ON FUNCTION ops.is_excluded_from_metrics(uuid) TO service_role, postgres;
