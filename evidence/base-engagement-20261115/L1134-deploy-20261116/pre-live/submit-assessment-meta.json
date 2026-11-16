@@ -1,0 +1,19 @@
+{
+  "slug": "submit-assessment",
+  "status": "ACTIVE",
+  "version": 44,
+  "ezbr_sha256": "110f365775b57b68977c68627ef2cda1645aae09a4ef23944555de8fcb0ff19a",
+  "updated_at": 1793114288188,
+  "verify_jwt": true,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_078815b9-b8c4-482b-b67a-1d62ccf16575_39/source/supabase/functions/submit-assessment/index.ts",
+  "updated_at_et": "Tue Oct 27, 2026 11:18:08 AM ET",
+  "files": [
+    "functions/submit-assessment/index.ts",
+    "functions/_shared/rate_limit.ts",
+    "functions/_shared/events.ts",
+    "functions/_shared/email_footer.ts",
+    "functions/_shared/capture_methods.ts",
+    "functions/submit-assessment/mood_block.ts"
+  ],
+  "read_at_et": "Mon Nov 16, 2026 9:36:13 AM ET"
+}

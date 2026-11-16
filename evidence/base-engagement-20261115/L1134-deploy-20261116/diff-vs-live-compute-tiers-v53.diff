@@ -1,0 +1,53 @@
+diff --git a/live/supabase/functions/compute-tiers/index.ts b/branch/supabase/functions/compute-tiers/index.ts
+index 23930ee..4e350ba 100644
+--- a/live/supabase/functions/compute-tiers/index.ts
++++ b/branch/supabase/functions/compute-tiers/index.ts
+@@ -205,6 +205,21 @@ Deno.serve(async (req: Request) => {
+       if (enforceOn()) return json({ success: false, error: "unauthorized" }, 401);
+     }
+ 
++    // P1-06 guard: live compute-tiers v53 (assessments INSERT webhook) has no check_kind guard.
++    // A quick submit would otherwise rewrite worst_joints, rom_total, compute_joint_scores,
++    // persist_protocols_for_assessment (the plan), pack eligibility, and sport-pack technique_eligibility.
++    // Skip all of that for check_kind=quick so Stacy's line "Your plan stays the same until your 6-week retest" stays true.
++    // If the column is missing (migration unapplied), this is a no-op and full assessments still score.
++    // Runs after the Row 19 caller check, so the caller check is unchanged.
++    if ((assessment as { check_kind?: string }).check_kind === "quick") {
++      return json({
++        success: true,
++        assessment_id: assessmentId,
++        sport: (assessment.sport as string | undefined) ?? "general",
++        skipped: "quick_check_no_rescore",
++      }, 200);
++    }
++
+     const sport = (assessment.sport as string | undefined) ?? "general";
+     const userId = assessment.user_id as string | undefined;
+     const athleteId = (assessment.athlete_id as string | undefined) ?? null;
+@@ -212,13 +227,25 @@ Deno.serve(async (req: Request) => {
+     // T1 option C (Oct 21 2026): the user's previous assessment (read only) for the two-in-a-row agreement check.
+     let prevAssessment: Record<string, unknown> | null = null;
+     if (userId && assessment.created_at) {
+-      const { data: prevRows } = await supa
++      // P1-06 follow-up (a): a quick re-check row is never "previous" (check_kind IS DISTINCT FROM 'quick'; NULL counts as full).
++      // If the check_kind column is missing (migration unapplied) the filtered read errors; fall back to the v53 read unchanged.
++      let { data: prevRows, error: prevErr } = await supa
+         .from("assessments")
+         .select("*")
+         .eq("user_id", userId)
+         .lt("created_at", assessment.created_at as string)
++        .or("check_kind.is.null,check_kind.neq.quick")
+         .order("created_at", { ascending: false })
+         .limit(1);
++      if (prevErr) {
++        ({ data: prevRows } = await supa
++          .from("assessments")
++          .select("*")
++          .eq("user_id", userId)
++          .lt("created_at", assessment.created_at as string)
++          .order("created_at", { ascending: false })
++          .limit(1));
++      }
+       prevAssessment = (prevRows && prevRows[0]) ? (prevRows[0] as Record<string, unknown>) : null;
+     }
+     // FG-36: hip flexion is scored only for assessments created at or after the DB cutover. Any read failure = old behavior.

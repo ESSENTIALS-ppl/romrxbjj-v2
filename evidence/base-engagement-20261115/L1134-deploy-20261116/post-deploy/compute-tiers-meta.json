@@ -1,0 +1,17 @@
+{
+  "slug": "compute-tiers",
+  "status": "ACTIVE",
+  "version": 54,
+  "ezbr_sha256": "f4c62a384310b5db2966b566ad1085c61733aa4653853cb34b50c7f17e33170b",
+  "updated_at": 1794840179988,
+  "verify_jwt": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_7c308d07-a2a3-47df-b525-df53cf14af25_54/source/source/index.ts",
+  "updated_at_et": "Mon Nov 16, 2026 9:42:59 AM ET",
+  "files": [
+    "source/index.ts",
+    "source/joint_totals.ts",
+    "_shared/t1_narrow_bands.ts",
+    "source/pack_recompute.ts"
+  ],
+  "read_at_et": "Mon Nov 16, 2026 9:43:13 AM ET"
+}
