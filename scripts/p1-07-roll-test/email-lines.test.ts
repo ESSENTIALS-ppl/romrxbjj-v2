@@ -50,7 +50,7 @@ Deno.test("P1-07 v3 window: digest (nextCheck) and lapsed (Stacy lapsedNextLine)
   const seen = new Set<string>();
   for (const c of await read("cases.json")) {
     const key = `${c.scenario}|${c.day}`;
-    const { digest, lapsed, expectLapsed } = lines(c.schedule, c.today, c.tz ?? "America/Chicago");
+    const { digest, lapsed, expectLapsed } = lines(c.schedule, c.today, c.tz ?? "America/New_York");
     assert(key in EXPECT, `no expectation for ${key}`);
     assertEquals(digest, EXPECT[key][0], key);
     assertEquals(lapsed, EXPECT[key][1], key);

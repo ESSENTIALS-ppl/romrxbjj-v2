@@ -12,7 +12,7 @@
 -- "Your next check is today." shows on local days 7 to 14 (next_check_at stays at +7 while the window is open).
 -- Window end is computed here from last_assessed_at in the user's tz (no stored column: the tz lives in
 -- notification_preferences and can change, so a stored close time could go stale).
--- Time zone (same source as lifecycle-emails): notification_preferences.timezone if valid, else America/Chicago
+-- Time zone (same source as lifecycle-emails): notification_preferences.timezone if valid, else America/New_York
 -- (lifecycle-emails DEFAULT_TZ). user_mobility_schedule has no tz column.
 -- Does not touch any other cron job (never send-renewal-reminders-daily, send-renewal-reminders or RENEWAL_BASE_SEND).
 
@@ -57,7 +57,7 @@ begin
      set next_check_at = s.next_retest_at,
          updated_at = p_now
     from (
-      select s2.user_id, coalesce(tzn.name, 'America/Chicago') as tz
+      select s2.user_id, coalesce(tzn.name, 'America/New_York') as tz
         from public.user_mobility_schedule s2
         left join public.notification_preferences np on np.user_id = s2.user_id
         left join lateral (select t.name from pg_catalog.pg_timezone_names t where t.name = np.timezone limit 1) tzn on true
@@ -70,7 +70,7 @@ begin
   return n;
 end $$;
 comment on function public.roll_next_check_at(timestamptz) is
-  'P1-07 rule 3 (v3 window): after local day 14 ends (notification_preferences.timezone, fallback America/Chicago) with no quick check, next_check_at = next_retest_at. Idempotent. Cron roll-next-check-at-hourly.';
+  'P1-07 rule 3 (v3 window): after local day 14 ends (notification_preferences.timezone, fallback America/New_York) with no quick check, next_check_at = next_retest_at. Idempotent. Cron roll-next-check-at-hourly.';
 revoke all on function public.roll_next_check_at(timestamptz) from public, anon, authenticated;
 grant execute on function public.roll_next_check_at(timestamptz) to service_role, postgres;
 

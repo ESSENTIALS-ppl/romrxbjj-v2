@@ -47,8 +47,9 @@ for (const [k, u] of Object.entries(users)) await fullSave(u, `a0000000-0000-400
 const cases = []
 const snap = async (scenario, k, today, day) => cases.push({ scenario, today, day, tz: tzOf[k] ?? null, schedule: await sched(users[k]) })
 const OPEN = '2026-11-08T12:00:00.000Z', RETEST = '2026-12-13T12:00:00.000Z'
-const chi = ['noQuick', 'quick10', 're42', 'noPrefs', 'badTz']
-const allOpen = async () => { for (const k of chi) if ((await sched(users[k])).next_check_at !== OPEN) return false; return true }
+const chi = ['noQuick', 'quick10', 're42'] // stored America/Chicago
+const nyFallback = ['noPrefs', 'badTz'] // invalid or missing tz -> America/New_York
+const allOpen = async (keys = [...chi, ...nyFallback]) => { for (const k of keys) if ((await sched(users[k])).next_check_at !== OPEN) return false; return true }
 // Day 0-6: nothing rolls (before the window).
 let n = await roll('2026-11-04T18:20:00Z')
 ok('day 3: roll changes 0 rows', n === 0, `n=${n}`)
@@ -72,17 +73,21 @@ n = await roll('2026-11-15T14:20:00Z')
 ok('Tokyo day 14 23:20 local (Nov 15 14:20Z): not rolled', n === 0 && (await sched(users.tokyo)).next_check_at === '2026-11-08T03:00:00.000Z', `n=${n}`)
 n = await roll('2026-11-15T15:20:00Z')
 ok('Tokyo day 15 00:20 local (Nov 15 15:20Z): rolled (only Tokyo)', n === 1 && (await sched(users.tokyo)).next_check_at === '2026-12-13T03:00:00.000Z', `n=${n}`)
-// Day 14, 11:20 PM Chicago (Nov 16 05:20Z): late evening, still open.
+// Day 14, 11:20 PM America/New_York (Nov 16 04:20Z): fallback users still open; Chicago is 22:20, also open.
+n = await roll('2026-11-16T04:20:00Z')
+ok('day 14 23:20 America/New_York: fallback users still open, 0 rows rolled', n === 0 && await allOpen(['noQuick', 're42', ...nyFallback]), `n=${n}`)
+// Day 15, 00:20 America/New_York (Nov 16 05:20Z) = day 14 23:20 Chicago: only invalid/missing tz (NY fallback) roll.
 n = await roll('2026-11-16T05:20:00Z')
-ok('day 14 23:20 Chicago (late evening): still open, 0 rows rolled', n === 0 && (await sched(users.noQuick)).next_check_at === OPEN, `n=${n}`)
+ok('day 15 00:20 America/New_York: no-prefs and invalid tz use America/New_York fallback and roll', n === 2 && (await sched(users.noPrefs)).next_check_at === RETEST && (await sched(users.badTz)).next_check_at === RETEST, `n=${n}`)
+ok('day 14 23:20 Chicago (same instant): stored-Chicago rows still open', (await sched(users.noQuick)).next_check_at === OPEN && (await sched(users.re42)).next_check_at === OPEN)
 await snap('no quick check', 'noQuick', '2026-11-15', 14)
-// Day 15, 00:20 Chicago (Nov 16 06:20Z): roll.
+// Day 15, 00:20 Chicago (Nov 16 06:20Z): stored-Chicago rows roll. Fallback users already rolled (idempotent).
 n = await roll('2026-11-16T06:20:00Z')
 const s1 = await sched(users.noQuick)
 ok('day 15 00:20 Chicago: no-quick row rolled to next_retest_at', s1.next_check_at === s1.next_retest_at && s1.next_check_at === RETEST, JSON.stringify(s1))
-ok('no-prefs row uses America/Chicago fallback (rolled same hour)', (await sched(users.noPrefs)).next_check_at === RETEST)
-ok('invalid tz row uses America/Chicago fallback, no error', (await sched(users.badTz)).next_check_at === RETEST)
-ok('day 15 roll changes exactly the 4 Chicago-day rows without a quick check (noQuick, re42, noPrefs, badTz)', n === 4, `n=${n}`)
+ok('no-prefs row stays on America/New_York fallback (already rolled, no error)', (await sched(users.noPrefs)).next_check_at === RETEST)
+ok('invalid tz row stays on America/New_York fallback, no error', (await sched(users.badTz)).next_check_at === RETEST)
+ok('day 15 00:20 Chicago roll changes exactly the 2 remaining stored-Chicago rows without a quick check (noQuick, re42)', n === 2, `n=${n}`)
 await snap('no quick check', 'noQuick', '2026-11-16', 15)
 // Idempotent: second run changes nothing.
 const before = JSON.stringify(await db.query(`select * from public.user_mobility_schedule order by user_id`).then(r => r.rows))

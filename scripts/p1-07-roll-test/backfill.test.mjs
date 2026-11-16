@@ -37,10 +37,10 @@ await db.exec(readFileSync(join(here, '../../supabase/migrations-unapplied/20261
 const ja = (await db.query(jobsQ)).rows
 ok('jobs 1-12 unchanged by the apply', JSON.stringify(jb) === JSON.stringify(ja.slice(0, 12)), `before=${jb.length} after=${ja.length}`)
 const rows = (await db.query(`
-  select s.user_id, s.last_assessed_at, s.next_check_at, s.next_retest_at, coalesce(t.name,'America/Chicago') tz,
-         (s.last_assessed_at at time zone coalesce(t.name,'America/Chicago'))::date d0,
-         (now() at time zone coalesce(t.name,'America/Chicago'))::date today,
-         (s.next_check_at at time zone coalesce(t.name,'America/Chicago'))::date dcheck
+  select s.user_id, s.last_assessed_at, s.next_check_at, s.next_retest_at, coalesce(t.name,'America/New_York') tz,
+         (s.last_assessed_at at time zone coalesce(t.name,'America/New_York'))::date d0,
+         (now() at time zone coalesce(t.name,'America/New_York'))::date today,
+         (s.next_check_at at time zone coalesce(t.name,'America/New_York'))::date dcheck
     from public.user_mobility_schedule s left join public.notification_preferences np on np.user_id = s.user_id
     left join lateral (select name from pg_timezone_names where name = np.timezone limit 1) t on true`)).rows
 ok('one backfilled row per user', rows.length === users.length, `${rows.length}/${users.length}`)
@@ -77,7 +77,7 @@ for (let h = 1; h <= 24 * 16; h++) {
   if (t.getUTCMinutes() !== 20) t.setUTCMinutes(20)
   await db.query(`select public.roll_next_check_at($1::timestamptz)`, [t.toISOString()])
   const rr = (await db.query(`select s.user_id, (s.last_assessed_at at time zone z.tz)::date d0, ($1::timestamptz at time zone z.tz)::date today, (s.next_check_at at time zone z.tz)::date dcheck
-     from public.user_mobility_schedule s join (select s2.user_id, coalesce(t.name,'America/Chicago') tz from public.user_mobility_schedule s2 left join public.notification_preferences np on np.user_id=s2.user_id left join lateral (select name from pg_timezone_names where name = np.timezone limit 1) t on true) z on z.user_id = s.user_id`, [t.toISOString()])).rows
+     from public.user_mobility_schedule s join (select s2.user_id, coalesce(t.name,'America/New_York') tz from public.user_mobility_schedule s2 left join public.notification_preferences np on np.user_id=s2.user_id left join lateral (select name from pg_timezone_names where name = np.timezone limit 1) t on true) z on z.user_id = s.user_id`, [t.toISOString()])).rows
   for (const r of rr) { const y = young.find(y => y.u === r.user_id); if (!y) continue; const day = Math.round((r.today - r.d0) / D)
     if (day >= 7 && day <= 14 && !y.quick) { walkOpen++; if (Math.round((r.dcheck - r.d0) / D) !== 7) walkBad.push(`${r.user_id} day ${day} open but moved`) }
     if (day >= 15 && day < 42) { walkAfter++; if (!(r.dcheck > r.today)) walkBad.push(`${r.user_id} day ${day}`) } }
