@@ -1,4 +1,4 @@
-// submit-assessment from live v44 plus P1-07 schedule and P1-06 quick re-check. BRANCH ONLY, not deployed. Migrations UNAPPLIED.
+// submit-assessment from live v44 plus P1-07 schedule, P1-06 quick re-check, and v4 day 7-14 server guard. BRANCH ONLY, not deployed. Migrations UNAPPLIED.
 // - v31: marketing opt-out now read from public.users (the `profiles` table never existed, so the
 //        opt-out was silently ignored). Removed the v1 BJJ-flavored users upsert (platforms ['bjj'],
 //        subscription_status 'pending' which the check constraint rejects). Logs product_events.
@@ -10,7 +10,7 @@ import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
 import { buildMoodBlockForUser } from "./mood_block.ts";
-import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, type ScheduleRead, scheduleRow } from "./schedule.ts";
+import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, rejectQuickWindow, type ScheduleRead, scheduleRow } from "./schedule.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -261,7 +261,12 @@ Deno.serve(async (req) => {
     if (!schErr && sch) sched = sch as unknown as ScheduleRead;
   } catch { sched = null; }
   if (checkKind === "quick") {
-    const rejected = rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
+    let userTz: string | null = null;
+    try {
+      const { data: pref } = await admin.from("notification_preferences").select("timezone").eq("user_id", user.id).maybeSingle();
+      if (pref && typeof (pref as { timezone?: unknown }).timezone === "string") userTz = (pref as { timezone: string }).timezone;
+    } catch { /* resolveTz falls back; single DEFAULT_TZ in schedule.ts */ }
+    const rejected = rejectQuickWindow(sched, new Date(), userTz) ?? rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
     if (rejected) return json({ error: QUICK_ERRORS[rejected] }, 400);
     row.check_kind = "quick"; // omit on full submits so insert still works before the unapplied check_kind migration
   }
