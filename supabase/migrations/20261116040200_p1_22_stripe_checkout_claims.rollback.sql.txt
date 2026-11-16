@@ -1,0 +1,6 @@
+-- ROLLBACK for 20261116040200_p1_22_stripe_checkout_claims (UNAPPLIED companion).
+-- Revert stripe-webhook to v53 FIRST. With the table gone the patched function fails open
+-- (alert + event on every delivery, as v53), so order matters only for repeat alerts.
+-- This drops the claim rows (bookkeeping only; no user or billing data). Export them first if wanted:
+--   COPY (SELECT * FROM public.stripe_checkout_claims) TO STDOUT WITH CSV HEADER;
+DROP TABLE IF EXISTS public.stripe_checkout_claims;

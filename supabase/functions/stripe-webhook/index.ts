@@ -288,6 +288,49 @@ const STRIPE_TEST_SECRET = (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "").trim()
 const ARL_LIVE = (Deno.env.get("ARL_LIVE_ENABLED") ?? "").toLowerCase() === "true";
 const TEST_MODE_READY = STRIPE_TEST_WEBHOOK_SECRET.startsWith("whsec_") && STRIPE_TEST_SECRET.startsWith("sk_test_");
 
+/** P1-22: atomic first-delivery claim for a Stripe checkout session id.
+ *  INSERT ... ON CONFLICT (stripe_checkout_session_id) DO NOTHING RETURNING via
+ *  upsert(ignoreDuplicates) + select(); the PRIMARY KEY on
+ *  public.stripe_checkout_claims (migration 20261116040200) makes it atomic, so two
+ *  concurrent Stripe deliveries of the same session cannot both get "first".
+ *  "first"  = this call inserted the row (returned row checked).
+ *  "repeat" = the row already existed (0 rows returned, no error).
+ *  "unknown"= no session id, or the claim errored (e.g. table not there yet):
+ *             fail open, i.e. behave exactly like v53 (alert + event).
+ *  Gates only the Jim PAID alert and the checkout_completed event; entitlement
+ *  writes always run. DEPLOY HOLD: stripe-webhook deploy needs Jim's own yes.
+ *  Does not touch create-checkout-session. */
+async function claimCheckoutSession(
+  supabase: ReturnType<typeof createClient>,
+  sessionId: string | null,
+  purpose: string,
+  userId: string | null,
+  livemode: boolean | null,
+): Promise<"first" | "repeat" | "unknown"> {
+  if (!sessionId) return "unknown";
+  try {
+    const { data, error } = await supabase
+      .from("stripe_checkout_claims")
+      .upsert(
+        { stripe_checkout_session_id: sessionId, purpose, user_id: userId, livemode },
+        { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true },
+      )
+      .select("stripe_checkout_session_id");
+    if (error) {
+      console.error("checkout claim failed; failing open", sessionId, error.message);
+      return "unknown";
+    }
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 1 && rows[0]?.stripe_checkout_session_id === sessionId) return "first";
+    if (rows.length === 0) return "repeat";
+    console.error("checkout claim returned unexpected rows; failing open", sessionId, rows.length);
+    return "unknown";
+  } catch (e) {
+    console.error("checkout claim threw; failing open", sessionId, String(e));
+    return "unknown";
+  }
+}
+
 /** v40: user id an event refers to (metadata first, then customer id lookup). */
 async function eventUserEmail(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>): Promise<string | null> {
   const meta = (obj.metadata ?? {}) as Record<string, string>;
@@ -405,7 +448,12 @@ Deno.serve(async (req: Request) => {
           props: { email_id: "arl_ack", checkout_session: obj.id, testmode: testEvent } });
       }
 
-      if (alertJim) await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
+      // P1-22: claim this checkout session right before the PAID alert. The alert stays where it
+      // is in v53 (order unchanged); a repeat delivery skips only the alert and checkout_completed.
+      const claim = await claimCheckoutSession(supabase, typeof obj.id === "string" ? obj.id : null, "base", meta.user_id ?? null, typeof obj.livemode === "boolean" ? obj.livemode : null);
+      const firstDelivery = claim !== "repeat";
+      if (!firstDelivery) console.log("checkout.session.completed repeat delivery; PAID alert and checkout_completed skipped", obj.id);
+      if (alertJim && firstDelivery) await sendEmail(BRAND_HQ, JIM_EMAIL, `New Base PAID: ${email}`,
         `<p>New ROMRx Base membership activated.</p>
          <p><strong>Email:</strong> ${email}<br>
          <strong>User ID:</strong> ${meta.user_id}<br>
@@ -423,8 +471,8 @@ Deno.serve(async (req: Request) => {
         await supabase.rpc("add_sport_access", { p_user_id: meta.user_id, p_sport: pendingSport });
       }
 
-      await logEvent("checkout_completed", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
-        props: { purpose: "base", pending_sport: pendingSport, amount_total: obj.amount_total ?? null, currency: obj.currency ?? null, discount: !!(obj.total_details as Record<string, unknown> | undefined)?.amount_discount } });
+      if (firstDelivery) await logEvent("checkout_completed", { userId: meta.user_id, sport: pendingSport ?? "general", source: "stripe",
+        props: { purpose: "base", pending_sport: pendingSport, amount_total: obj.amount_total ?? null, currency: obj.currency ?? null, discount: !!(obj.total_details as Record<string, unknown> | undefined)?.amount_discount, stripe_checkout_session_id: typeof obj.id === "string" ? obj.id : null } });
 
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }
@@ -462,15 +510,20 @@ Deno.serve(async (req: Request) => {
           props: { email_id: "arl_ack_sport", checkout_session: obj.id, testmode: testEvent, reason: sportAmounts.length ? "pack_name_missing" : "amounts_unavailable" } });
       }
 
-      if (alertJim) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
+      // P1-22: claim this checkout session right before the PAID alert. The alert stays where it
+      // is in v53 (order unchanged); a repeat delivery skips only the alert and checkout_completed.
+      const claim = await claimCheckoutSession(supabase, typeof obj.id === "string" ? obj.id : null, "sport_unlock", meta.user_id ?? null, typeof obj.livemode === "boolean" ? obj.livemode : null);
+      const firstDelivery = claim !== "repeat";
+      if (!firstDelivery) console.log("checkout.session.completed repeat delivery; PAID alert and checkout_completed skipped", obj.id);
+      if (alertJim && firstDelivery) await sendEmail(brand, JIM_EMAIL, `New Sport PAID: ${email} - ${meta.sport}`,
         `<p>New Sport pack purchase activated.</p>
          <p><strong>Email:</strong> ${email}<br>
          <strong>User ID:</strong> ${meta.user_id}<br>
          <strong>Sport:</strong> ${meta.sport}<br>
          <strong>Stripe customer:</strong> ${customerId}</p>`);
 
-      await logEvent("checkout_completed", { userId: meta.user_id, sport: meta.sport, source: "stripe",
-        props: { purpose: "sport_unlock", amount_total: obj.amount_total ?? null, currency: obj.currency ?? null } });
+      if (firstDelivery) await logEvent("checkout_completed", { userId: meta.user_id, sport: meta.sport, source: "stripe",
+        props: { purpose: "sport_unlock", amount_total: obj.amount_total ?? null, currency: obj.currency ?? null, stripe_checkout_session_id: typeof obj.id === "string" ? obj.id : null } });
 
       return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
     }
