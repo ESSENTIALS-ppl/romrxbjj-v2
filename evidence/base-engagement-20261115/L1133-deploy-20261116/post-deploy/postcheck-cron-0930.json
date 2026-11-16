@@ -1,0 +1,8 @@
+{"read_at_et":"Mon Nov 16, 2026 9:32:21 AM ET",
+ "cron_job11_run":{"runid":22276,"status":"succeeded","return_message":"1 row","start_et":"9:30:00.214 AM","end_et":"9:30:00.257 AM"},
+ "net_http_response":{"id":22399,"created_et":"9:30:00.262 AM","status_code":200,"error_msg":null,"timed_out":false,"success":"true","send_enabled":"false","dry_run":"true","audience":"canary","canary_count":"0","due_counts":{"digest":0,"lapsed":0,"retest":0,"protocol":0}},
+ "edge_logs_lifecycle_emails_v3":{"boot_et":"9:30:02.430 AM","boot_ms":33,"deployment_id_suffix":"612296fe-..._3","version":"3","response":"POST 200","response_logged_et":"9:30:03.754 AM","execution_time_ms":2988,"shutdown_et":"9:31:17.440 AM","errors":0},
+ "unsubscribe_v13_traffic":"none since deploy (no function_logs or function_edge_logs rows for function d7eaa2d5)",
+ "email_sends":24,"email_sends_last_sent_at_et":"Wed Oct 28, 2026 12:11:27 PM ET",
+ "notification_preferences_off":{"email_reminders":7,"retest_reminders":4,"weekly_digest":48},
+ "cron_job_md5":"08757cf075ed473abc9b9f06e10bffd6"}
