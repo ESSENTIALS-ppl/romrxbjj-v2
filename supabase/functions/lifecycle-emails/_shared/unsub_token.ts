@@ -2,8 +2,16 @@
 // A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
 // switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
 // Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
-export type UnsubScope = "retest" | "protocol" | "digest" | "all";
-export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all"];
+export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "check7" | "check14" | "lapsed";
+export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "check7", "check14", "lapsed"];
+/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
+export type SettingScope = "retest" | "protocol" | "digest";
+/** Which settings toggle each scope switches off. P1 scopes (L1031) follow the toggle their email already names, with no new words:
+ *  check7 and check14 say "Turn off check reminders" (Settings "Check reminders" = retest_reminders, which also gates the retest email);
+ *  lapsed says "Turn off plan day reminders" (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). */
+export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
+  retest: "retest", protocol: "protocol", digest: "digest", check7: "retest", check14: "retest", lapsed: "protocol",
+};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const enc = new TextEncoder();
