@@ -1,0 +1,65 @@
+{
+ "at": "2026-11-16T14:41:04.987343+00:00",
+ "functions": [
+  {
+   "sig": "get_my_profile()",
+   "md5": "62bd79b62c41f0ae180705861edf5ce6",
+   "has_filter": true,
+   "n_filter": 2,
+   "prosecdef": false,
+   "proconfig": [
+    "search_path=public"
+   ],
+   "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+   "rettype": "jsonb",
+   "def": "CREATE OR REPLACE FUNCTION public.get_my_profile()\n RETURNS jsonb\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_uid UUID := auth.uid();\n  v_profile JSONB;\n  v_assessment JSONB;\n  v_assessments JSONB;\n  v_eligibility JSONB;\n  v_sport_entitlements JSONB;\nBEGIN\n  IF v_uid IS NULL THEN\n    RETURN jsonb_build_object('error', 'Not authenticated');\n  END IF;\n\n  SELECT to_jsonb(u) INTO v_profile FROM public.users u WHERE u.id = v_uid;\n\n  SELECT to_jsonb(a) INTO v_assessment\n    FROM public.assessments a\n    WHERE a.user_id = v_uid\n      AND a.check_kind IS DISTINCT FROM 'quick'\n    ORDER BY a.assessed_at DESC\n    LIMIT 1;\n\n  SELECT jsonb_agg(to_jsonb(a) ORDER BY a.assessed_at DESC) INTO v_assessments\n    FROM (\n      SELECT * FROM public.assessments a\n      WHERE a.user_id = v_uid\n        AND a.check_kind IS DISTINCT FROM 'quick'\n      ORDER BY a.assessed_at DESC\n      LIMIT 4\n    ) a;\n\n  -- BJJ \"My Game\" only. The techniques + technique_eligibility tables are shared\n  -- across sports (Base ROM architecture); +Bodybuilding rows must not leak into\n  -- the BJJ view. +Bodybuilding uses its own app and never calls this function.\n  SELECT jsonb_agg(\n    jsonb_build_object(\n      'id', te.id, 'technique_id', te.technique_id, 'technique_code', te.technique_code,\n      'tier', te.tier, 'flag', te.flag, 'limiting_joints', te.limiting_joints,\n      'techniques', jsonb_build_object('code', t.code, 'name', t.name, 'belt', t.belt, 'category', t.category)\n    ) ORDER BY te.tier\n  ) INTO v_eligibility\n    FROM public.technique_eligibility te\n    LEFT JOIN public.techniques t ON t.id = te.technique_id\n    WHERE te.user_id = v_uid\n      AND te.sport = 'bjj';\n\n  SELECT jsonb_agg(\n    jsonb_build_object(\n      'sport', se.sport,\n      'status', se.status,\n      'stripe_subscription_id', se.stripe_subscription_id,\n      'granted_at', se.granted_at,\n      'expires_at', se.expires_at\n    ) ORDER BY se.granted_at DESC\n  ) INTO v_sport_entitlements\n    FROM public.sport_entitlements se\n    WHERE se.user_id = v_uid;\n\n  RETURN jsonb_build_object(\n    'profile', v_profile,\n    'assessment', v_assessment,\n    'assessments', COALESCE(v_assessments, '[]'::jsonb),\n    'eligibility', COALESCE(v_eligibility, '[]'::jsonb),\n    'sport_entitlements', COALESCE(v_sport_entitlements, '[]'::jsonb)\n  );\nEND;\n$function$\n"
+  },
+  {
+   "sig": "my_joint_history(integer)",
+   "md5": "095750d845a72af8072986a64a63ec3e",
+   "has_filter": true,
+   "n_filter": 1,
+   "prosecdef": false,
+   "proconfig": [
+    "search_path=public"
+   ],
+   "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+   "rettype": "TABLE(assessment_id uuid, assessed_at timestamp with time zone, rom_total numeric, joint_key text, score smallint, left_value numeric, right_value numeric)",
+   "def": "CREATE OR REPLACE FUNCTION public.my_joint_history(p_limit integer DEFAULT 20)\n RETURNS TABLE(assessment_id uuid, assessed_at timestamp with time zone, rom_total numeric, joint_key text, score smallint, left_value numeric, right_value numeric)\n LANGUAGE sql\n STABLE\n SET search_path TO 'public'\nAS $function$\n  WITH mine AS (\n    SELECT a.id, COALESCE(a.assessed_at, a.created_at) AS at, a.rom_total\n    FROM public.assessments a\n    WHERE a.user_id = auth.uid()\n      AND a.check_kind IS DISTINCT FROM 'quick'\n    ORDER BY COALESCE(a.assessed_at, a.created_at) DESC\n    LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 20), 50))\n  )\n  SELECT m.id, m.at, m.rom_total, j.joint_key, j.score, j.left_value, j.right_value\n  FROM mine m JOIN public.joint_scores j ON j.assessment_id = m.id\n  ORDER BY m.at ASC, j.joint_key ASC;\n$function$\n"
+  },
+  {
+   "sig": "my_joint_start_vs_now()",
+   "md5": "bc7032f38750dac59b22f6e7db6c5952",
+   "has_filter": true,
+   "n_filter": 1,
+   "prosecdef": false,
+   "proconfig": [
+    "search_path=public"
+   ],
+   "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+   "rettype": "TABLE(joint_key text, first_assessed_at timestamp with time zone, latest_assessed_at timestamp with time zone, first_score smallint, latest_score smallint, first_left numeric, first_right numeric, latest_left numeric, latest_right numeric)",
+   "def": "CREATE OR REPLACE FUNCTION public.my_joint_start_vs_now()\n RETURNS TABLE(joint_key text, first_assessed_at timestamp with time zone, latest_assessed_at timestamp with time zone, first_score smallint, latest_score smallint, first_left numeric, first_right numeric, latest_left numeric, latest_right numeric)\n LANGUAGE sql\n STABLE\n SET search_path TO 'public'\nAS $function$\n  WITH rows AS (\n    SELECT j.joint_key, COALESCE(a.assessed_at, a.created_at) AS at, j.score, j.left_value, j.right_value,\n           row_number() OVER (PARTITION BY j.joint_key ORDER BY COALESCE(a.assessed_at, a.created_at) ASC)  AS rn_first,\n           row_number() OVER (PARTITION BY j.joint_key ORDER BY COALESCE(a.assessed_at, a.created_at) DESC) AS rn_last\n    FROM public.assessments a JOIN public.joint_scores j ON j.assessment_id = a.id\n    WHERE a.user_id = auth.uid()\n      AND a.check_kind IS DISTINCT FROM 'quick'\n  )\n  SELECT f.joint_key, f.at, l.at, f.score, l.score, f.left_value, f.right_value, l.left_value, l.right_value\n  FROM rows f JOIN rows l ON l.joint_key = f.joint_key AND l.rn_last = 1\n  WHERE f.rn_first = 1 AND f.at < l.at\n  ORDER BY f.joint_key;\n$function$\n"
+  }
+ ],
+ "view": {
+  "pretty_md5": "5d1e048164a311c482a6ba605c023349",
+  "has_quick": true,
+  "reloptions": [
+   "security_invoker=true"
+  ],
+  "relacl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+  "ncols": 20,
+  "cols_md5": "f67dc1f81d545350a0bcfe434f323a16"
+ },
+ "cron_md5_all": "2fa1e843681ee3c1d91f926be9c15159",
+ "stored_version": "20261116144054",
+ "stored_stmt_md5": "75128ec7f27c293436baa069861af5a4",
+ "n_migrations": 183,
+ "head": "20261116144054",
+ "counts": {
+  "assessments": 22,
+  "product_events": 9603,
+  "ums": 19,
+  "email_sends": 24
+ }
+}
