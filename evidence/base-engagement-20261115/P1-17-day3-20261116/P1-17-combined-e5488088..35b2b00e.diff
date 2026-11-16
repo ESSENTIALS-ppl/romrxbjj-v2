@@ -1,0 +1,1502 @@
+diff --git a/supabase/functions/rombot-checkin/_shared/email_footer.ts b/supabase/functions/rombot-checkin/_shared/email_footer.ts
+new file mode 100644
+index 0000000..6e509f6
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/_shared/email_footer.ts
+@@ -0,0 +1,19 @@
++// _shared/email_footer.ts - one place for the postal address and unsubscribe link every lifecycle email footer uses.
++// Jim's closed decision 2026-10-03 (ledger, Reid's Suite 240 mail check): the footer carries the full address
++// "6605 Longshore Street, Suite 240, Dublin, OH 43017-2774" (CAN-SPAM valid physical postal address).
++// Change the address HERE only. No em dashes. American spelling.
++
++export const LEGAL_ENTITY = "ROMRx LLC";
++export const POSTAL_ADDRESS = "6605 Longshore Street, Suite 240, Dublin, OH 43017-2774";
++/** "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774" */
++export const POSTAL_LINE = `${LEGAL_ENTITY}, ${POSTAL_ADDRESS}`;
++
++/**
++ * Same opt-out link pattern the drip emails already use: `{base}/unsubscribe?email=...`.
++ * base is the brand site origin (https://romrxbjj.com, https://romrxbodybuilding.com) or, for Base,
++ * https://romrx.io/app (HQ SPA route /app/unsubscribe; romrx.io also redirects /unsubscribe to it).
++ * The page calls the `unsubscribe` edge function, which sets users.marketing_opt_out.
++ */
++export function unsubscribeUrl(base: string, email: string): string {
++  return `${base.replace(/\/$/, "")}/unsubscribe?email=${encodeURIComponent(email)}`;
++}
+diff --git a/supabase/functions/rombot-checkin/_shared/unsub_token.ts b/supabase/functions/rombot-checkin/_shared/unsub_token.ts
+new file mode 100644
+index 0000000..75d35b8
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/_shared/unsub_token.ts
+@@ -0,0 +1,57 @@
++// unsub_token.ts (FG-09/10/11, staged 2026-11-02). Scoped, signed opt-out token for lifecycle emails.
++// A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
++// switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
++// Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
++export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "lapsed";
++export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "lapsed"];
++/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
++export type SettingScope = "retest" | "protocol" | "digest";
++/** Which settings toggle each scope switches off. The lapsed link already says "Turn off plan day reminders"
++ *  (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). No new words. */
++export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
++  retest: "retest", protocol: "protocol", digest: "digest", lapsed: "protocol",
++};
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++
++const enc = new TextEncoder();
++function b64u(bytes: Uint8Array): string {
++  let s = "";
++  for (const b of bytes) s += String.fromCharCode(b);
++  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
++}
++function b64uDecode(s: string): Uint8Array | null {
++  try {
++    const p = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
++    const bin = atob(p);
++    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
++  } catch { return null; }
++}
++async function key(secret: string): Promise<CryptoKey> {
++  return await crypto.subtle.importKey("raw", enc.encode(secret) as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
++}
++export function secretOk(secret: string | null | undefined): secret is string {
++  return typeof secret === "string" && secret.length >= 32;
++}
++export async function signUnsubToken(secret: string | null | undefined, userId: string, scope: UnsubScope): Promise<string | null> {
++  if (!secretOk(secret) || !UUID_RE.test(userId) || !SCOPES.includes(scope)) return null;
++  const payload = b64u(enc.encode(JSON.stringify({ u: userId.toLowerCase(), s: scope })));
++  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", await key(secret), enc.encode(payload) as BufferSource));
++  return `${payload}.${b64u(sig)}`;
++}
++export async function verifyUnsubToken(secret: string | null | undefined, token: string | null | undefined): Promise<{ userId: string; scope: UnsubScope } | null> {
++  if (!secretOk(secret) || typeof token !== "string" || token.length > 512) return null;
++  const parts = token.split(".");
++  if (parts.length !== 2) return null;
++  const sig = b64uDecode(parts[1]);
++  if (!sig) return null;
++  // crypto.subtle.verify compares in constant time.
++  const ok = await crypto.subtle.verify("HMAC", await key(secret), sig as BufferSource, enc.encode(parts[0]) as BufferSource);
++  if (!ok) return null;
++  const raw = b64uDecode(parts[0]);
++  if (!raw) return null;
++  try {
++    const p = JSON.parse(new TextDecoder().decode(raw));
++    if (typeof p?.u !== "string" || !UUID_RE.test(p.u) || !SCOPES.includes(p?.s)) return null;
++    return { userId: p.u.toLowerCase(), scope: p.s as UnsubScope };
++  } catch { return null; }
++}
+diff --git a/supabase/functions/rombot-checkin/source/copy.ts b/supabase/functions/rombot-checkin/source/copy.ts
+new file mode 100644
+index 0000000..050e172
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/copy.ts
+@@ -0,0 +1,103 @@
++// P1-17 day 3 ROMBot check-in: user-facing words. EVERY string below is Stacy's final copy, byte for byte:
++// /workspace/process/evidence/STACY-P1-17-DAY3-WORDS-20261116-0926.md (sha256 6fd272b642b33c817e51208b7f55567e3acdff338c6ad9cfa3bec6064a1a8ec3),
++// "Final copy", "No-name fallback" and "Email subjects". Covered by L1031 via ledger L1036(c). Sign-off is plain "ROMBot".
++// Placeholders keep Stacy's spelling: {first_name} {today_area} {n} {session/sessions} {remaining} {next_check_date}.
++// The words test (test/words.test.ts) pins every string here against her file. Do not edit without a new Stacy file.
++// The only other user-facing words this function sends are the shared lifecycle footer strings (FOOTER below), reused
++// verbatim from lifecycle-emails live v3 (Stacy P1-16 e1e0a602 lines; ALL_OFF_TEXT; POSTAL_LINE). No new footer words.
++
++export type Branch = "A" | "B" | "C";
++
++/** Stacy "Final copy": [first line, button label, last line] per branch. The button label is shown without Stacy's [brackets]. */
++export const BRANCH_COPY: Readonly<Record<Branch, { line1: string; button: string; line3: string }>> = {
++  A: {
++    line1: "Hey {first_name}, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your {today_area}. It's short, and you can do it now. Want to start?",
++    button: "Start today's session",
++    line3: "If something got in the way, tell me here and I'll help you find an easier way in.",
++  },
++  B: {
++    line1: "Nice work, {first_name}. You've done {n} {session/sessions} since your assessment. {remaining} more and you reach your week 1 goal of 3 sessions. Today's focus is your {today_area}.",
++    button: "Start today's session",
++    line3: "Anything feel too easy or too hard? Tell me and I'll help you adjust how you do it.",
++  },
++  C: {
++    line1: "{first_name}, {n} sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is {next_check_date}. That's when you measure again and see where you are.",
++    button: "See my plan",
++    line3: "If any move doesn't feel right, tell me here.",
++  },
++};
++
++/** Stacy "No-name fallback": the named opener (left) is replaced by her no-name opener (right). */
++export const NO_NAME_OPENER: Readonly<Record<Branch, { named: string; noName: string }>> = {
++  A: { named: "Hey {first_name}, ROMBot here.", noName: "Hey there, ROMBot here." },
++  B: { named: "Nice work, {first_name}.", noName: "Nice work." },
++  C: { named: "{first_name}, {n} sessions since your assessment.", noName: "{n} sessions since your assessment." },
++};
++
++/** Stacy "Email subjects". No-name: "Subjects drop ", {first_name}"." */
++export const SUBJECTS: Readonly<Record<Branch, string>> = {
++  A: "Your plan is ready, {first_name}",
++  B: "{n} done. {remaining} more for your week 1 goal",
++  C: "Strong start, {first_name}",
++};
++export const SUBJECT_NAME_SUFFIX = ", {first_name}";
++
++/** Stacy: "{remaining} renders as a word: n = 1 gives "Two more", n = 2 gives "One more"." */
++export const REMAINING_WORD: Readonly<Record<1 | 2, string>> = { 1: "Two", 2: "One" };
++
++/** Stacy: "Email body opens with "ROMBot here."" Stacy Nov 16 answer: Branch B and C only; A already says it in its first line. */
++export const EMAIL_OPENER = "ROMBot here.";
++
++/** Shared lifecycle footer, reused verbatim from lifecycle-emails live v3 (copyFor lapsed + ALL_OFF_TEXT). Plan day reminders is
++ *  the P1-01 toggle (email_reminders) this email depends on, so its existing Stacy P1-16 lines are the ones that apply. */
++export const FOOTER = {
++  why: "You're getting this because Plan day reminders is on in your ROMRx settings.",
++  off: "Turn off plan day reminders",
++  allOff: "Turn off all ROMRx emails except account and billing notices",
++  sentTo: (email: string) => `This message was sent to ${email}.`,
++} as const;
++
++export interface Fill {
++  first_name: string | null;
++  today_area: string;
++  n: number;
++  next_check_date: string | null;
++}
++
++function sessionWord(n: number): string { return n === 1 ? "session" : "sessions"; }
++
++/** Fill one template. Throws if a placeholder it needs is missing, so a broken message is never sent. */
++export function fill(t: string, f: Fill): string {
++  let out = t;
++  if (out.includes("{first_name}")) {
++    if (!f.first_name) throw new Error("first_name required");
++    out = out.split("{first_name}").join(f.first_name);
++  }
++  if (out.includes("{remaining}")) {
++    if (f.n !== 1 && f.n !== 2) throw new Error("remaining needs n 1 or 2");
++    out = out.split("{remaining}").join(REMAINING_WORD[f.n]);
++  }
++  if (out.includes("{next_check_date}")) {
++    if (!f.next_check_date) throw new Error("next_check_date required");
++    out = out.split("{next_check_date}").join(f.next_check_date);
++  }
++  out = out.split("{session/sessions}").join(sessionWord(f.n));
++  out = out.split("{today_area}").join(f.today_area);
++  out = out.split("{n}").join(String(f.n));
++  if (/[{}]/.test(out)) throw new Error("unfilled placeholder");
++  return out;
++}
++
++export interface Rendered { branch: Branch; line1: string; button: string; line3: string; subject: string; }
++export function render(branch: Branch, f: Fill): Rendered {
++  const c = BRANCH_COPY[branch];
++  let line1 = c.line1;
++  let subject = SUBJECTS[branch];
++  if (!f.first_name) {
++    const o = NO_NAME_OPENER[branch];
++    if (!line1.startsWith(o.named)) throw new Error("opener mismatch");
++    line1 = o.noName + line1.slice(o.named.length);
++    subject = subject.split(SUBJECT_NAME_SUFFIX).join("");
++  }
++  return { branch, line1: fill(line1, f), button: c.button, line3: fill(c.line3, f), subject: fill(subject, f) };
++}
+diff --git a/supabase/functions/rombot-checkin/source/deletion.ts b/supabase/functions/rombot-checkin/source/deletion.ts
+new file mode 100644
+index 0000000..e0dbac1
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/deletion.ts
+@@ -0,0 +1,17 @@
++// FG-21 wiring: has this user asked for account deletion? Two independent records are checked, either one is enough:
++//  1) account_deletion_requests (status requested or in_progress), the new log (migration fg21, service-role write only);
++//  2) client_feedback rows with metadata.kind = "account_deletion_request" (what the live request-account-deletion function already writes).
++// FAILS CLOSED: any unexpected error answers true (do not email). The one exception is "table does not exist" (42P01) for source 1,
++// which is the state before the FG-21 migration is applied; source 2 still protects those users.
++// deno-lint-ignore no-explicit-any
++type Sb = any;
++export async function deletionRequested(sb: Sb, userId: string): Promise<boolean> {
++  try {
++    const log = await sb.from("account_deletion_requests").select("id").eq("user_id", userId).in("status", ["requested", "in_progress"]).limit(1);
++    if (log.error) { if (log.error.code !== "42P01") return true; }
++    else if ((log.data ?? []).length > 0) return true;
++    const fb = await sb.from("client_feedback").select("id").eq("user_id", userId).eq("metadata->>kind", "account_deletion_request").limit(1);
++    if (fb.error) return true;
++    return (fb.data ?? []).length > 0;
++  } catch { return true; }
++}
+diff --git a/supabase/functions/rombot-checkin/source/email.ts b/supabase/functions/rombot-checkin/source/email.ts
+new file mode 100644
+index 0000000..713308e
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/email.ts
+@@ -0,0 +1,46 @@
++// P1-17 day 3 email fallback (Base only). Layout follows lifecycle-emails buildEmail (live v3); words come from copy.ts only.
++// No tracking pixels, no click tracking, no em dashes. One-click unsubscribe (RFC 8058) with a signed "protocol" scope token:
++// the Plan day reminders toggle (email_reminders) this email depends on. Uses the live unsubscribe v13 scopes as they are.
++import { EMAIL_OPENER, FOOTER, type Rendered } from "./copy.ts";
++import { APP_PATH } from "./logic.ts";
++
++/** P1-08 Base sender, the same value as ROMRX_SENDER in b19b13dca82a3c2eb34a641aa5ca79e410090c00
++ *  (lifecycle-emails/source/email.ts). Defined here so this function does not depend on that deploy. A test pins the two equal
++ *  whenever lifecycle-emails exports it. Reply-To hello@romrx.io per Jim 9:42 AM ET Nov 16 ("Replies go to hello@, Reid triages them
++ *  from my inbox."). HELD with P1-08: no send before Jim's sender yes is relayed. */
++export const ROMRX_SENDER = { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" } as const;
++export const BASE_BRAND = { key: "base", name: "ROMRx", appBase: "https://romrx.io/app" } as const;
++
++const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
++
++/** Stacy (Nov 16 answer): the email-level "ROMBot here." opener is dropped for Branch A ONLY, because A's own first line
++ *  already says it ("Hey {first_name}, ROMBot here." / "Hey there, ROMBot here."). B and C keep it. */
++export function opener(r: Rendered): boolean { return r.branch !== "A"; }
++
++export interface Built { from: string; replyTo: string; subject: string; html: string; text: string; headers: Record<string, string>; }
++export function buildCheckinEmail(r: Rendered, to: string, links: { offKind: string; offAll: string; oneClick: string }, postalLine: string): Built {
++  const open = `${BASE_BRAND.appBase}${APP_PATH}`;
++  const p = (s: string) => `    <p style="font-size:14px;color:#1a2e2e;line-height:1.7;margin:0 0 12px;">${esc(s)}</p>`;
++  const sentTo = FOOTER.sentTo(to);
++  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
++<body style="margin:0;padding:0;background:#f8fcfc;font-family:Inter,system-ui,sans-serif;">
++<div style="max-width:600px;margin:0 auto;padding:32px 24px;">
++  <div style="margin-bottom:24px;"><span style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a2e2e;">${esc(BASE_BRAND.name)}</span></div>
++  <div style="background:#fff;border-radius:12px;border:1px solid #cde0e0;padding:32px;">
++${opener(r) ? p(EMAIL_OPENER) + "\n" : ""}${p(r.line1)}
++    <a href="${esc(open)}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;margin:8px 0 12px;">${esc(r.button)}</a>
++${p(r.line3)}
++    <p style="font-size:12px;color:#5a7070;margin-top:24px;line-height:1.6;">${esc(FOOTER.why)} <a href="${esc(links.offKind)}" style="color:#008080;">${esc(FOOTER.off)}</a></p>
++    <p style="font-size:12px;color:#5a7070;line-height:1.6;"><a href="${esc(links.offAll)}" style="color:#008080;">${esc(FOOTER.allOff)}</a></p>
++  </div>
++  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${esc(postalLine)}<br /><a href="mailto:${esc(ROMRX_SENDER.replyTo)}" style="color:#008080;">${esc(ROMRX_SENDER.replyTo)}</a><br />${esc(sentTo)}</p>
++</div></body></html>`;
++  const text = [
++    ...(opener(r) ? [EMAIL_OPENER, ""] : []), r.line1, "", `${r.button}: ${open}`, "", r.line3, "",
++    `${FOOTER.why} ${FOOTER.off}: ${links.offKind}`, `${FOOTER.allOff}: ${links.offAll}`, "", postalLine, ROMRX_SENDER.replyTo, sentTo,
++  ].join("\n");
++  return {
++    from: ROMRX_SENDER.from, replyTo: ROMRX_SENDER.replyTo, subject: r.subject, html, text,
++    headers: { "List-Unsubscribe": `<${links.oneClick}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
++  };
++}
+diff --git a/supabase/functions/rombot-checkin/source/handler.ts b/supabase/functions/rombot-checkin/source/handler.ts
+new file mode 100644
+index 0000000..542bd79
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/handler.ts
+@@ -0,0 +1,105 @@
++// rombot-checkin handler (P1-17 day 3 ROMBot check-in). BUILD ONLY, not deployed. All I/O is injected.
++// Switches (fail-safe: ON only when exactly "on"; none is set by this build):
++//  - ROMBOT_CHECKIN_SEND: the whole feature. Off = dry run (plan only, no note, no email, no claim).
++//  - LIFECYCLE_EMAILS_SEND: the email fallback also needs the lifecycle send switch (same switch as lifecycle-emails).
++// Each run has two phases: (1) day-3 in-app notes; (2) email fallbacks for notes written at least 24 h earlier with no app
++// activity since (logic.ts planEmails). A note and its email never go in the same run.
++// Audience = the lifecycle rules: LIFECYCLE_AUDIENCE exactly "all", else canary LIFECYCLE_CANARY_USER_IDS only.
++// LIFECYCLE_SUPPRESS_USER_IDS is treated as a pending deletion request (skip), as in lifecycle-emails.
++import { flagOn, maskEmail, noteContent, APP_PATH, plan, planEmails, type Candidate, type PlannedNote } from "./logic.ts";
++import { buildCheckinEmail, type Built } from "./email.ts";
++import { POSTAL_LINE } from "../_shared/email_footer.ts";
++import { signUnsubToken } from "../_shared/unsub_token.ts";
++
++export interface NoteInsert {
++  user_id: string;
++  /** ai_conversations row: sport "base", provider "rombot", no title (no new words in the chat list). */
++  conversation: { sport: "base"; provider: "rombot"; context_snapshot: Record<string, unknown> };
++  /** ai_messages row: role "assistant". */
++  message: { role: "assistant"; content: string; tokens_used: 0; latency_ms: 0 };
++}
++export interface Deps {
++  env: (k: string) => string | undefined;
++  cronOk: (req: Request) => Promise<boolean>;
++  now: () => Date;
++  load: (now: Date) => Promise<Candidate[]>;
++  claim: (userId: string, id: string) => Promise<boolean>;
++  release: (userId: string, id: string) => Promise<void>;
++  insertNote: (n: NoteInsert) => Promise<boolean>;
++  send: (to: string, b: Built) => Promise<boolean>;
++}
++
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++export function idList(v: string | null | undefined): Set<string> {
++  return new Set((v ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => UUID_RE.test(s)));
++}
++/** Same opt-out endpoints as lifecycle-emails live v3 (Base confirm page + unsubscribe one-click). */
++export const UNSUB_BASE = "https://cqzvqzwwevnflinxgnpp.supabase.co/functions/v1/unsubscribe";
++export const CONFIRM_PAGE_BASE = "https://romrx.io/app/unsubscribe";
++/** context_snapshot.kind the loader uses to find a user's note in a later run. */
++export const NOTE_KIND = "checkin_d3";
++
++export function noteFor(x: PlannedNote): NoteInsert {
++  return {
++    user_id: x.user_id,
++    conversation: {
++      sport: "base", provider: "rombot",
++      context_snapshot: { kind: NOTE_KIND, branch: x.branch, assessment_id: x.assessment_id, button: { label: x.rendered.button, path: APP_PATH } },
++    },
++    message: { role: "assistant", content: noteContent(x.rendered), tokens_used: 0, latency_ms: 0 },
++  };
++}
++
++export async function handle(req: Request, d: Deps): Promise<Response> {
++  const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
++  if (!(await d.cronOk(req))) return new Response("forbidden", { status: 403 });
++  const url = new URL(req.url);
++  const dry = !flagOn(d.env("ROMBOT_CHECKIN_SEND")) || url.searchParams.get("dry_run") === "1";
++  const emailOn = !dry && flagOn(d.env("LIFECYCLE_EMAILS_SEND"));
++  const all = d.env("LIFECYCLE_AUDIENCE") === "all";
++  const canary = idList(d.env("LIFECYCLE_CANARY_USER_IDS"));
++  const suppress = idList(d.env("LIFECYCLE_SUPPRESS_USER_IDS"));
++  const now = d.now();
++  const loaded = (await d.load(now)).map((c) => suppress.has(c.user_id.toLowerCase()) ? { ...c, deletion_requested: true } : c);
++  const notes = plan(now, loaded, { all, canary });
++  const emails = planEmails(now, loaded, { all, canary });
++  if (dry) {
++    return json({
++      success: true, dry_run: true, send_enabled: false, email_enabled: false, audience: all ? "all" : "canary", date: now.toISOString(),
++      notes: notes.due.map((x) => ({ branch: x.branch, note_id: x.note_id, hour_source: x.send.hourSource, tz_source: x.send.tzSource })),
++      skipped: notes.skipped,
++      emails: emails.due.map((x) => ({ branch: x.branch, email_id: x.email_id, email: maskEmail(x.email), note_age_hours: x.note_age_hours })),
++      email_skipped: emails.skipped,
++    });
++  }
++  if (!all && canary.size === 0) return json({ success: true, send_enabled: true, audience: "canary", note: "no canary ids set; nothing written or sent" });
++  const r = { notes: 0, already: 0, failed: 0, emails_sent: 0, emails_already: 0, emails_failed: 0, emails_held: 0 };
++  // Phase 1: in-app notes. No email here.
++  for (const x of notes.due) {
++    let mine = false;
++    try { mine = await d.claim(x.user_id, x.note_id); } catch { r.failed++; continue; }
++    if (!mine) { r.already++; continue; } // one check-in per assessment, ever
++    let ok = false;
++    try { ok = await d.insertNote(noteFor(x)); } catch { ok = false; }
++    if (ok) r.notes++;
++    else { r.failed++; try { await d.release(x.user_id, x.note_id); } catch { /* next hourly run retries inside the window */ } }
++  }
++  // Phase 2: email fallbacks for earlier notes (24 h+, no activity since). Held, unclaimed, while LIFECYCLE_EMAILS_SEND is not on.
++  const secret = d.env("UNSUBSCRIBE_HMAC_SECRET");
++  for (const x of emails.due) {
++    if (!emailOn) { r.emails_held++; continue; }
++    const [tKind, tAll] = [await signUnsubToken(secret, x.user_id, "protocol"), await signUnsubToken(secret, x.user_id, "all")];
++    if (!tKind || !tAll) { r.emails_failed++; continue; } // fail closed: no email without opt-out links
++    const built = buildCheckinEmail(x.rendered, x.email, {
++      offKind: `${CONFIRM_PAGE_BASE}?t=${tKind}`, offAll: `${CONFIRM_PAGE_BASE}?t=${tAll}`, oneClick: `${UNSUB_BASE}?t=${tKind}&b=base`,
++    }, POSTAL_LINE);
++    try {
++      if (!(await d.claim(x.user_id, x.email_id))) { r.emails_already++; continue; } // at most one email per note
++    } catch { r.emails_failed++; continue; }
++    let sent = false;
++    try { sent = await d.send(x.email, built); } catch { sent = false; }
++    if (sent) r.emails_sent++;
++    else { r.emails_failed++; try { await d.release(x.user_id, x.email_id); } catch { /* a later run inside the window retries */ } }
++  }
++  return json({ success: true, send_enabled: true, email_enabled: emailOn, audience: all ? "all" : "canary", date: now.toISOString(), results: r });
++}
+diff --git a/supabase/functions/rombot-checkin/source/index.ts b/supabase/functions/rombot-checkin/source/index.ts
+new file mode 100644
+index 0000000..93fe784
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/index.ts
+@@ -0,0 +1,135 @@
++// rombot-checkin (P1-17 day 3 ROMBot check-in). NEW function, BUILD ONLY, not deployed; verify_jwt false (cron-only).
++// Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed), like lifecycle-emails. Dry run unless
++// ROMBOT_CHECKIN_SEND === "on"; the email fallback also needs LIFECYCLE_EMAILS_SEND === "on", and goes 24 h+ after the note
++// only if there was no app activity since it. Reads only the user's own rows
++// listed in spec section 3; never scores, degrees, bands, prices or other users' data.
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { handle, NOTE_KIND } from "./handler.ts";
++import { type Candidate, EMAIL_MAX_WAIT_HOURS } from "./logic.ts";
++import { deletionRequested } from "./deletion.ts";
++
++const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
++const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
++const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
++const sb = createClient(SUPABASE_URL, KEY);
++
++async function cronOk(req: Request): Promise<boolean> {
++  const got = (req.headers.get("x-cron-secret") ?? "").trim();
++  if (got.length < 32) return false;
++  try {
++    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_webhook_secret`, {
++      method: "POST",
++      headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
++      body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
++    });
++    return r.ok && (await r.json()) === true;
++  } catch { return false; }
++}
++
++async function isTest(email: string | null): Promise<boolean> {
++  if (!email) return true;
++  try {
++    const { data, error } = await sb.rpc("is_test_account", { p_email: email });
++    return error ? true : data === true; // fail closed: unknown = treated as test, no message
++  } catch { return true; }
++}
++
++async function fullAssessments(userId: string): Promise<Candidate["full_assessments"]> {
++  // check_kind exists only after P1-06 031000; before that every row is a full assessment.
++  let q = await sb.from("assessments").select("id, assessed_at, red_flag_triggered, check_kind").eq("user_id", userId).order("assessed_at", { ascending: false }).limit(5);
++  if (q.error && q.error.code === "42703") q = await sb.from("assessments").select("id, assessed_at, red_flag_triggered").eq("user_id", userId).order("assessed_at", { ascending: false }).limit(5) as typeof q;
++  if (q.error) throw new Error("assessments load failed");
++  return ((q.data ?? []) as Record<string, unknown>[])
++    .filter((r) => r.check_kind !== "quick")
++    .map((r) => ({ id: String(r.id), assessed_at: String(r.assessed_at), red_flag_triggered: (r.red_flag_triggered as boolean | null) ?? null }));
++}
++
++async function load(now: Date): Promise<Candidate[]> {
++  // Note phase: day 3 in any zone falls inside 2 to 5 days after the assessment instant.
++  const from = new Date(now.getTime() - 5 * 86400000).toISOString();
++  const to = new Date(now.getTime() - 2 * 86400000).toISOString();
++  const { data: recent, error } = await sb.from("assessments").select("user_id").gte("assessed_at", from).lte("assessed_at", to).limit(5000);
++  if (error) throw new Error("recent assessments load failed");
++  // Email phase: users whose check-in note (ai_conversations, context_snapshot.kind = checkin_d3) was written between
++  // EMAIL_MAX_WAIT_HOURS + 1 h and 23 h ago. Existing rows only; no new table or column.
++  const nFrom = new Date(now.getTime() - (EMAIL_MAX_WAIT_HOURS + 1) * 3600000).toISOString();
++  const nTo = new Date(now.getTime() - 23 * 3600000).toISOString();
++  const { data: noted, error: nErr } = await sb.from("ai_conversations").select("user_id").eq("context_snapshot->>kind", NOTE_KIND).gte("created_at", nFrom).lte("created_at", nTo).limit(5000);
++  if (nErr) throw new Error("check-in notes load failed");
++  const ids = [...new Set([...(recent ?? []), ...(noted ?? [])].map((r) => String(r.user_id)))];
++  const out: Candidate[] = [];
++  for (const id of ids) {
++    const { data: u } = await sb.from("users").select("id, email, full_name, active_sport, base_status, marketing_opt_out").eq("id", id).maybeSingle();
++    if (!u) continue;
++    const full = await fullAssessments(id);
++    const newest = full[0];
++    const { data: pref } = await sb.from("notification_preferences").select("reminder_time, timezone, email_reminders, protocol_opt_in_at").eq("user_id", id).maybeSingle();
++    let ranked: string[] = [];
++    let sessions: string[] = [];
++    if (newest) {
++      const { data: pr } = await sb.from("protocols").select("joint_key, priority_rank").eq("assessment_id", newest.id).eq("user_id", id).order("priority_rank", { ascending: true });
++      ranked = (pr ?? []).map((r) => String(r.joint_key));
++      const { data: ss } = await sb.from("protocol_sessions").select("logged_at").eq("user_id", id).gte("logged_at", newest.assessed_at).limit(200);
++      sessions = (ss ?? []).map((r) => String(r.logged_at));
++    }
++    const { data: msg } = await sb.from("ai_messages").select("created_at").eq("user_id", id).eq("role", "user").order("created_at", { ascending: false }).limit(1).maybeSingle();
++    let nextCheckAt: string | null = null;
++    try {
++      const { data: sch, error: e } = await sb.from("user_mobility_schedule").select("next_check_at").eq("user_id", id).maybeSingle();
++      if (!e && sch) nextCheckAt = (sch as { next_check_at: string | null }).next_check_at ?? null;
++    } catch { nextCheckAt = null; } // table absent before P1-07 030000: Branch C is skipped (no_next_check)
++    // Email phase inputs (activity since the note = session save, assessment of any kind, or a ROMBot user message).
++    const { data: nc } = await sb.from("ai_conversations").select("created_at, context_snapshot").eq("user_id", id).eq("context_snapshot->>kind", NOTE_KIND).order("created_at", { ascending: false }).limit(1).maybeSingle();
++    let note: Candidate["note"] = null;
++    let emailAlready = false;
++    if (nc) {
++      const snap = (nc.context_snapshot ?? {}) as Record<string, unknown>;
++      const b = snap.branch;
++      note = { assessment_id: String(snap.assessment_id ?? ""), branch: b === "A" || b === "B" || b === "C" ? b : null, at: String(nc.created_at) };
++      const { data: es, error: esErr } = await sb.from("email_sends").select("email_id").eq("user_id", id).eq("email_id", `checkin-d3-email-${note.assessment_id}`).limit(1);
++      emailAlready = esErr ? true : (es ?? []).length > 0; // fail closed: unknown = treat as already sent
++    }
++    const { data: ls } = await sb.from("protocol_sessions").select("logged_at").eq("user_id", id).order("logged_at", { ascending: false }).limit(1).maybeSingle();
++    const { data: la } = await sb.from("assessments").select("assessed_at").eq("user_id", id).order("assessed_at", { ascending: false }).limit(1).maybeSingle();
++    out.push({
++      user_id: id, email: u.email ?? null, full_name: u.full_name ?? null, active_sport: u.active_sport ?? null,
++      base_status: u.base_status ?? null, marketing_opt_out: u.marketing_opt_out ?? null,
++      is_test: await isTest(u.email ?? null), deletion_requested: await deletionRequested(sb, id),
++      pref: pref ? { reminder_time: pref.reminder_time ?? null, timezone: pref.timezone ?? null, email_reminders: pref.email_reminders ?? null, protocol_opt_in_at: pref.protocol_opt_in_at ?? null } : null,
++      full_assessments: full, ranked_joint_keys: ranked, sessions_since: sessions,
++      last_user_message_at: (msg as { created_at?: string } | null)?.created_at ?? null, next_check_at: nextCheckAt,
++      note, email_already: emailAlready,
++      last_session_at: (ls as { logged_at?: string } | null)?.logged_at ?? null,
++      last_any_assessment_at: (la as { assessed_at?: string } | null)?.assessed_at ?? null,
++    });
++  }
++  return out;
++}
++
++Deno.serve((req) => handle(req, {
++  env: (k) => Deno.env.get(k),
++  cronOk, now: () => new Date(), load,
++  claim: async (user_id, email_id) => {
++    const { error } = await sb.from("email_sends").insert({ user_id, email_id });
++    if (!error) return true;
++    if (error.code === "23505") return false;
++    throw new Error("claim failed");
++  },
++  release: async (user_id, email_id) => { await sb.from("email_sends").delete().eq("user_id", user_id).eq("email_id", email_id); },
++  insertNote: async (n) => {
++    const { data: conv, error } = await sb.from("ai_conversations").insert({ user_id: n.user_id, ...n.conversation }).select("id").single();
++    if (error || !conv) return false;
++    const { error: mErr } = await sb.from("ai_messages").insert({ conversation_id: conv.id, user_id: n.user_id, ...n.message });
++    if (mErr) { await sb.from("ai_conversations").delete().eq("id", conv.id).eq("user_id", n.user_id); return false; } // no empty chat left behind
++    return true;
++  },
++  send: async (to, b) => {
++    if (!RESEND_API_KEY) return false;
++    const r = await fetch("https://api.resend.com/emails", {
++      method: "POST", headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
++      body: JSON.stringify({ from: b.from, to: [to], subject: b.subject, html: b.html, text: b.text, reply_to: b.replyTo, headers: b.headers }),
++    });
++    return r.ok;
++  },
++}));
+diff --git a/supabase/functions/rombot-checkin/source/logic.ts b/supabase/functions/rombot-checkin/source/logic.ts
+new file mode 100644
+index 0000000..3529ccd
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/source/logic.ts
+@@ -0,0 +1,292 @@
++// P1-17 day 3 ROMBot check-in: pure rules (no I/O), so every rule is testable without a network.
++// Spec (behavior only, not words): /workspace/research/base-comp-20261115/reid/ROMBOT-DAY3-SPEC.md sections 2, 3, 6, 7.
++// Grant's rulings (Nov 16, 2026): send time = notification_preferences.reminder_time if set, else 9:00 AM; zone = the stored
++// timezone (the client saves the device zone there), else America/New_York. The email fallback goes out ONLY on a plan day,
++// at the reminder time, ONLY to P1-01 opt-ins (the same consent and opt-out settings lifecycle-emails honors); otherwise the
++// email is skipped and the in-app note is kept. Replies go to ai-chat, whose crisis route (live v96) is unchanged here.
++// Grant Q3 (Nov 16, 9:49 AM ET): the email is never in the note's run; it goes in the first run at least 24 h after the note,
++// at the same send hour, on a plan day, only with no app activity since the note (planEmails). Q4: the note itself goes to
++// every eligible Base user whatever their email opt-in (plan).
++import { type Branch, type Fill, render, type Rendered } from "./copy.ts";
++
++/** P1-17 default send hour (Grant 9:28 AM ET Nov 16, overriding the spec's 7:00). Used ONLY when reminder_time is empty or unreadable. */
++export const DEFAULT_HOUR = 9;
++/** P1-17 fallback zone when no valid stored timezone exists. */
++export const DEFAULT_TZ = "America/New_York";
++/** Eligible from the send hour until this many hours later, so one failed hourly run is retried (same as lifecycle-emails). */
++export const SEND_WINDOW_HOURS = 3;
++/** The check-in goes on the user's local calendar day = assessment local date + 3. */
++export const CHECKIN_DAY = 3;
++/** Plan days. Mirrors lifecycle-emails PROTOCOL_DAYS (every weekday has a protocol in the apps; MyProtocol ROTATION covers 0 to 6).
++ *  A test pins this equal to lifecycle-emails, so the plan-day rule stays one rule. */
++export const PLAN_DAYS: readonly number[] = [0, 1, 2, 3, 4, 5, 6];
++/** MyProtocol.tsx ROTATION (romrx-io-web): weekday -> index into the user's ranked focus list. */
++export const ROTATION: Readonly<Record<number, number>> = { 1: 0, 2: 1, 3: 2, 4: 0, 5: 1, 6: 2, 0: 0 };
++/** Plain body part names for {today_area} (spec section 3: body part names only, no degrees, scores or bands).
++ *  Keyed by joint family (protocols.joint_key prefix). Unknown family = no message (fail closed). */
++export const AREA_BY_FAMILY: Readonly<Record<string, string>> = {
++  hip: "hips", shoulder: "shoulders", cervical: "neck", ankle: "ankles",
++};
++/** Stop rules (spec section 7). */
++export const BRANCH_C_RECENT_SESSION_HOURS = 12;
++export const RECENT_ROMBOT_MESSAGE_HOURS = 24;
++
++export function flagOn(v: string | null | undefined): boolean { return v === "on"; }
++
++export function validTz(tz: string | null | undefined): tz is string {
++  if (!tz || typeof tz !== "string" || tz.length > 64) return false;
++  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; }
++}
++/** reminder_time text such as "07:00", "7:00", "08:30:00" or "8:30 AM". Returns null when empty or unreadable. */
++export function parseReminderHour(t: string | null | undefined): number | null {
++  if (t === null || t === undefined || typeof t !== "string" || t.trim() === "") return null;
++  const m = /^\s*(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(t);
++  if (!m) return null;
++  let h = parseInt(m[1], 10);
++  const ap = m[3]?.toLowerCase();
++  if (ap) { if (h < 1 || h > 12) return null; if (ap === "pm" && h < 12) h += 12; if (ap === "am" && h === 12) h = 0; }
++  if (h < 0 || h > 23) return null;
++  return h;
++}
++
++export interface SendTime { hour: number; tz: string; hourSource: "reminder_time" | "default_9"; tzSource: "stored" | "default_ny"; }
++/** Send-time fallback order (Grant): 1) reminder_time if set; 2) else 9:00. Zone: stored timezone if valid, else America/New_York. */
++export function sendTime(pref: { reminder_time?: string | null; timezone?: string | null } | null | undefined): SendTime {
++  const h = parseReminderHour(pref?.reminder_time ?? null);
++  const tzOk = validTz(pref?.timezone ?? null);
++  return {
++    hour: h ?? DEFAULT_HOUR, hourSource: h === null ? "default_9" : "reminder_time",
++    tz: tzOk ? pref!.timezone! : DEFAULT_TZ, tzSource: tzOk ? "stored" : "default_ny",
++  };
++}
++
++export function localParts(now: Date, tz: string): { date: string; hour: number; dow: number } {
++  const parts = new Intl.DateTimeFormat("en-US", {
++    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", weekday: "short",
++  }).formatToParts(now);
++  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
++  return { date: `${g("year")}-${g("month")}-${g("day")}`, hour: parseInt(g("hour"), 10) % 24, dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(g("weekday")) };
++}
++export function inWindow(localHour: number, targetHour: number): boolean {
++  const d = (localHour - targetHour + 24) % 24;
++  return d >= 0 && d < SEND_WINDOW_HOURS;
++}
++export function ymdAdd(date: string, days: number): string {
++  const [y, m, d] = date.split("-").map((x) => parseInt(x, 10));
++  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
++}
++/** Stacy's date format for {next_check_date}: "Monday, Dec 28". */
++export function shortDate(iso: string | null | undefined, tz: string): string | null {
++  if (!iso) return null;
++  const t = Date.parse(iso);
++  if (!Number.isFinite(t)) return null;
++  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "short", day: "numeric" }).formatToParts(new Date(t));
++  const g = (x: string) => parts.find((p) => p.type === x)?.value ?? "";
++  if (!g("weekday") || !g("month") || !g("day")) return null;
++  return `${g("weekday")}, ${g("month")} ${g("day")}`;
++}
++
++/** First name: first word of users.full_name, else no name (spec section 3). Only plain name characters are used, because
++ *  ROMBot.tsx renders message lines as HTML; anything else (an email, digits, markup) gives the no-name copy. */
++export function firstName(full: string | null | undefined): string | null {
++  const f = (full ?? "").trim().split(/\s+/)[0] ?? "";
++  return /^\p{L}[\p{L}'.-]{0,39}$/u.test(f) ? f : null;
++}
++
++export function branchFor(n: number): Branch { return n <= 0 ? "A" : n <= 2 ? "B" : "C"; }
++
++/** {today_area}: the user's ranked focus list (protocols for the assessment, priority_rank ascending), picked like MyProtocol's
++ *  TodayCard: ranked[min(ROTATION[dow], len - 1)]. Returns null when it cannot be named. */
++export function todayArea(rankedJointKeys: string[], dow: number): string | null {
++  if (!rankedJointKeys.length || !(dow in ROTATION)) return null;
++  const key = rankedJointKeys[Math.min(ROTATION[dow], rankedJointKeys.length - 1)];
++  const fam = (key ?? "").split("_")[0];
++  return AREA_BY_FAMILY[fam] ?? null;
++}
++
++export interface Pref {
++  reminder_time: string | null; timezone: string | null;
++  email_reminders: boolean | null; protocol_opt_in_at: string | null;
++}
++/** The user's check-in note already written by an earlier run: the ai_conversations row with context_snapshot.kind
++ *  "checkin_d3" (created_at = when the note was written). Existing data only; no new table or column. */
++export interface NoteRecord { assessment_id: string; branch: Branch | null; at: string; }
++export interface Candidate {
++  user_id: string;
++  email: string | null;
++  full_name: string | null;
++  active_sport: string | null;
++  base_status: string | null;
++  marketing_opt_out: boolean | null;
++  is_test: boolean;
++  deletion_requested: boolean;
++  pref: Pref | null;
++  /** Full assessments only (quick re-checks excluded when check_kind exists), newest first. */
++  full_assessments: { id: string; assessed_at: string; red_flag_triggered: boolean | null }[];
++  /** protocols.joint_key for the newest assessment, priority_rank ascending. */
++  ranked_joint_keys: string[];
++  /** protocol_sessions.logged_at values at or after the assessment. */
++  sessions_since: string[];
++  /** Newest ai_messages.created_at with role 'user' (any chat), or null. */
++  last_user_message_at: string | null;
++  /** user_mobility_schedule.next_check_at (P1-07), or null when the row or table is absent. */
++  next_check_at: string | null;
++  /** Email phase only (optional so note-phase callers need not set them). */
++  note?: NoteRecord | null;
++  /** email_sends already has checkin-d3-email-<assessment id> for this note. */
++  email_already?: boolean;
++  /** Newest protocol_sessions.logged_at (any), and newest assessments.assessed_at of ANY kind (full or quick). */
++  last_session_at?: string | null;
++  last_any_assessment_at?: string | null;
++}
++
++export type SkipReason =
++  | "not_audience" | "not_base_active" | "test_account" | "deletion_requested" | "no_assessment" | "not_first_assessment"
++  | "red_flag" | "no_plan" | "outside_send_window" | "not_day3" | "recent_rombot_message" | "branch_c_recent_session"
++  | "no_next_check";
++export type EmailSkip =
++  // permanent (this note never gets an email)
++  | "not_opted_in" | "marketing_opt_out" | "no_email" | "not_base_brand" | "email_already" | "note_stale" | "email_expired"
++  | "activity_session" | "activity_assessment" | "activity_rombot_message" | "branch_changed"
++  | "not_audience" | "not_base_active" | "test_account" | "deletion_requested" | "red_flag" | "no_plan" | "no_next_check"
++  // wait (a later run may send it)
++  | "too_soon" | "outside_send_window" | "not_plan_day";
++
++/** One note per assessment, ever (claim checkin-d3-<assessment id> in email_sends). */
++export interface PlannedNote {
++  user_id: string; assessment_id: string; branch: Branch; rendered: Rendered;
++  note_id: string; local_date: string; send: SendTime;
++}
++/** At most one email per note (claim checkin-d3-email-<assessment id>). */
++export interface PlannedEmail {
++  user_id: string; assessment_id: string; branch: Branch; rendered: Rendered;
++  email_id: string; email: string; local_date: string; send: SendTime; note_age_hours: number;
++}
++
++/** Q3 (Grant, Nov 16): the email waits at least this long after the in-app note. */
++export const EMAIL_MIN_WAIT_HOURS = 24;
++/** Last moment an email may follow its note. 72 h after a day-3 note is local day 6, before the day-7 check (P1-08), so the
++ *  fallback never lands on top of the next check email. After this the note stays in-app only. */
++export const EMAIL_MAX_WAIT_HOURS = 72;
++
++/** P1-01 consent: the Plan day reminders toggle is on AND carries the explicit opt-in marker (set only by set_reminder_opt_in).
++ *  Same rule as lifecycle-emails explicitOn(pref, "protocol"); a test pins the two equal. */
++export function protocolOptedIn(p: Pref | null): boolean {
++  if (!p || p.email_reminders !== true) return false;
++  const m = p.protocol_opt_in_at;
++  return typeof m === "string" && Number.isFinite(Date.parse(m));
++}
++export function isPlanDay(dow: number, days: readonly number[] = PLAN_DAYS): boolean { return days.includes(dow); }
++export function isBaseBrand(sport: string | null | undefined): boolean { return sport !== "bjj" && sport !== "bodybuilding"; }
++
++type Opts = { all: boolean; canary: ReadonlySet<string>; planDays?: readonly number[] };
++type Gate = SkipReason & EmailSkip;
++function commonGate(c: Candidate, opts: Opts): Gate | null {
++  if (!opts.all && !opts.canary.has(c.user_id.toLowerCase())) return "not_audience";
++  if (c.base_status !== "active") return "not_base_active";
++  if (c.is_test) return "test_account";
++  if (c.deletion_requested) return "deletion_requested";
++  return null;
++}
++/** Branch and words for `now`: n = sessions since the assessment; {today_area} for the user's local weekday now. */
++function renderFor(c: Candidate, now: Date, st: SendTime, lp: { date: string; dow: number }, assessedAt: number):
++  { branch: Branch; rendered: Rendered; newestSession: number } | "no_plan" | "no_next_check" {
++  const area = todayArea(c.ranked_joint_keys, lp.dow);
++  if (!area) return "no_plan";
++  const sessions = c.sessions_since.filter((s) => Number.isFinite(Date.parse(s)) && Date.parse(s) >= assessedAt);
++  const n = sessions.length;
++  const branch = branchFor(n);
++  let nextCheck: string | null = null;
++  if (branch === "C") {
++    // One source with lifecycle-emails (W1): next_check_at only, no 7-day or 42-day math. Never a past date.
++    const nc = c.next_check_at && Number.isFinite(Date.parse(c.next_check_at)) ? c.next_check_at : null;
++    if (!nc || localParts(new Date(Date.parse(nc)), st.tz).date <= lp.date) return "no_next_check";
++    nextCheck = shortDate(nc, st.tz);
++    if (!nextCheck) return "no_next_check";
++  }
++  const f: Fill = { first_name: firstName(c.full_name), today_area: area, n, next_check_date: nextCheck };
++  return { branch, rendered: render(branch, f), newestSession: n ? Math.max(...sessions.map((s) => Date.parse(s))) : NaN };
++}
++
++/** Note phase: the in-app note goes to EVERY eligible Base user on local day 3 at their send hour, whatever their email
++ *  opt-in (Grant Q4, Nov 16). No email is sent in this phase. */
++export function plan(now: Date, cands: Candidate[], opts: Opts) {
++  const due: PlannedNote[] = [];
++  const skipped: Partial<Record<SkipReason, number>> = {};
++  const skip = (r: SkipReason) => { skipped[r] = (skipped[r] ?? 0) + 1; };
++  for (const c of cands) {
++    const g = commonGate(c, opts);
++    if (g) { skip(g); continue; }
++    const a = c.full_assessments[0];
++    if (!a) { skip("no_assessment"); continue; }
++    if (c.full_assessments.length !== 1) { skip("not_first_assessment"); continue; }
++    if (a.red_flag_triggered === true) { skip("red_flag"); continue; }
++    const st = sendTime(c.pref);
++    const lp = localParts(now, st.tz);
++    const at = Date.parse(a.assessed_at);
++    if (!Number.isFinite(at)) { skip("no_assessment"); continue; }
++    if (lp.date !== ymdAdd(localParts(new Date(at), st.tz).date, CHECKIN_DAY)) { skip("not_day3"); continue; }
++    if (!inWindow(lp.hour, st.hour)) { skip("outside_send_window"); continue; }
++    const lastMsg = c.last_user_message_at ? Date.parse(c.last_user_message_at) : NaN;
++    if (Number.isFinite(lastMsg) && now.getTime() - lastMsg < RECENT_ROMBOT_MESSAGE_HOURS * 3600000) { skip("recent_rombot_message"); continue; }
++    const r = renderFor(c, now, st, lp, at);
++    if (typeof r === "string") { skip(r); continue; }
++    if (r.branch === "C" && now.getTime() - r.newestSession < BRANCH_C_RECENT_SESSION_HOURS * 3600000) { skip("branch_c_recent_session"); continue; }
++    due.push({ user_id: c.user_id, assessment_id: a.id, branch: r.branch, rendered: r.rendered, note_id: `checkin-d3-${a.id}`, local_date: lp.date, send: st });
++  }
++  return { due, skipped };
++}
++
++const after = (iso: string | null | undefined, t: number) => !!iso && Number.isFinite(Date.parse(iso)) && Date.parse(iso) > t;
++
++/** Email phase (Grant Q3, Nov 16): the email fallback goes in the FIRST run at least 24 h after the note was written, at the
++ *  user's send hour (same rule as the note), on a plan day, and ONLY if there has been no app activity since the note:
++ *  no session save, no assessment (full or quick), no ROMBot message. Every other gate stays (P1-01 opt-in, marketing
++ *  opt-out, Base brand; LIFECYCLE_EMAILS_SEND is checked by the handler). Wait reasons (too_soon, outside_send_window,
++ *  not_plan_day) let a later run send; the window closes EMAIL_MAX_WAIT_HOURS after the note. */
++export function planEmails(now: Date, cands: Candidate[], opts: Opts) {
++  const due: PlannedEmail[] = [];
++  const skipped: Partial<Record<EmailSkip, number>> = {};
++  const skip = (r: EmailSkip) => { skipped[r] = (skipped[r] ?? 0) + 1; };
++  for (const c of cands) {
++    const note = c.note;
++    if (!note) continue; // no note yet: nothing to follow up
++    const g = commonGate(c, opts);
++    if (g) { skip(g); continue; }
++    if (c.email_already) { skip("email_already"); continue; }
++    const noteAt = Date.parse(note.at);
++    if (!Number.isFinite(noteAt)) { skip("note_stale"); continue; }
++    const ageH = (now.getTime() - noteAt) / 3600000;
++    if (ageH > EMAIL_MAX_WAIT_HOURS) { skip("email_expired"); continue; }
++    // Activity since the note, from data already recorded (no new open signal).
++    if (after(c.last_session_at, noteAt) || c.sessions_since.some((s) => after(s, noteAt))) { skip("activity_session"); continue; }
++    if (after(c.last_any_assessment_at, noteAt) || c.full_assessments.some((x) => after(x.assessed_at, noteAt))) { skip("activity_assessment"); continue; }
++    if (after(c.last_user_message_at, noteAt)) { skip("activity_rombot_message"); continue; }
++    const a = c.full_assessments[0];
++    if (!a || a.id !== note.assessment_id) { skip("note_stale"); continue; }
++    if (a.red_flag_triggered === true) { skip("red_flag"); continue; }
++    if (!protocolOptedIn(c.pref)) { skip("not_opted_in"); continue; }
++    if (c.marketing_opt_out === true) { skip("marketing_opt_out"); continue; }
++    if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) { skip("no_email"); continue; }
++    if (!isBaseBrand(c.active_sport)) { skip("not_base_brand"); continue; }
++    if (ageH < EMAIL_MIN_WAIT_HOURS) { skip("too_soon"); continue; }
++    const st = sendTime(c.pref);
++    const lp = localParts(now, st.tz);
++    if (!inWindow(lp.hour, st.hour)) { skip("outside_send_window"); continue; }
++    if (!isPlanDay(lp.dow, opts.planDays ?? PLAN_DAYS)) { skip("not_plan_day"); continue; }
++    const r = renderFor(c, now, st, lp, Date.parse(a.assessed_at));
++    if (typeof r === "string") { skip(r); continue; }
++    if (note.branch && note.branch !== r.branch) { skip("branch_changed"); continue; }
++    due.push({ user_id: c.user_id, assessment_id: a.id, branch: r.branch, rendered: r.rendered, email_id: `checkin-d3-email-${a.id}`, email: c.email, local_date: lp.date, send: st, note_age_hours: Math.round(ageH * 100) / 100 });
++  }
++  return { due, skipped };
++}
++
++/** In-app message text: Stacy's first and last lines. The button is carried in context_snapshot for the client to draw. */
++export function noteContent(r: Rendered): string { return `${r.line1}\n${r.line3}`; }
++export const APP_PATH = "/dashboard/my-protocol?src=checkin-d3";
++
++export function maskEmail(e: string): string {
++  const [l, d] = e.split("@");
++  return `${(l ?? "").slice(0, 1)}***@${d ?? ""}`;
++}
+diff --git a/supabase/functions/rombot-checkin/test/crisis.test.ts b/supabase/functions/rombot-checkin/test/crisis.test.ts
+new file mode 100644
+index 0000000..7da3ba7
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/crisis.test.ts
+@@ -0,0 +1,45 @@
++// P1-17 crisis routing: replies to the check-in go to ai-chat in the same (user-owned) conversation, so the LIVE ai-chat crisis
++// route (v96, unconditional, runs before any model call, Stacy v3 replies) answers pain or red-flag replies. This build adds NO
++// trigger and NO words and does not touch ai-chat (Nov 3 lesson: do not widen the crisis triggers; L954 bare "numb"/"emergency"
++// stay unmatched). The live handler is not in this repo, so this test runs against a pinned copy of live v96 when
++// AI_CHAT_HANDLER points at it (sha256 below), and is ignored otherwise.
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { noteFor } from "../source/handler.ts";
++import { plan } from "../source/logic.ts";
++import { ALL, at, cand } from "./fixtures.ts";
++
++const LIVE_V96_HANDLER_SHA256 = "24f61509de9fc132a3da9b558fd13ecfc065455c014716153ba9b96cf0fc4554";
++const path = Deno.env.get("AI_CHAT_HANDLER");
++const note = noteFor(plan(at("2026-11-16T12:30:00Z"), [cand()], ALL).due[0]);
++
++Deno.test({
++  name: "live ai-chat v96 crisis route answers pain or red-flag replies in the check-in conversation; benign replies go to ROMBot",
++  ignore: !path,
++  fn: async () => {
++    const bytes = await Deno.readFile(path!);
++    const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
++    assertEquals(sha, LIVE_V96_HANDLER_SHA256);
++    const m = await import(path!);
++    const history = [{ role: note.message.role, content: note.message.content }];
++    // Self-harm and crisis-number replies: Reply A. Emergency (chest pain, fainting, broken bone): Reply B. Words are ai-chat's own.
++    for (const t of ["I want to hurt myself", "what's the crisis line number", "I have chest pain when I do it"]) {
++      const k = m.detectCrisis(t, history);
++      assert(k === "A" || k === "B", t);
++      assert(m.crisisReply(k) === m.CRISIS_REPLY_A || m.crisisReply(k) === m.CRISIS_REPLY_B);
++    }
++    assertEquals(m.detectCrisis("I passed out after the stretch", history), "B");
++    // Ordinary replies to Stacy's prompts are not crisis-routed (no new triggers added by P1-17).
++    for (const t of ["it felt too easy", "work got in the way", "my hips feel tight", "yes"]) assertEquals(m.detectCrisis(t, history), null, t);
++    // The check-in note is not Reply A, so it cannot switch on the soft-distress follow-up rule.
++    assert(note.message.content !== m.CRISIS_REPLY_A);
++  },
++});
++Deno.test("the check-in chat is owned by the user, so ai-chat's ownership check (FG-06) lets replies in and the crisis route runs", async () => {
++  assertEquals(note.user_id, cand().user_id);
++  if (!path) return;
++  const m = await import(path);
++  const rows = [{ id: "c1", user_id: note.user_id }];
++  const client = { from: () => { const f: Record<string, string> = {}; const q = { select: () => q, eq: (k: string, v: string) => { f[k] = v; return q; }, maybeSingle: () => Promise.resolve({ data: rows.find((r) => r.id === f.id && r.user_id === f.user_id) ?? null }) }; return q; } };
++  assertEquals(await m.conversationOwnedBy(client, "c1", note.user_id), true);
++  assertEquals(await m.conversationOwnedBy(client, "c1", "someone-else"), false);
++});
+diff --git a/supabase/functions/rombot-checkin/test/emails.test.ts b/supabase/functions/rombot-checkin/test/emails.test.ts
+new file mode 100644
+index 0000000..8ac08b2
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/emails.test.ts
+@@ -0,0 +1,91 @@
++// P1-17 Q3 (Grant, Nov 16): the email fallback waits at least 24 h after the in-app note, goes at the user's send hour on a
++// plan day, only with no app activity since the note (session save, assessment of any kind, ROMBot message), and only to
++// P1-01 opt-ins (plus marketing opt-out, address and Base brand gates). At most one email per note.
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { type Candidate, EMAIL_MAX_WAIT_HOURS, EMAIL_MIN_WAIT_HOURS, planEmails } from "../source/logic.ts";
++import { ALL, at, cand } from "./fixtures.ts";
++
++// Note written Mon Nov 16, 2026 at 7:30:05 AM ET (12:30:05Z) by the 12:30Z run. Reminder 07:00 ET, window 7:00 to 9:59 ET.
++const NOTE_AT = "2026-11-16T12:30:05Z";
++const AID = "aaaaaaaa-0000-4000-8000-000000000001";
++const noted = (over: Partial<Candidate> = {}) => cand({ note: { assessment_id: AID, branch: "A", at: NOTE_AT }, email_already: false, last_session_at: null, last_any_assessment_at: "2026-11-13T14:00:00Z", ...over });
++const plus = (h: number, m = 0) => new Date(Date.parse(NOTE_AT) + h * 3600000 + m * 60000);
++
++Deno.test("constants: wait at least 24 h, window closes 72 h after the note", () => {
++  assertEquals([EMAIL_MIN_WAIT_HOURS, EMAIL_MAX_WAIT_HOURS], [24, 72]);
++});
++Deno.test("23h59m after the note: no send (too_soon), even at the reminder hour", () => {
++  const p = planEmails(plus(23, 59), [noted()], ALL);
++  assertEquals([p.due.length, p.skipped], [0, { too_soon: 1 }]);
++});
++Deno.test("24 h+ after the note with no activity, at the reminder hour on a plan day: send, branch A words for today", () => {
++  const p = planEmails(plus(24, 1), [noted()], ALL); // Tue 7:31 AM ET
++  assertEquals(p.due.length, 1);
++  const d = p.due[0];
++  assertEquals([d.email_id, d.email, d.branch], [`checkin-d3-email-${AID}`, "user@example.com", "A"]);
++  assert(d.rendered.line1.includes("Today's focus is your shoulders.")); // Tuesday: ROTATION[2] = 1 -> shoulder_flex
++  assert(d.note_age_hours >= 24);
++});
++Deno.test("the hourly run that lands 1 s short of 24 h waits, and the next run in the window sends", () => {
++  assertEquals(planEmails(at("2026-11-17T12:30:00Z"), [noted()], ALL).skipped, { too_soon: 1 });
++  assertEquals(planEmails(at("2026-11-17T13:30:00Z"), [noted()], ALL).due.length, 1);
++});
++Deno.test("activity since the note, each kind: no send, ever", () => {
++  const t = new Date(Date.parse(NOTE_AT) + 3600000).toISOString();
++  const cases: [Partial<Candidate>, string][] = [
++    [{ last_session_at: t }, "activity_session"],
++    [{ sessions_since: [t] }, "activity_session"],
++    [{ last_any_assessment_at: t }, "activity_assessment"], // quick check (full list unchanged)
++    [{ full_assessments: [{ id: "new", assessed_at: t, red_flag_triggered: false }, { id: AID, assessed_at: "2026-11-13T14:00:00Z", red_flag_triggered: false }], last_any_assessment_at: t }, "activity_assessment"],
++    [{ last_user_message_at: t }, "activity_rombot_message"],
++  ];
++  for (const [over, why] of cases) {
++    const p = planEmails(plus(24, 30), [noted(over)], ALL);
++    assertEquals([p.due.length, p.skipped], [0, { [why]: 1 }], JSON.stringify(over));
++  }
++  // Activity before the note does not block.
++  assertEquals(planEmails(plus(24, 30), [noted({ last_user_message_at: "2026-11-15T11:00:00Z", last_session_at: "2026-11-10T11:00:00Z" })], ALL).due.length, 1);
++});
++Deno.test("wrong hour: waits (outside_send_window), then sends at the next day's reminder hour inside 72 h", () => {
++  assertEquals(planEmails(plus(26, 30), [noted()], ALL).skipped, { outside_send_window: 1 }); // Tue 10:00 AM ET
++  assertEquals(planEmails(plus(48, 30), [noted()], ALL).due.length, 1); // Wed 8:00 AM ET
++});
++Deno.test("non-plan day: waits (not_plan_day), then sends on the next plan day at the reminder hour", () => {
++  const tueOff = { ...ALL, planDays: [0, 1, 3, 4, 5, 6] }; // Tuesday (2) not a plan day
++  assertEquals(planEmails(plus(24, 30), [noted()], tueOff).skipped, { not_plan_day: 1 });
++  const wed = planEmails(plus(48, 30), [noted()], tueOff);
++  assertEquals(wed.due.length, 1);
++  assert(wed.due[0].rendered.line1.includes("Today's focus is your neck.")); // Wednesday: ROTATION[3] = 2 -> cervical_rot
++});
++Deno.test("window closes: more than 72 h after the note, no send", () => {
++  assertEquals(planEmails(plus(72, 30), [noted()], ALL).skipped, { email_expired: 1 });
++});
++Deno.test("at most one email per note: email_already skips", () => {
++  assertEquals(planEmails(plus(24, 30), [noted({ email_already: true })], ALL).skipped, { email_already: 1 });
++});
++Deno.test("no note yet: nothing planned and nothing counted", () => {
++  const p = planEmails(plus(24, 30), [cand()], ALL);
++  assertEquals([p.due.length, p.skipped], [0, {}]);
++});
++Deno.test("every other gate stays: P1-01 opt-in, marketing opt-out, address, Base brand, audience, Base active, test, deletion", () => {
++  const cases: [Partial<Candidate>, string][] = [
++    [{ pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } }, "not_opted_in"],
++    [{ pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: false, protocol_opt_in_at: "2026-11-13T15:00:00Z" } }, "not_opted_in"],
++    [{ pref: null }, "not_opted_in"],
++    [{ marketing_opt_out: true }, "marketing_opt_out"],
++    [{ email: null }, "no_email"],
++    [{ active_sport: "bjj" }, "not_base_brand"],
++    [{ active_sport: "bodybuilding" }, "not_base_brand"],
++    [{ base_status: "inactive" }, "not_base_active"],
++    [{ is_test: true }, "test_account"],
++    [{ deletion_requested: true }, "deletion_requested"],
++  ];
++  for (const [over, why] of cases) assertEquals(planEmails(plus(24, 30), [noted(over)], ALL).skipped, { [why]: 1 }, JSON.stringify(over));
++  assertEquals(planEmails(plus(24, 30), [noted()], { all: false, canary: new Set() }).skipped, { not_audience: 1 });
++});
++Deno.test("send hour rule is the note's: empty reminder_time and no zone means 9:00 New York", () => {
++  const c = noted({ pref: { reminder_time: null, timezone: null, email_reminders: true, protocol_opt_in_at: "2026-11-13T15:00:00Z" } });
++  assertEquals(planEmails(at("2026-11-17T13:30:00Z"), [c], ALL).skipped, { outside_send_window: 1 }); // 8:30 ET
++  const d = planEmails(at("2026-11-17T14:30:00Z"), [c], ALL).due[0]; // 9:30 ET
++  assertEquals([d.send.hour, d.send.tz], [9, "America/New_York"]);
++});
+diff --git a/supabase/functions/rombot-checkin/test/fixtures.ts b/supabase/functions/rombot-checkin/test/fixtures.ts
+new file mode 100644
+index 0000000..d68cbf9
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/fixtures.ts
+@@ -0,0 +1,18 @@
++// P1-17 test fixture: one Base user, assessed Fri Nov 13, 2026 9:00 AM ET (day 3 local = Mon Nov 16), reminder 07:00 ET, P1-01 opt-in.
++import type { Candidate } from "../source/logic.ts";
++
++export const U = "11111111-1111-4111-8111-111111111111";
++export const ALL = { all: true, canary: new Set<string>() };
++// Assessment Fri Nov 13, 2026, 9:00 AM ET. Day 3 local = Mon Nov 16.
++export const ASSESSED = "2026-11-13T14:00:00Z";
++export const at = (iso: string) => new Date(iso);
++export function cand(over: Partial<Candidate> = {}): Candidate {
++  return {
++    user_id: U, email: "user@example.com", full_name: "Sam Lee", active_sport: "base", base_status: "active", marketing_opt_out: false,
++    is_test: false, deletion_requested: false,
++    pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: "2026-11-13T15:00:00Z" },
++    full_assessments: [{ id: "aaaaaaaa-0000-4000-8000-000000000001", assessed_at: ASSESSED, red_flag_triggered: false }],
++    ranked_joint_keys: ["hip_ir", "shoulder_flex", "cervical_rot"], sessions_since: [], last_user_message_at: null, next_check_at: "2026-11-20T14:00:00Z",
++    ...over,
++  };
++}
+diff --git a/supabase/functions/rombot-checkin/test/handler.test.ts b/supabase/functions/rombot-checkin/test/handler.test.ts
+new file mode 100644
+index 0000000..3db9180
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/handler.test.ts
+@@ -0,0 +1,169 @@
++// P1-17 handler tests: switches (dry by default), audience, one note and at most one email per note, the email fallback in a
++// later run (24 h+ after the note, no activity since, reminder time, plan day, P1-01 opt-in only), sender, headers, and the
++// live unsubscribe scopes (no change).
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { type Deps, handle, type NoteInsert } from "../source/handler.ts";
++import type { Built } from "../source/email.ts";
++import { ROMRX_SENDER } from "../source/email.ts";
++import { verifyUnsubToken } from "../_shared/unsub_token.ts";
++import { handleTokenRequest, ONE_CLICK_BODY, SCOPE_COLUMN } from "../../unsubscribe/source/token_path.ts";
++import { SCOPE_SETTING } from "../../unsubscribe/_shared/unsub_token.ts";
++import { cand } from "./fixtures.ts";
++import type { Candidate } from "../source/logic.ts";
++
++const SECRET = "s".repeat(40);
++const NOW = new Date("2026-11-16T12:30:00Z"); // Mon 7:30 AM ET, day 3 for the fixture: the note run
++const LATER = new Date("2026-11-17T13:30:00Z"); // Tue 8:30 AM ET, 25 h after the note: the email run
++const NOTE_AT = "2026-11-16T12:30:05Z";
++const noted = (over: Partial<Candidate> = {}) => cand({ note: { assessment_id: "aaaaaaaa-0000-4000-8000-000000000001", branch: "A", at: NOTE_AT }, email_already: false, last_session_at: null, last_any_assessment_at: "2026-11-13T14:00:00Z", ...over });
++const req = (q = "") => new Request(`https://x.test/rombot-checkin${q}`, { method: "POST" });
++function deps(env: Record<string, string>, cands = [cand()], now = NOW) {
++  const log = { claims: [] as string[], releases: [] as string[], notes: [] as NoteInsert[], sends: [] as { to: string; b: Built }[] };
++  const claimed = new Set<string>();
++  const d: Deps = {
++    env: (k) => env[k], cronOk: () => Promise.resolve(true), now: () => now, load: () => Promise.resolve(cands),
++    claim: (u, id) => { log.claims.push(id); if (claimed.has(u + id)) return Promise.resolve(false); claimed.add(u + id); return Promise.resolve(true); },
++    release: (u, id) => { log.releases.push(id); claimed.delete(u + id); return Promise.resolve(); },
++    insertNote: (n) => { log.notes.push(n); return Promise.resolve(true); },
++    send: (to, b) => { log.sends.push({ to, b }); return Promise.resolve(true); },
++  };
++  return { d, log };
++}
++const ON = { ROMBOT_CHECKIN_SEND: "on", LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET };
++
++Deno.test("cron secret required", async () => {
++  const { d } = deps(ON);
++  assertEquals((await handle(req(), { ...d, cronOk: () => Promise.resolve(false) })).status, 403);
++});
++Deno.test("dry by default: no switch set = plan only, no claim, no note, no email, emails masked", async () => {
++  for (const env of [{ LIFECYCLE_AUDIENCE: "all" }, { LIFECYCLE_AUDIENCE: "all", ROMBOT_CHECKIN_SEND: "ON" }, { LIFECYCLE_AUDIENCE: "all", ROMBOT_CHECKIN_SEND: "true" }, { ...ON, ROMBOT_CHECKIN_SEND: "" }]) {
++    const { d, log } = deps(env as Record<string, string>);
++    const j = await (await handle(req(), d)).json();
++    assertEquals(j.dry_run, true);
++    assertEquals([log.claims.length, log.notes.length, log.sends.length], [0, 0, 0]);
++    assertEquals(j.notes[0].note_id, "checkin-d3-aaaaaaaa-0000-4000-8000-000000000001");
++    assertEquals(j.emails, []);
++    const e = deps(env as Record<string, string>, [noted()], LATER);
++    const je = await (await handle(req(), e.d)).json();
++    assertEquals(je.emails[0].email, "u***@example.com");
++    assertEquals([e.log.claims.length, e.log.sends.length], [0, 0]);
++  }
++  const { d, log } = deps(ON);
++  assertEquals((await (await handle(req("?dry_run=1"), d)).json()).dry_run, true);
++  assertEquals(log.notes.length, 0);
++});
++Deno.test("canary audience with no ids writes nothing", async () => {
++  const { d, log } = deps({ ROMBOT_CHECKIN_SEND: "on", LIFECYCLE_EMAILS_SEND: "on", UNSUBSCRIBE_HMAC_SECRET: SECRET });
++  await handle(req(), d);
++  assertEquals([log.notes.length, log.sends.length], [0, 0]);
++});
++Deno.test("in-app note: assistant message in a new Base ROMBot chat, no title, button in context_snapshot; no email in the same run", async () => {
++  const { d, log } = deps(ON);
++  const j = await (await handle(req(), d)).json();
++  assertEquals(j.results.notes, 1);
++  assertEquals([j.results.emails_sent, log.sends.length], [0, 0]); // Q3: never the same run as the note
++  const n = log.notes[0];
++  assertEquals(n.conversation.sport, "base");
++  assertEquals(n.conversation.provider, "rombot");
++  assert(!("title" in n.conversation));
++  assertEquals(n.message.role, "assistant");
++  assertEquals(n.message.content, "Hey Sam, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?\nIf something got in the way, tell me here and I'll help you find an easier way in.");
++  assertEquals(n.conversation.context_snapshot, { kind: "checkin_d3", branch: "A", assessment_id: "aaaaaaaa-0000-4000-8000-000000000001", button: { label: "Start today's session", path: "/dashboard/my-protocol?src=checkin-d3" } });
++});
++Deno.test("Q4: the in-app note is written for non opt-ins, marketing opt-outs and sport-pack brands too", async () => {
++  for (const over of [
++    { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } },
++    { marketing_opt_out: true }, { active_sport: "bjj" }, { email: null },
++  ]) {
++    const { d, log } = deps(ON, [cand(over)]);
++    const j = await (await handle(req(), d)).json();
++    assertEquals([j.results.notes, log.notes.length], [1, 1], JSON.stringify(over));
++  }
++});
++Deno.test("one check-in per assessment: a second run is a no-op", async () => {
++  const { d, log } = deps(ON);
++  await handle(req(), d);
++  const j2 = await (await handle(req(), d)).json();
++  assertEquals(j2.results.already, 1);
++  assertEquals(log.notes.length, 1);
++});
++Deno.test("email fallback in a later run: Base sender ROMRx <hello@romrx.io>, Stacy subject, Branch A no extra opener, one-click unsubscribe", async () => {
++  const { d, log } = deps(ON, [noted()], LATER);
++  const j = await (await handle(req(), d)).json();
++  assertEquals([j.results.notes, j.results.emails_sent], [0, 1]);
++  const { to, b } = log.sends[0];
++  assertEquals(to, "user@example.com");
++  // Jim, 9:42 AM ET Nov 16 (as relayed by Grant): "Replies go to hello@, Reid triages them from my inbox." Reply-To is hello@, never reid@.
++  assertEquals([b.from, b.replyTo], ["ROMRx <hello@romrx.io>", "hello@romrx.io"]);
++  assert(!/reid@/i.test(b.replyTo + b.html + b.text));
++  assert(b.html.includes('href="mailto:hello@romrx.io"'));
++  assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
++  assertEquals(b.subject, "Your plan is ready, Sam");
++  // Stacy (Nov 16): Branch A drops the "ROMBot here." opener; its first line already says it.
++  assert(b.text.startsWith("Hey Sam, ROMBot here. It's been 3 days"));
++  assertEquals(b.text.split("ROMBot here.").length - 1, 1);
++  assertEquals(b.html.split("ROMBot here.").length - 1, 1);
++  assert(b.text.includes("Today's focus is your shoulders.")); // Tuesday's area
++  assert(b.html.includes("https://romrx.io/app/dashboard/my-protocol?src=checkin-d3"));
++  assertEquals(b.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
++  assert(!/jim@romrx|romrxbjj\.com|romrxbodybuilding\.com/.test(b.html + b.text + b.from + b.replyTo));
++  assert(!/[\u2014\u2013]/.test(b.html + b.text + b.subject));
++});
++Deno.test("at most one email per note: a second later run is a no-op", async () => {
++  const { d, log } = deps(ON, [noted()], LATER);
++  await handle(req(), d);
++  const j2 = await (await handle(req(), d)).json();
++  assertEquals([j2.results.emails_already, log.sends.length], [1, 1]);
++});
++Deno.test("LIFECYCLE_EMAILS_SEND not on: email held, not claimed, not sent", async () => {
++  for (const v of ["off", "", "ON"]) {
++    const { d, log } = deps({ ...ON, LIFECYCLE_EMAILS_SEND: v }, [noted()], LATER);
++    const j = await (await handle(req(), d)).json();
++    assertEquals([j.results.emails_held, log.claims.length, log.sends.length], [1, 0, 0]);
++  }
++});
++Deno.test("activity since the note, or a non opt-in: no email", async () => {
++  const t = "2026-11-16T20:00:00Z";
++  for (const over of [{ last_session_at: t }, { last_any_assessment_at: t }, { last_user_message_at: t }, { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } }] as Partial<Candidate>[]) {
++    const { d, log } = deps(ON, [noted(over)], LATER);
++    await handle(req(), d);
++    assertEquals([log.claims.length, log.sends.length], [0, 0], JSON.stringify(over));
++  }
++});
++Deno.test("no signing secret: no email (fail closed), nothing claimed", async () => {
++  const { d, log } = deps({ ...ON, UNSUBSCRIBE_HMAC_SECRET: "" }, [noted()], LATER);
++  const j = await (await handle(req(), d)).json();
++  assertEquals([j.results.emails_failed, log.claims.length, log.sends.length], [1, 0, 0]);
++});
++Deno.test("failed note insert releases the note claim; failed send releases the email claim", async () => {
++  const a = deps(ON);
++  const j = await (await handle(req(), { ...a.d, insertNote: () => Promise.resolve(false) })).json();
++  assertEquals([j.results.failed, a.log.releases[0]], [1, "checkin-d3-aaaaaaaa-0000-4000-8000-000000000001"]);
++  const b = deps(ON, [noted()], LATER);
++  const j2 = await (await handle(req(), { ...b.d, send: () => Promise.resolve(false) })).json();
++  assertEquals([j2.results.emails_failed, b.log.releases[0]], [1, "checkin-d3-email-aaaaaaaa-0000-4000-8000-000000000001"]);
++});
++Deno.test("suppress list is treated as a pending deletion request (no note, no email)", async () => {
++  const env = { ...ON, LIFECYCLE_SUPPRESS_USER_IDS: "11111111-1111-4111-8111-111111111111" };
++  const { d, log } = deps(env);
++  await handle(req(), d);
++  const e = deps(env, [noted()], LATER);
++  await handle(req(), e.d);
++  assertEquals([log.notes.length, e.log.sends.length], [0, 0]);
++});
++Deno.test("unsubscribe: links carry live scopes only (protocol and all); the live unsubscribe path turns off Plan day reminders", async () => {
++  const { d, log } = deps(ON, [noted()], LATER);
++  await handle(req(), d);
++  const b = log.sends[0].b;
++  const oneClick = /<([^>]+)>/.exec(b.headers["List-Unsubscribe"])![1];
++  const t = decodeURIComponent(/\?t=([^&]+)/.exec(oneClick)![1]);
++  assertEquals(await verifyUnsubToken(SECRET, t), { userId: "11111111-1111-4111-8111-111111111111", scope: "protocol" });
++  let col = "";
++  const r = await handleTokenRequest(new Request(`https://x.test/unsubscribe?t=${encodeURIComponent(t)}`, { method: "POST", body: ONE_CLICK_BODY }), {
++    secret: SECRET, apply: (_u, scope) => { col = scope === "all" ? "all" : SCOPE_COLUMN[SCOPE_SETTING[scope]]; return Promise.resolve(1); }, log: () => Promise.resolve(),
++  });
++  assert(r !== null && r.status < 400);
++  assertEquals(col, "email_reminders");
++  const allT = decodeURIComponent(/Turn off all ROMRx emails except account and billing notices: https:\/\/romrx\.io\/app\/unsubscribe\?t=(\S+)/.exec(b.text)![1]);
++  assertEquals((await verifyUnsubToken(SECRET, allT))?.scope, "all");
++});
+diff --git a/supabase/functions/rombot-checkin/test/logic.test.ts b/supabase/functions/rombot-checkin/test/logic.test.ts
+new file mode 100644
+index 0000000..20a1942
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/logic.test.ts
+@@ -0,0 +1,120 @@
++// P1-17 logic tests: send-time fallback order, day 3 timing, branch selection, plan-day and consent gating, stop rules.
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { branchFor, type Candidate, DEFAULT_HOUR, DEFAULT_TZ, firstName, isPlanDay, parseReminderHour, plan, PLAN_DAYS, protocolOptedIn, sendTime, shortDate, todayArea, noteContent } from "../source/logic.ts";
++
++import { ALL, ASSESSED, at, cand, U } from "./fixtures.ts";
++
++const MON_730_ET = at("2026-11-16T12:30:00Z");
++
++Deno.test("send-time: reminder_time set wins (stored zone)", () => {
++  const s = sendTime({ reminder_time: "07:00", timezone: "America/Los_Angeles" });
++  assertEquals(s, { hour: 7, hourSource: "reminder_time", tz: "America/Los_Angeles", tzSource: "stored" });
++});
++Deno.test("send-time: empty reminder_time with a stored zone gives 9:00 in that zone", () => {
++  for (const t of [null, "", "  ", "garbage", "25:00", "13 PM"]) {
++    assertEquals(sendTime({ reminder_time: t, timezone: "America/Denver" }), { hour: 9, hourSource: "default_9", tz: "America/Denver", tzSource: "stored" });
++  }
++});
++Deno.test("send-time: empty reminder_time and no zone gives 9:00 America/New_York (no Chicago fallback)", () => {
++  assertEquals(sendTime(null), { hour: 9, hourSource: "default_9", tz: "America/New_York", tzSource: "default_ny" });
++  assertEquals(sendTime({ reminder_time: null, timezone: "Not/AZone" }), { hour: 9, hourSource: "default_9", tz: "America/New_York", tzSource: "default_ny" });
++  assertEquals(DEFAULT_HOUR, 9);
++  assertEquals(DEFAULT_TZ, "America/New_York");
++});
++Deno.test("send-time: a saved 07:00 is the user's choice and is honored (Grant: leave the Settings pre-fill alone)", () => {
++  assertEquals(parseReminderHour("07:00"), 7);
++  assertEquals(parseReminderHour("8:30 AM"), 8);
++  assertEquals(parseReminderHour("12:00 AM"), 0);
++  assertEquals(parseReminderHour("07:00:00"), 7);
++});
++Deno.test("send-time drives the window: 7:30 ET sends for 07:00, not for an empty time (9:00)", () => {
++  assertEquals(plan(MON_730_ET, [cand()], ALL).due.length, 1);
++  const empty = cand({ pref: { reminder_time: null, timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: "2026-11-13T15:00:00Z" } });
++  assertEquals(plan(MON_730_ET, [empty], ALL).skipped, { outside_send_window: 1 });
++  assertEquals(plan(at("2026-11-16T14:30:00Z"), [empty], ALL).due[0].send.hourSource, "default_9"); // 9:30 ET
++  // No prefs row and no zone: 9:00 New York.
++  const noPref = cand({ pref: null });
++  assertEquals(plan(at("2026-11-16T13:30:00Z"), [noPref], ALL).skipped, { outside_send_window: 1 }); // 8:30 ET
++  const d = plan(at("2026-11-16T14:30:00Z"), [noPref], ALL).due[0];
++  assertEquals([d.send.hour, d.send.tz], [9, "America/New_York"]);
++  // Stored zone is used for both the hour and the day: 07:00 Los Angeles = 15:00Z on Nov 16.
++  const la = cand({ pref: { reminder_time: "07:00", timezone: "America/Los_Angeles", email_reminders: true, protocol_opt_in_at: "2026-11-13T15:00:00Z" } });
++  assertEquals(plan(MON_730_ET, [la], ALL).skipped, { outside_send_window: 1 });
++  assertEquals(plan(at("2026-11-16T15:30:00Z"), [la], ALL).due.length, 1);
++});
++Deno.test("day 3 only: local assessment date + 3, nothing on day 2 or day 4", () => {
++  assertEquals(plan(at("2026-11-15T12:30:00Z"), [cand()], ALL).skipped, { not_day3: 1 });
++  assertEquals(plan(at("2026-11-17T12:30:00Z"), [cand()], ALL).skipped, { not_day3: 1 });
++});
++
++Deno.test("branch selection: 0 = A, 1 to 2 = B, 3 or more = C", () => {
++  assertEquals([0, 1, 2, 3, 7].map(branchFor), ["A", "B", "B", "C", "C"]);
++  const s = (k: number) => Array.from({ length: k }, (_, i) => `2026-11-1${3 + Math.min(i, 2)}T${String(16 + i).padStart(2, "0")}:00:00Z`);
++  assertEquals(plan(MON_730_ET, [cand()], ALL).due[0].branch, "A");
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: s(1) })], ALL).due[0].branch, "B");
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: s(2) })], ALL).due[0].branch, "B");
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: ["2026-11-13T16:00:00Z", "2026-11-14T16:00:00Z", "2026-11-15T16:00:00Z"] })], ALL).due[0].branch, "C");
++  // Sessions before the assessment do not count.
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: ["2026-11-10T16:00:00Z"] })], ALL).due[0].branch, "A");
++});
++Deno.test("branch C: skipped after a session in the last 12 hours, and when next_check_at is unknown or not in the future", () => {
++  const three = ["2026-11-13T16:00:00Z", "2026-11-14T16:00:00Z", "2026-11-16T03:00:00Z"]; // last one 9.5 h before 12:30Z
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: three })], ALL).skipped, { branch_c_recent_session: 1 });
++  const old3 = ["2026-11-13T16:00:00Z", "2026-11-14T16:00:00Z", "2026-11-15T16:00:00Z"];
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: old3, next_check_at: null })], ALL).skipped, { no_next_check: 1 });
++  assertEquals(plan(MON_730_ET, [cand({ sessions_since: old3, next_check_at: "2026-11-16T14:00:00Z" })], ALL).skipped, { no_next_check: 1 });
++  const ok = plan(MON_730_ET, [cand({ sessions_since: old3 })], ALL).due[0];
++  assert(ok.rendered.line1.includes("Your next check is Friday, Nov 20."));
++});
++Deno.test("{next_check_date} format is Stacy's \"Monday, Dec 28\"", () => {
++  assertEquals(shortDate("2026-12-28T15:00:00Z", "America/New_York"), "Monday, Dec 28");
++});
++
++Deno.test("plan days are every weekday today", () => {
++  assertEquals(PLAN_DAYS, [0, 1, 2, 3, 4, 5, 6]);
++  for (let d = 0; d < 7; d++) assert(isPlanDay(d));
++  assert(!isPlanDay(7) && !isPlanDay(-1));
++  assert(!isPlanDay(1, [2, 4]));
++});
++Deno.test("Q4: the in-app note goes to every eligible Base user whatever their email opt-in, marketing setting, address or brand", () => {
++  for (const over of [
++    {}, { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: true, protocol_opt_in_at: null } },
++    { pref: { reminder_time: "07:00", timezone: "America/New_York", email_reminders: false, protocol_opt_in_at: null } },
++    { marketing_opt_out: true }, { email: null }, { active_sport: "bjj" },
++  ] as Partial<Candidate>[]) assertEquals(plan(MON_730_ET, [cand(over)], ALL).due.length, 1, JSON.stringify(over));
++  assert(!protocolOptedIn(null));
++});
++Deno.test("stop rules: audience, Base active, test account, deletion, first full assessment only, red flag, plan, recent ROMBot message", () => {
++  const sk = (over: Partial<Candidate>, opts = ALL) => plan(MON_730_ET, [cand(over)], opts).skipped;
++  assertEquals(sk({}, { all: false, canary: new Set() }), { not_audience: 1 });
++  assertEquals(plan(MON_730_ET, [cand()], { all: false, canary: new Set([U]) }).due.length, 1);
++  assertEquals(sk({ base_status: "inactive" }), { not_base_active: 1 });
++  assertEquals(sk({ base_status: null }), { not_base_active: 1 });
++  assertEquals(sk({ is_test: true }), { test_account: 1 });
++  assertEquals(sk({ deletion_requested: true }), { deletion_requested: 1 });
++  assertEquals(sk({ full_assessments: [] }), { no_assessment: 1 });
++  assertEquals(sk({ full_assessments: [{ id: "b", assessed_at: ASSESSED, red_flag_triggered: false }, { id: "c", assessed_at: "2026-10-01T14:00:00Z", red_flag_triggered: false }] }), { not_first_assessment: 1 });
++  assertEquals(sk({ full_assessments: [{ id: "b", assessed_at: ASSESSED, red_flag_triggered: true }] }), { red_flag: 1 });
++  assertEquals(sk({ ranked_joint_keys: [] }), { no_plan: 1 });
++  assertEquals(sk({ ranked_joint_keys: ["lumbar_flex"] }), { no_plan: 1 });
++  assertEquals(sk({ last_user_message_at: "2026-11-15T20:00:00Z" }), { recent_rombot_message: 1 });
++  assertEquals(plan(MON_730_ET, [cand({ last_user_message_at: "2026-11-15T11:00:00Z" })], ALL).due.length, 1);
++});
++Deno.test("today_area follows MyProtocol ROTATION on the user's local weekday, body part names only", () => {
++  const r = ["hip_ir", "shoulder_flex", "cervical_rot"];
++  assertEquals([0, 1, 2, 3, 4, 5, 6].map((d) => todayArea(r, d)), ["hips", "hips", "shoulders", "neck", "hips", "shoulders", "neck"]);
++  assertEquals(todayArea(["ankle_df"], 3), "ankles"); // shorter list: last item
++  assertEquals(todayArea(["thoracic_rot"], 1), null);
++});
++Deno.test("first name: plain first word only, else the no-name copy (HTML-safe for ROMBot.tsx)", () => {
++  assertEquals(firstName("Sam Lee"), "Sam");
++  assertEquals(firstName("  José  "), "José");
++  assertEquals(firstName("O'Neil"), "O'Neil");
++  for (const bad of [null, "", "user@example.com", "<b>x</b>", "12345", "a&b"]) assertEquals(firstName(bad), null);
++  const p = plan(MON_730_ET, [cand({ full_name: "<img src=x>" })], ALL).due[0];
++  assert(p.rendered.line1.startsWith("Hey there, ROMBot here."));
++  assert(!/[<>&]/.test(noteContent(p.rendered)));
++});
++Deno.test("note claim id: one note per assessment", () => {
++  assertEquals(plan(MON_730_ET, [cand()], ALL).due[0].note_id, "checkin-d3-aaaaaaaa-0000-4000-8000-000000000001");
++});
+diff --git a/supabase/functions/rombot-checkin/test/shared.test.ts b/supabase/functions/rombot-checkin/test/shared.test.ts
+new file mode 100644
+index 0000000..27e7793
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/shared.test.ts
+@@ -0,0 +1,25 @@
++// P1-17 one-rule checks against lifecycle-emails (live v3 tree) so the two functions cannot drift.
++import { assertEquals } from "jsr:@std/assert@1";
++import { PLAN_DAYS, protocolOptedIn } from "../source/logic.ts";
++import { ROMRX_SENDER } from "../source/email.ts";
++import * as LL from "../../lifecycle-emails/source/logic.ts";
++
++const read = (p: string) => Deno.readFile(new URL(p, import.meta.url));
++Deno.test("vendored files are byte-identical to lifecycle-emails (unsub_token, email_footer, deletion)", async () => {
++  for (const [a, b] of [["../_shared/unsub_token.ts", "../../lifecycle-emails/_shared/unsub_token.ts"], ["../_shared/email_footer.ts", "../../lifecycle-emails/_shared/email_footer.ts"], ["../source/deletion.ts", "../../lifecycle-emails/source/deletion.ts"]]) {
++    assertEquals(await read(a), await read(b), a);
++  }
++});
++Deno.test("plan days are lifecycle-emails PROTOCOL_DAYS", () => assertEquals([...PLAN_DAYS], [...LL.PROTOCOL_DAYS]));
++Deno.test("P1-01 consent rule equals lifecycle-emails explicitOn(pref, \"protocol\")", () => {
++  const base = { user_id: "u", retest_reminders: null, weekly_digest: null, created_at: null, updated_at: null, reminder_time: "07:00", timezone: "America/New_York" };
++  for (const email_reminders of [true, false, null]) for (const protocol_opt_in_at of ["2026-11-13T15:00:00Z", null, "nope"]) {
++    const p = { ...base, email_reminders, protocol_opt_in_at };
++    assertEquals(protocolOptedIn(p), LL.explicitOn(p as never, "protocol"), JSON.stringify(p));
++  }
++});
++Deno.test("sender equals b19b13dc ROMRX_SENDER (and lifecycle-emails' export, once that deploy is in this tree)", async () => {
++  assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
++  const le = await import("../../lifecycle-emails/source/email.ts") as Record<string, unknown>;
++  if ("ROMRX_SENDER" in le) assertEquals(ROMRX_SENDER, le.ROMRX_SENDER);
++});
+diff --git a/supabase/functions/rombot-checkin/test/words.test.ts b/supabase/functions/rombot-checkin/test/words.test.ts
+new file mode 100644
+index 0000000..baf4c78
+--- /dev/null
++++ b/supabase/functions/rombot-checkin/test/words.test.ts
+@@ -0,0 +1,143 @@
++// P1-17 words test: every user-facing string equals Stacy's final copy byte for byte
++// (STACY-P1-17-DAY3-WORDS-20261116-0926.md, sha256 6fd272b6...). The literal block below is her text; when STACY_WORDS_FILE
++// points at her file (run: STACY_WORDS_FILE=/workspace/process/evidence/STACY-P1-17-DAY3-WORDS-20261116-0926.md), the test also
++// checks the file's sha256 and re-reads every string from the file itself.
++import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
++import { BRANCH_COPY, EMAIL_OPENER, FOOTER, NO_NAME_OPENER, REMAINING_WORD, render, SUBJECT_NAME_SUFFIX, SUBJECTS } from "../source/copy.ts";
++import { buildCheckinEmail } from "../source/email.ts";
++import { AREA_BY_FAMILY, todayArea } from "../source/logic.ts";
++
++const STACY_SHA256 = "6fd272b642b33c817e51208b7f55567e3acdff338c6ad9cfa3bec6064a1a8ec3";
++const STACY = {
++  A: ["Hey {first_name}, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your {today_area}. It's short, and you can do it now. Want to start?", "[Start today's session]", "If something got in the way, tell me here and I'll help you find an easier way in."],
++  B: ["Nice work, {first_name}. You've done {n} {session/sessions} since your assessment. {remaining} more and you reach your week 1 goal of 3 sessions. Today's focus is your {today_area}.", "[Start today's session]", "Anything feel too easy or too hard? Tell me and I'll help you adjust how you do it."],
++  C: ["{first_name}, {n} sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is {next_check_date}. That's when you measure again and see where you are.", "[See my plan]", "If any move doesn't feel right, tell me here."],
++} as const;
++const STACY_SUBJECTS = { A: "Your plan is ready, {first_name}", B: "{n} done. {remaining} more for your week 1 goal", C: "Strong start, {first_name}" } as const;
++const STACY_NO_NAME = { A: "Hey there, ROMBot here.", B: "Nice work.", C: "{n} sessions since your assessment." } as const;
++
++for (const b of ["A", "B", "C"] as const) {
++  Deno.test(`branch ${b}: line 1, button and line 3 equal Stacy's final copy byte for byte`, () => {
++    assertEquals(BRANCH_COPY[b].line1, STACY[b][0]);
++    assertEquals(`[${BRANCH_COPY[b].button}]`, STACY[b][1]);
++    assertEquals(BRANCH_COPY[b].line3, STACY[b][2]);
++    assertEquals(SUBJECTS[b], STACY_SUBJECTS[b]);
++    assertEquals(NO_NAME_OPENER[b].noName, STACY_NO_NAME[b]);
++    assert(STACY[b][0].startsWith(NO_NAME_OPENER[b].named), "named opener is the start of Stacy's line");
++  });
++}
++Deno.test("remaining word, email opener and subject no-name rule are Stacy's", () => {
++  assertEquals(REMAINING_WORD, { 1: "Two", 2: "One" });
++  assertEquals(EMAIL_OPENER, "ROMBot here.");
++  assertEquals(SUBJECT_NAME_SUFFIX, ", {first_name}");
++});
++Deno.test("sign-off is plain ROMBot: no \"Jim's ROMBot\" and no Reid draft words anywhere in the copy", async () => {
++  const src = await Deno.readTextFile(new URL("../source/copy.ts", import.meta.url));
++  assert(!src.includes("Jim's ROMBot"));
++  for (const draft of ["it's Jim's ROMBot", "ready to go", "right now", "One more this week gets you to 3", "feel like a habit", "in your first 3 days", "see what's changed", "{n} down."]) {
++    assert(!src.includes(draft), `Reid draft phrase present: ${draft}`);
++  }
++});
++Deno.test("no em dashes, en dashes or spaced hyphens in any user-facing string", () => {
++  const all = [...Object.values(BRANCH_COPY).flatMap((c) => [c.line1, c.button, c.line3]), ...Object.values(SUBJECTS), ...Object.values(NO_NAME_OPENER).map((o) => o.noName), EMAIL_OPENER, FOOTER.why, FOOTER.off, FOOTER.allOff, FOOTER.sentTo("user@example.com")];
++  for (const s of all) { assert(!/[\u2014\u2013]/.test(s), s); assert(!/ - /.test(s), s); }
++});
++
++Deno.test("rendered examples, named and no-name, every branch", () => {
++  const A = render("A", { first_name: "Sam", today_area: "hips", n: 0, next_check_date: null });
++  assertEquals(A.line1, "Hey Sam, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?");
++  assertEquals(A.subject, "Your plan is ready, Sam");
++  const A0 = render("A", { first_name: null, today_area: "hips", n: 0, next_check_date: null });
++  assertEquals(A0.line1, "Hey there, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?");
++  assertEquals(A0.subject, "Your plan is ready");
++  const B1 = render("B", { first_name: "Sam", today_area: "shoulders", n: 1, next_check_date: null });
++  assertEquals(B1.line1, "Nice work, Sam. You've done 1 session since your assessment. Two more and you reach your week 1 goal of 3 sessions. Today's focus is your shoulders.");
++  assertEquals(B1.subject, "1 done. Two more for your week 1 goal");
++  const B2 = render("B", { first_name: null, today_area: "neck", n: 2, next_check_date: null });
++  assertEquals(B2.line1, "Nice work. You've done 2 sessions since your assessment. One more and you reach your week 1 goal of 3 sessions. Today's focus is your neck.");
++  assertEquals(B2.subject, "2 done. One more for your week 1 goal");
++  const C = render("C", { first_name: "Sam", today_area: "hips", n: 4, next_check_date: "Monday, Dec 28" });
++  assertEquals(C.line1, "Sam, 4 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Monday, Dec 28. That's when you measure again and see where you are.");
++  assertEquals(C.subject, "Strong start, Sam");
++  assertEquals(C.button, "See my plan");
++  const C0 = render("C", { first_name: null, today_area: "hips", n: 3, next_check_date: "Monday, Dec 28" });
++  assertEquals(C0.line1, "3 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Monday, Dec 28. That's when you measure again and see where you are.");
++  assertEquals(C0.subject, "Strong start");
++});
++Deno.test("a missing placeholder value throws instead of sending a broken message", () => {
++  assertThrows(() => render("C", { first_name: "Sam", today_area: "hips", n: 3, next_check_date: null }));
++  assertThrows(() => render("B", { first_name: "Sam", today_area: "hips", n: 3, next_check_date: null }));
++});
++Deno.test("footer strings are the live lifecycle-emails ones (no new footer words)", async () => {
++  const le = await import("../../lifecycle-emails/source/email.ts");
++  assertEquals(FOOTER.allOff, le.ALL_OFF_TEXT);
++  const lapsed = le.copyFor({ kind: "lapsed", user_id: "u", email: "user@example.com", first_name: "x", active_sport: null, email_id: "x", local_date: "2026-11-16" } as never);
++  assertEquals(FOOTER.why, lapsed.why);
++  assertEquals(FOOTER.off, lapsed.off);
++});
++
++// Stacy (Nov 16): Branch A's email drops the "ROMBot here." opener (line 1 already says it); B and C keep it.
++const LINKS = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https://romrx.io/app/unsubscribe?t=a", oneClick: "https://x.test/u?t=k&b=base" };
++const count = (hay: string, needle: string) => hay.split(needle).length - 1;
++Deno.test("email opener: Branch A says \"ROMBot here.\" exactly once (text and html, named and no-name); B and C open with it", () => {
++  for (const first_name of ["Sam", null]) {
++    const A = buildCheckinEmail(render("A", { first_name, today_area: "hips", n: 0, next_check_date: null }), "user@example.com", LINKS, "P");
++    assertEquals([count(A.text, "ROMBot here."), count(A.html, "ROMBot here.")], [1, 1], String(first_name));
++    assert(A.text.startsWith(first_name ? "Hey Sam, ROMBot here." : "Hey there, ROMBot here."));
++    for (const [b, n, nc] of [["B", 1, null], ["C", 3, "Monday, Dec 28"]] as const) {
++      const E = buildCheckinEmail(render(b, { first_name, today_area: "hips", n, next_check_date: nc }), "user@example.com", LINKS, "P");
++      assert(E.text.startsWith("ROMBot here.\n\n"), b);
++      assert(E.html.includes(">ROMBot here.</p>"), b);
++      assertEquals([count(E.text, "ROMBot here."), count(E.html, "ROMBot here.")], [1, 1], b);
++    }
++  }
++});
++
++// Stacy (Nov 16): hips, shoulders, neck and ankles are approved. Every area word the code can emit must be plain everyday
++// words: no clinical terms, no degrees, no band names. Keys = every joint key found in src/ and supabase/functions/.
++const AREA_WORDS = ["hips", "shoulders", "neck", "ankles"] as const;
++const KEYS = ["hip_er_l", "shoulder_er_l", "shoulder_er", "hip_abd_l", "hip_flex", "shoulder_er_r", "hip_flex_l", "hip_er_r", "ankle_df", "lumbar_flex", "ankle_df_l", "hip_ir_l", "hip_abd", "hip_flex_r", "hip_er", "lumbar_ext", "ankle_df_r", "hip_ir", "cervical_flex", "cervical_ext", "shoulder_flex_l", "hip_abd_r", "shoulder_flex", "hip_ir_r", "cervical_rot", "cervical_rot_l", "cervical_lat_l", "shoulder_flex_r", "cervical_lat", "cervical_lat_r", "cervical_rot_r", "shoulder_er_min", "shoulder_flex_min", "hip_flex_min", "hip_flex_unscored", "hip_er_min", "ankle_df_min", "cervical_lat_min", "hip_ext_l", "hip_ir_min", "thoracic_rot", "knee_flex", "wrist_ext", "", "x"];
++const CLINICAL = /lumbar|thoracic|cervical|spine|spinal|flexion|extension|rotation|abduction|adduction|dorsiflexion|plantar|lateral|internal|external|\bROM\b|°|\d|deg|needs focus|building|steady/i;
++Deno.test("area words: everything the code can emit is one of hips, shoulders, neck, ankles (plain words, no clinical terms, degrees or bands)", () => {
++  assertEquals(Object.values(AREA_BY_FAMILY).sort(), [...AREA_WORDS].sort());
++  const emitted = new Set<string>();
++  for (const k of KEYS) for (const k2 of KEYS.slice(0, 8)) for (let dow = 0; dow < 7; dow++) {
++    const a = todayArea([k, k2, k], dow);
++    if (a !== null) emitted.add(a);
++  }
++  for (const w of [...emitted, ...Object.values(AREA_BY_FAMILY)]) {
++    assert((AREA_WORDS as readonly string[]).includes(w), w);
++    assert(/^[a-z]+$/.test(w) && !CLINICAL.test(w), w);
++  }
++  assertEquals([...emitted].sort(), [...AREA_WORDS].sort());
++  for (const k of ["lumbar_flex", "lumbar_ext", "thoracic_rot", "knee_flex"]) assertEquals(todayArea([k], 1), null, k); // no message, never a clinical word
++});
++
++const file = Deno.env.get("STACY_WORDS_FILE");
++Deno.test({
++  name: "Stacy's file itself: sha256 matches and every string is re-read from it byte for byte",
++  ignore: !file,
++  fn: async () => {
++    const bytes = await Deno.readFile(file!);
++    const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
++    assertEquals(sha, STACY_SHA256);
++    const lines = new TextDecoder().decode(bytes).split("\n");
++    const quoted: Record<string, string[]> = {};
++    let cur = "";
++    for (const l of lines) {
++      const m = /^Branch ([ABC]):/.exec(l);
++      if (m) { cur = m[1]; quoted[cur] = []; continue; }
++      if (cur && l.startsWith("> ")) quoted[cur].push(l.slice(2));
++      if (l.startsWith("{remaining} renders")) cur = "";
++    }
++    for (const b of ["A", "B", "C"] as const) {
++      assertEquals(quoted[b], [BRANCH_COPY[b].line1, `[${BRANCH_COPY[b].button}]`, BRANCH_COPY[b].line3]);
++      const subj = lines.find((l) => l.startsWith(`- ${b}: "`))!;
++      assertEquals(subj, `- ${b}: "${SUBJECTS[b]}"`);
++    }
++    const nn = lines.find((l) => l.startsWith("No-name fallback:"))!;
++    assertEquals(nn, `No-name fallback: Branch A "${NO_NAME_OPENER.A.noName}" Branch B "${NO_NAME_OPENER.B.noName}" Branch C "${NO_NAME_OPENER.C.noName}" Subjects drop "${SUBJECT_NAME_SUFFIX}".`);
++    assert(lines.includes(`{remaining} renders as a word: n = 1 gives "${REMAINING_WORD[1]} more", n = 2 gives "${REMAINING_WORD[2]} more".`));
++    assert(lines.some((l) => l.startsWith(`Email body opens with "${EMAIL_OPENER}"`)));
++  },
++});
+diff --git a/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron.sql b/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron.sql
+new file mode 100644
+index 0000000..d9fae30
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron.sql
+@@ -0,0 +1,11 @@
++-- P1-17 day 3 ROMBot check-in: hourly cron for the new rombot-checkin function. UNAPPLIED. BUILD ONLY.
++-- Apply ONLY via MCP apply_migration, and only after rombot-checkin is deployed, its own sha gate line, Vera precheck PASS,
++-- and Sable's OK. Rename this file to its live id after apply (pure-rename commit).
++-- Rollback: 20261116160000_rombot_checkin_cron_rollback.sql
++-- Version 20261116160000 is a placeholder after the live head (20261116143959 at build time); apply_migration stamps the real id.
++-- Same pattern as the live lifecycle-emails-hourly job (public.cron_call_edge, which sends the cron secret header).
++-- Scheduling the job sends nothing by itself: the function is a dry run until ROMBOT_CHECKIN_SEND is exactly "on",
++-- and the email fallback also needs LIFECYCLE_EMAILS_SEND exactly "on". This migration sets neither.
++-- No table, column, policy or data change.
++
++select cron.schedule('rombot-checkin-hourly', '30 * * * *', $$select public.cron_call_edge('rombot-checkin', 120000)$$);
+diff --git a/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron_rollback.sql b/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron_rollback.sql
+new file mode 100644
+index 0000000..cdfedb0
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261116160000_rombot_checkin_cron_rollback.sql
+@@ -0,0 +1,4 @@
++-- Rollback for 20261116160000_rombot_checkin_cron.sql (P1-17). Removes only the rombot-checkin-hourly job. No data change.
++-- Claims already written to public.email_sends (email_id 'checkin-d3-%') and in-app notes are left in place.
++
++select cron.unschedule('rombot-checkin-hourly');
