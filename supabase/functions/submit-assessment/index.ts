@@ -10,7 +10,7 @@ import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
 import { buildMoodBlockForUser } from "./mood_block.ts";
-import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, rejectQuickWindow, type ScheduleRead, scheduleRow } from "./schedule.ts";
+import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, rejectQuickWindow, rejectQuickSavedRow, type AssessmentQuickRow, type ScheduleRead, scheduleRow } from "./schedule.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -266,7 +266,17 @@ Deno.serve(async (req) => {
       const { data: pref } = await admin.from("notification_preferences").select("timezone").eq("user_id", user.id).maybeSingle();
       if (pref && typeof (pref as { timezone?: unknown }).timezone === "string") userTz = (pref as { timezone: string }).timezone;
     } catch { /* resolveTz falls back; single DEFAULT_TZ in schedule.ts */ }
-    const rejected = rejectQuickWindow(sched, new Date(), userTz) ?? rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
+    // Second once-per-cycle check: public.assessments (user_id, check_kind, created_at).
+    // Quick save writes user_id + check_kind='quick'; created_at comes from default now().
+    // Reject if created_at is after user_mobility_schedule.last_assessed_at (last full; not moved on a quick save).
+    let quickRows: AssessmentQuickRow[] = [];
+    try {
+      let q = admin.from("assessments").select("check_kind, created_at").eq("user_id", user.id).eq("check_kind", "quick");
+      if (sched?.last_assessed_at) q = q.gt("created_at", sched.last_assessed_at);
+      const { data: existing, error: existingErr } = await q;
+      if (!existingErr && Array.isArray(existing)) quickRows = existing as AssessmentQuickRow[];
+    } catch { /* check_kind may be unapplied; schedule signal still applies */ }
+    const rejected = rejectQuickWindow(sched, new Date(), userTz) ?? rejectQuickSavedRow(sched?.last_assessed_at, quickRows) ?? rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
     if (rejected) return json({ error: QUICK_ERRORS[rejected] }, 400);
     row.check_kind = "quick"; // omit on full submits so insert still works before the unapplied check_kind migration
   }

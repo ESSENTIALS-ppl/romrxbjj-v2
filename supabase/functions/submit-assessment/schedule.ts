@@ -191,3 +191,33 @@ export function rejectQuickWindow(
   if (day === null || day < CHECK_DAYS || day > CHECK14_DAYS) return "no_schedule";
   return null;
 }
+
+/** A quick save writes public.assessments.user_id, assessments.check_kind = 'quick', and assessments.assessed_at.
+ *  assessments.created_at is not sent; the column is timestamptz not null default now() (20260428000003).
+ *  user_mobility_schedule.last_assessed_at is the last full assessment and is not moved on a quick save. */
+export interface AssessmentQuickRow {
+  check_kind?: string | null;
+  created_at?: string | null;
+}
+
+/** True when an assessments row already has check_kind='quick' with created_at strictly after last_assessed_at. */
+export function quickRowExistsThisCycle(
+  lastAssessedAt: string | null | undefined,
+  rows: ReadonlyArray<AssessmentQuickRow>,
+): boolean {
+  const start = lastAssessedAt ? Date.parse(lastAssessedAt) : NaN;
+  if (!Number.isFinite(start)) return false;
+  return rows.some((r) => {
+    if (r.check_kind !== "quick") return false;
+    const t = r.created_at ? Date.parse(r.created_at) : NaN;
+    return Number.isFinite(t) && t > start;
+  });
+}
+
+/** Second once-per-cycle check: a saved quick assessments row still blocks if the schedule write failed. Same no_schedule error. */
+export function rejectQuickSavedRow(
+  lastAssessedAt: string | null | undefined,
+  rows: ReadonlyArray<AssessmentQuickRow> | null | undefined,
+): "no_schedule" | null {
+  return quickRowExistsThisCycle(lastAssessedAt, rows ?? []) ? "no_schedule" : null;
+}

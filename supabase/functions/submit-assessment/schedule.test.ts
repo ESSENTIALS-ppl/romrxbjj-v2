@@ -12,6 +12,7 @@ import {
   QUICK_ERRORS,
   rejectQuickSubmit,
   rejectQuickWindow,
+  rejectQuickSavedRow,
   resolveTz,
   scheduleFromAssessedAt,
   scheduleRow,
@@ -199,4 +200,29 @@ Deno.test("P1-06 v4 guard: a new full assessment resets the cycle", () => {
   assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 7, "00:00", TZ), TZ), null);
   assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 14, "23:30", TZ), TZ), null);
   assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 15, "00:00", TZ), TZ), "no_schedule");
+});
+
+Deno.test("P1-06 v4: quick row saved and schedule not updated: second quick attempt is rejected 400 no_schedule", () => {
+  // Failure case Grant/Jules found: assessments insert succeeded, schedule write did not run.
+  const s = schedAt();
+  assertEquals(s.next_check_at === s.next_retest_at, false);
+  const day10 = atLocal(LAST_FULL, 10, "12:00", TZ);
+  assertEquals(rejectQuickWindow(s, day10, TZ), null);
+  const savedAt = atLocal(LAST_FULL, 8, "12:00", TZ).toISOString();
+  const rows = [{ check_kind: "quick" as const, created_at: savedAt }];
+  assertEquals(rejectQuickSavedRow(s.last_assessed_at, rows), "no_schedule");
+  assertEquals(rejectQuickWindow(s, day10, TZ) ?? rejectQuickSavedRow(s.last_assessed_at, rows), "no_schedule");
+  assertEquals(QUICK_ERRORS.no_schedule, "No quick re-check is scheduled");
+});
+
+Deno.test("P1-06 v4: a quick row from a previous cycle (created_at before last_assessed_at) does not block", () => {
+  const newFullIso = atLocal(LAST_FULL, 10, "12:00", TZ).toISOString();
+  const reset = schedAt(newFullIso);
+  const prior = [{ check_kind: "quick" as const, created_at: atLocal(LAST_FULL, 8, "12:00", TZ).toISOString() }];
+  assertEquals(Date.parse(prior[0].created_at) < Date.parse(reset.last_assessed_at), true);
+  assertEquals(rejectQuickSavedRow(reset.last_assessed_at, prior), null);
+  assertEquals(rejectQuickWindow(reset, atLocal(newFullIso, 7, "00:00", TZ), TZ) ?? rejectQuickSavedRow(reset.last_assessed_at, prior), null);
+  // A full row after last_assessed_at is not a quick save and does not block.
+  const fullAfter = [{ check_kind: "full" as const, created_at: atLocal(newFullIso, 1, "12:00", TZ).toISOString() }];
+  assertEquals(rejectQuickSavedRow(reset.last_assessed_at, fullAfter), null);
 });
