@@ -1,3 +1,4 @@
+// ROMRx send-renewal-reminders v7 (2026-11-15, BRANCH ONLY): Base-only recipients get the ROMRx Base brand (romrx.io sender, links, L1014 fine print); sport output unchanged. See email.ts.
 // ROMRx send-renewal-reminders v6 (2026-11-02, FG-35: explicit legacy skip, send gated by RENEWAL_BASE_SEND). Based on v5 (2026-10-26): targets Base subscribers. v4 read users.subscription_expiry, empty for every
 // active account, so the Jan 1, 2027 Base charge got no reminders. v5 reads Base billing state (users.base_*, billing_consents.trial_end),
 // claims each reminder row BEFORE sending (unique user_id+reminder_type+subscription_expiry) so retries never double send,
@@ -8,8 +9,8 @@
 // so replies land in the unified inbox).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { type CandidateRow, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
+import { type Brand, brandFor, buildBaseEmail, buildBaseText, buildEmail, subjectFor } from "./email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,66 +31,14 @@ async function cronCallerOk(req: Request): Promise<boolean> {
   }
 }
 
-interface Brand { name: string; brandHtml: string; from: string; replyTo: string; domain: string; }
-const BRANDS: Record<string, Brand> = {
-  bjj: {
-    name: "ROMRxBJJ",
-    brandHtml: 'ROMRx<sup style="font-size:11px;font-weight:400;">BJJ</sup>',
-    from: "Jim Scott <jim@romrxbjj.com>",
-    replyTo: "jim@romrxbjj.com",
-    domain: "https://romrxbjj.com",
-  },
-  bodybuilding: {
-    name: "ROMRxBodybuilding",
-    brandHtml: 'ROMRx<sup style="font-size:11px;font-weight:400;">Bodybuilding</sup>',
-    from: "Jim Scott <jim@romrxbodybuilding.com>",
-    replyTo: "jim@romrxbodybuilding.com",
-    domain: "https://romrxbodybuilding.com",
-  },
-};
-function brandFor(sport?: string | null): Brand {
-  return sport === "bodybuilding" ? BRANDS.bodybuilding : BRANDS.bjj;
-}
 
-
-function buildEmail(brand: Brand, name: string, plan: string, price: string, daysUntil: number, expiryDateStr: string, reminderLabel: string, email: string): string {
-  const urgency = daysUntil <= 2;
-  const accentColor = urgency ? "#dc2626" : "#008080";
-  const dashboardUrl = `${brand.domain}/dashboard/settings`;
-  const bodyMessage = daysUntil <= 2
-    ? `This is your final reminder. Your ${plan} membership renews on <strong>${expiryDateStr}</strong> and you will be charged <strong>${price}</strong>. If you do not wish to renew, cancel before that date in your account settings.`
-    : daysUntil <= 30
-    ? `As required by law, we are notifying you that your ${plan} membership renews on <strong>${expiryDateStr}</strong>. You will be charged <strong>${price}</strong> unless you cancel before that date.`
-    : `Your ${plan} membership renews on <strong>${expiryDateStr}</strong>. You will be charged <strong>${price}</strong>. If you want to cancel, you have time to do so in your account settings.`;
-
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f8fcfc;font-family:Inter,system-ui,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:32px 24px;">
-  <div style="margin-bottom:24px;"><span style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a2e2e;">${brand.brandHtml}</span></div>
-  <div style="background:#fff;border-radius:12px;border:1px solid #cde0e0;padding:32px;">
-    <div style="display:inline-block;background:${accentColor};color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:20px;">Renewal in ${reminderLabel}</div>
-    <h1 style="font-family:Georgia,serif;font-size:22px;color:#1a2e2e;margin:0 0 12px;">Hey ${name},</h1>
-    <p style="font-size:14px;color:#1a2e2e;line-height:1.7;margin:0 0 16px;">${bodyMessage}</p>
-    <div style="background:#f8fcfc;border-radius:10px;border:1px solid #cde0e0;padding:16px 20px;margin:20px 0;">
-      <table style="width:100%;font-size:13px;">
-        <tr><td style="color:#5a7070;padding:4px 0;">Plan</td><td style="text-align:right;font-weight:600;color:#1a2e2e;">${plan}</td></tr>
-        <tr><td style="color:#5a7070;padding:4px 0;">Renewal date</td><td style="text-align:right;font-weight:600;color:#1a2e2e;">${expiryDateStr}</td></tr>
-        <tr><td style="color:#5a7070;padding:4px 0;">Amount</td><td style="text-align:right;font-weight:700;color:${accentColor};font-size:15px;">${price}</td></tr>
-      </table>
-    </div>
-    <a href="${dashboardUrl}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;">Manage Subscription</a>
-    <p style="font-size:11px;color:#5a7070;margin-top:24px;line-height:1.6;">To cancel, go to Settings and click Manage Subscription before your renewal date. All sales are final per our <a href="${brand.domain}/legal" style="color:#008080;">Refund Policy</a>.</p>
-  </div>
-  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${POSTAL_LINE}<br /><a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
-<p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}.</p></div></body></html>`;
-}
-
-async function sendEmail(brand: Brand, to: string, subject: string, html: string): Promise<boolean> {
+// text is set for Base only; JSON.stringify drops an undefined text, so the sport request body is the same bytes as v26.
+async function sendEmail(brand: Brand, to: string, subject: string, html: string, text?: string): Promise<boolean> {
   if (!RESEND_API_KEY) { console.warn("RESEND_API_KEY not set"); return false; }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: brand.from, to: [to], subject, html, reply_to: brand.replyTo }),
+    body: JSON.stringify({ from: brand.from, to: [to], subject, html, text, reply_to: brand.replyTo }),
   });
   if (!res.ok) { console.error("Resend error:", await res.text()); return false; }
   return true;
@@ -140,11 +89,15 @@ Deno.serve(async (req: Request) => {
     const price = formatUsdYear(d.amount_cents);
     const expiryFormatted = new Date(d.charge_at).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" });
     const firstName = (d.full_name ?? d.email).split(" ")[0];
-    const subject = d.days_until <= 2
-      ? `Your ${brand.name} membership renews in ${d.label} - last chance to cancel`
-      : `Your ${brand.name} membership renews in ${d.label}`;
+    const subject = subjectFor(brand, d.days_until, d.label);
     // Renewal reminders are required account notices: no unsubscribe link, and marketing_opt_out never blocks them (Grant, 2026-10-04).
-    const sent = await sendEmail(brand, d.email, subject, buildEmail(brand, firstName, "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email));
+    // 2026-11-15: Base-only recipients (active_sport not exactly "bjj"/"bodybuilding") get the ROMRx Base email with a text part;
+    // sport recipients get the unchanged v26 email. Base greets "there" when no name is on file (v26 used the email address).
+    const sent = brand.key === "base"
+      ? await sendEmail(brand, d.email, subject,
+        buildBaseEmail(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email),
+        buildBaseText(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email))
+      : await sendEmail(brand, d.email, subject, buildEmail(brand, firstName, "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email));
     if (sent) r.sent++;
     else {
       await supabase.from("renewal_reminders").delete().eq("id", claim.id); // release so tomorrow retries
