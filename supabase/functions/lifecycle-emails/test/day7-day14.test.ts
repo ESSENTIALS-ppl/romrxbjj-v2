@@ -79,7 +79,7 @@ Deno.test("P1-08 Stacy final words: day 7, day 14 A and B, exact subjects and li
   assert(d7.text.includes("Turn off check reminders"));
   assert(d7.text.includes("Turn off all ROMRx emails except account and billing notices"));
   assert(d7.text.includes(postal));
-  assert(d7.text.includes("jim@romrxbjj.com"));
+  assert(d7.text.includes("hello@romrx.io"));
   assert(d7.text.includes("This message was sent to alex@example.com."));
 
   const d14a = buildEmail({ ...baseDue, kind: "check14", retest_date: "Sunday, December 27", quick_check_done: false }, BRANDS.base, links, postal);
@@ -102,5 +102,5 @@ Deno.test("P1-08 Stacy final words: day 7, day 14 A and B, exact subjects and li
     assertFalse(/score|PRS|hip|shoulder|\bjoint\b/i.test(s), s);
     assertFalse(s.includes("\u2014"), "em dash");
   }
-  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(BRANDS.base.from, "ROMRx <hello@romrx.io>");
 });

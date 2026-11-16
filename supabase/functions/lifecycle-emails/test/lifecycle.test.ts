@@ -245,11 +245,11 @@ Deno.test("handler: LIFECYCLE_SUPPRESS_USER_IDS blocks a user even when everythi
   assertEquals(idList(`${U1}, junk ,${U2.toUpperCase()}`).size, 2);
 });
 
-Deno.test("Base From stays the live sender Jim Scott <jim@romrxbjj.com>; sport-pack senders are unchanged", () => {
-  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
-  assertEquals(BRANDS.base.replyTo, "jim@romrxbjj.com");
-  assertEquals(brandFor(null).from, "Jim Scott <jim@romrxbjj.com>");
-  assertEquals(brandFor(undefined).replyTo, "jim@romrxbjj.com");
+Deno.test("Base From/Reply-To are ROMRx <hello@romrx.io> (P1-08, ROMRX_SENDER); sport-pack senders are unchanged", () => {
+  assertEquals(BRANDS.base.from, "ROMRx <hello@romrx.io>");
+  assertEquals(BRANDS.base.replyTo, "hello@romrx.io");
+  assertEquals(brandFor(null).from, "ROMRx <hello@romrx.io>");
+  assertEquals(brandFor(undefined).replyTo, "hello@romrx.io");
   assertEquals(BRANDS.bjj.from, "Jim Scott <jim@romrxbjj.com>");
   assertEquals(BRANDS.bjj.replyTo, "jim@romrxbjj.com");
   assertEquals(BRANDS.bodybuilding.from, "Jim Scott <jim@romrxbodybuilding.com>");
@@ -301,11 +301,11 @@ Deno.test("P1-16 Stacy final words: exact subject and lines, no scores or em das
   assert(d.text.includes("You're getting this because Plan day reminders is on in your ROMRx settings."));
   assert(d.text.includes("Want fewer emails? Change your reminders in Settings: https://romrx.io/app/dashboard/settings"));
   assert(d.text.includes("This message was sent to alex@example.com."));
-  assert(d.text.includes("jim@romrxbjj.com"));
+  assert(d.text.includes("hello@romrx.io"));
   assertFalse(/score|PRS|hip|shoulder|\bjoint\b/i.test(d.subject + d.text));
   assertFalse(d.text.includes("\u2014"));
   assertFalse(/sessions this week|days to next check/i.test(d.text));
-  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(BRANDS.base.from, "ROMRx <hello@romrx.io>");
 });
 Deno.test("P1-16 lapsed: protocol opt-in only, no plan skipped, recent sign-in is not quiet", () => {
   const day14 = new Date("2026-11-01T14:00:00Z");
@@ -331,7 +331,7 @@ Deno.test("P1-15 digest includes sessions this week and days to next check (Stac
   assert(built.text.includes("Sessions this week: 3."));
   assert(built.text.includes("Your next check is in 2 days."));
   assertFalse(built.subject.includes("—") || built.subject.includes("\u2014"));
-  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(BRANDS.base.from, "ROMRx <hello@romrx.io>");
 });
 Deno.test("P1-15 digest: omit next-check line when the schedule table/row is absent; today and 1-day wording", () => {
   const dates = ["2026-11-02", "2026-11-04", "2026-11-08", "2026-10-20"];

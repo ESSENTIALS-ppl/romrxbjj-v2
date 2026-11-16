@@ -1,4 +1,4 @@
-// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed + P1-08 day 7 / day 14. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
+// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed + P1-08 day 7 / day 14. Base From/Reply-To = ROMRX_SENDER (ROMRx <hello@romrx.io>, P1-08). No P1-02 audience rewrite. BRANCH ONLY: not deployed.
 // Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed). Dry run unless LIFECYCLE_EMAILS_SEND === "on".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";

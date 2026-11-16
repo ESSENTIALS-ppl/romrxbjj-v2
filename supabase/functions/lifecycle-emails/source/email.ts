@@ -4,12 +4,14 @@
 import type { Due, Kind } from "./logic.ts";
 import { SCORE_LABEL } from "./score.ts";
 
+/** P1-08: the one Base lifecycle sender, used for every email kind a Base user gets. Sport-pack brands keep their own senders. */
+export const ROMRX_SENDER = { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" } as const;
 export interface Brand { key: "bjj" | "bodybuilding" | "base"; name: string; from: string; replyTo: string; appBase: string; settingsPath: string; }
 export const BRANDS: Record<string, Brand> = {
   bjj: { key: "bjj", name: "ROMRxBJJ", from: "Jim Scott <jim@romrxbjj.com>", replyTo: "jim@romrxbjj.com", appBase: "https://romrxbjj.com", settingsPath: "/dashboard/settings" },
   bodybuilding: { key: "bodybuilding", name: "ROMRxBodybuilding", from: "Jim Scott <jim@romrxbodybuilding.com>", replyTo: "jim@romrxbodybuilding.com", appBase: "https://romrxbodybuilding.com", settingsPath: "/dashboard/settings" },
-  // Base sender = the same From send-renewal-reminders v6 uses for Base subscribers (its brandFor falls back to the BJJ brand). Grant's call 6:32 PM.
-  base: { key: "base", name: "ROMRx", from: "Jim Scott <jim@romrxbjj.com>", replyTo: "jim@romrxbjj.com", appBase: "https://romrx.io/app", settingsPath: "/dashboard/settings" },
+  // Base sender (P1-08): ROMRX_SENDER, per Stacy's cleared P1-08 and P1-16 words (From: ROMRx <hello@romrx.io>, Reply-To: hello@romrx.io).
+  base: { key: "base", name: "ROMRx", from: ROMRX_SENDER.from, replyTo: ROMRX_SENDER.replyTo, appBase: "https://romrx.io/app", settingsPath: "/dashboard/settings" },
 };
 export function brandFor(sport: string | null | undefined): Brand {
   if (sport === "bodybuilding") return BRANDS.bodybuilding;
