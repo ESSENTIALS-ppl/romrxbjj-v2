@@ -1,0 +1,7 @@
+-- ROLLBACK for 20261029100200_assessment_drafts_purge_cron.sql. NOT APPLIED. Run before the table rollback.
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'assessment-drafts-purge-hourly') then
+    perform cron.unschedule('assessment-drafts-purge-hourly');
+  end if;
+end $$;
