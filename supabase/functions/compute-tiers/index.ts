@@ -1,3 +1,4 @@
+// compute-tiers v51 (FG-36 + FG-37 B1 STAGED, not deployed; base = live v50, rollback = redeploy v50). v51 also: pack owners get recompute_user_eligibility after every assessment (try/catch). v51: hip flexion scored (target 120, Jim override Nov 2 5:56 PM) for assessments created at/after public.scoring_cutovers[hip_flex_scored]; older ones unchanged.
 // compute-tiers v42-t1-rebased (LOCAL DRAFT, not deployed) - readiness engine + Phase A1 protocol persist
 // v42 (T1 rebased on the range reset; Jim Oct 21 2026 10:53 AM ET 'T1: A plus C', narrowed 11:47 AM ET, and 4:38 PM ET
 //   'Drop the T1 buffers on the reset moves'): worst_joints ordered by the T1 weighted gap (buffer A on hip_abd, cervical_rot,
@@ -124,16 +125,17 @@ function classify(a: Record<string, unknown>, technique: Record<string, unknown>
   return { tier: "GREEN", limiting: [] };
 }
 
-function computeWorstJointKeys(a: Record<string, unknown>, limit = 5, prev: Record<string, unknown> | null = null): string[] {
-  // body in ./joint_totals.ts (pure, unit tested); HIP_FLEX_UNSCORED there keeps hip flexion out of weak spots and the /100
+function computeWorstJointKeys(a: Record<string, unknown>, limit = 5, prev: Record<string, unknown> | null = null, opts: ScoreOpts = {}): string[] {
+  // body in ./joint_totals.ts (pure, unit tested); the FG-36 cutover guard there keeps hip flexion out of pre-cutover weak spots and the /100
   // T1 option C: prev = the user's previous assessment, so narrow-joint gaps get full weight only when two in a row agree
-  return worstJointKeys(a, JOINT_TARGETS, toNum, limit, prev);
+  return worstJointKeys(a, JOINT_TARGETS, toNum, limit, prev, opts);
 }
 
-function computeRomTotal(a: Record<string, unknown>): number {
-  return romTotal(a, JOINT_TARGETS, toNum);
+function computeRomTotal(a: Record<string, unknown>, opts: ScoreOpts = {}): number {
+  return romTotal(a, JOINT_TARGETS, toNum, opts);
 }
-import { romTotal, worstJointKeys } from "./joint_totals.ts";
+import { romTotal, worstJointKeys, type ScoreOpts } from "./joint_totals.ts";
+import { recomputePackEligibility } from "./pack_recompute.ts";
 
 // CORS (Reid E2E): the browser preflight (OPTIONS) used to fall through to req.json() and answer 400
 // missing_assessment_id, so the belt-change call from romrx.io failed in browsers. Same header set the other
@@ -143,6 +145,36 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Row 19 caller check. Two accepted callers: (1) the assessments DB trigger, which sends x-cron-secret (verified by
+// public.verify_webhook_secret('cron_webhook_secret'), fail closed); (2) a signed-in user whose JWT owns the assessment.
+// COMPUTE_TIERS_ENFORCE: unset/"off" = log-only (warn, still process); "on" = reject with 401. Flip with an env change, no redeploy.
+// deno-lint-ignore no-explicit-any
+async function callerOk(req: Request, supa: any, assessmentUserId: string | null): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const got = (req.headers.get("x-cron-secret") ?? "").trim();
+  if (got.length >= 32) {
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/verify_webhook_secret`, {
+        method: "POST",
+        headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
+      });
+      if (r.ok && (await r.json()) === true) return true;
+    } catch { /* fall through */ }
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (token && assessmentUserId) {
+    try {
+      const { data } = await supa.auth.getUser(token);
+      if (data?.user?.id && data.user.id === assessmentUserId) return true;
+    } catch { /* fall through */ }
+  }
+  return false;
+}
+function enforceOn(): boolean { return (Deno.env.get("COMPUTE_TIERS_ENFORCE") ?? "").toLowerCase() === "on"; }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -168,6 +200,25 @@ Deno.serve(async (req: Request) => {
     if (fetchErr || !assessment) {
       return json({ success: false, error: "assessment_not_found", detail: fetchErr?.message }, 404);
     }
+    if (!(await callerOk(req, supa, (assessment.user_id as string | null) ?? null))) {
+      console.warn("compute-tiers: caller check failed", { enforce: enforceOn() });
+      if (enforceOn()) return json({ success: false, error: "unauthorized" }, 401);
+    }
+
+    // P1-06 guard: live compute-tiers v53 (assessments INSERT webhook) has no check_kind guard.
+    // A quick submit would otherwise rewrite worst_joints, rom_total, compute_joint_scores,
+    // persist_protocols_for_assessment (the plan), pack eligibility, and sport-pack technique_eligibility.
+    // Skip all of that for check_kind=quick so Stacy's line "Your plan stays the same until your 6-week retest" stays true.
+    // If the column is missing (migration unapplied), this is a no-op and full assessments still score.
+    // Runs after the Row 19 caller check, so the caller check is unchanged.
+    if ((assessment as { check_kind?: string }).check_kind === "quick") {
+      return json({
+        success: true,
+        assessment_id: assessmentId,
+        sport: (assessment.sport as string | undefined) ?? "general",
+        skipped: "quick_check_no_rescore",
+      }, 200);
+    }
 
     const sport = (assessment.sport as string | undefined) ?? "general";
     const userId = assessment.user_id as string | undefined;
@@ -185,8 +236,17 @@ Deno.serve(async (req: Request) => {
         .limit(1);
       prevAssessment = (prevRows && prevRows[0]) ? (prevRows[0] as Record<string, unknown>) : null;
     }
-    const worstJoints = computeWorstJointKeys(assessment, 5, prevAssessment);
-    const romTotal = computeRomTotal(assessment);
+    // FG-36: hip flexion is scored only for assessments created at or after the DB cutover. Any read failure = old behavior.
+    let hipFlexScored = false;
+    try {
+      const { data: cut } = await supa.from("scoring_cutovers").select("effective_at").eq("key", "hip_flex_scored").maybeSingle();
+      const eff = cut?.effective_at ? Date.parse(cut.effective_at as string) : NaN;
+      const made = assessment.created_at ? Date.parse(assessment.created_at as string) : NaN;
+      hipFlexScored = Number.isFinite(eff) && Number.isFinite(made) && made >= eff;
+    } catch (_e) { hipFlexScored = false; }
+    const scoreOpts: ScoreOpts = { hipFlexScored };
+    const worstJoints = computeWorstJointKeys(assessment, 5, prevAssessment, scoreOpts);
+    const romTotal = computeRomTotal(assessment, scoreOpts);
     const { error: updErr } = await supa
       .from("assessments")
       .update({ worst_joints: worstJoints, rom_total: romTotal })
@@ -222,12 +282,16 @@ Deno.serve(async (req: Request) => {
       protocolPersist = { error: String(e) };
     }
 
+    // FG-37 B1: refresh technique unlocks for every pack this user owns (any sport the new row is tagged with), before the early return.
+    const packEligibility = await recomputePackEligibility(supa, userId);
+
     if (sport !== "bjj" && sport !== "bodybuilding") {
       return json({
         success: true, assessment_id: assessmentId, sport,
         worst_joints: worstJoints, rom_total: romTotal,
         protocol: protocolPersist,
         eligibility: "skipped_no_technique_catalog_for_sport",
+        pack_eligibility: packEligibility,
       });
     }
 
