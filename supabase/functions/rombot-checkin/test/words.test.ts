@@ -3,7 +3,7 @@
 // points at her file (run: STACY_WORDS_FILE=/workspace/process/evidence/STACY-P1-17-DAY3-WORDS-20261116-0926.md), the test also
 // checks the file's sha256 and re-reads every string from the file itself.
 import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
-import { BRANCH_COPY, EMAIL_OPENER, FOOTER, NO_NAME_OPENER, REMAINING_WORD, render, SUBJECT_NAME_SUFFIX, SUBJECTS } from "../source/copy.ts";
+import { BRANCH_COPY, EMAIL_COPY, EMAIL_OPENER, FOOTER, NO_NAME_OPENER, REMAINING_WORD, render, renderEmail, SUBJECT_NAME_SUFFIX, SUBJECTS } from "../source/copy.ts";
 import { buildCheckinEmail } from "../source/email.ts";
 import { AREA_BY_FAMILY, todayArea } from "../source/logic.ts";
 
@@ -39,7 +39,7 @@ Deno.test("sign-off is plain ROMBot: no \"Jim's ROMBot\" and no Reid draft words
   }
 });
 Deno.test("no em dashes, en dashes or spaced hyphens in any user-facing string", () => {
-  const all = [...Object.values(BRANCH_COPY).flatMap((c) => [c.line1, c.button, c.line3]), ...Object.values(SUBJECTS), ...Object.values(NO_NAME_OPENER).map((o) => o.noName), EMAIL_OPENER, FOOTER.why, FOOTER.off, FOOTER.allOff, FOOTER.sentTo("user@example.com")];
+  const all = [...Object.values(BRANCH_COPY).flatMap((c) => [c.line1, c.button, c.line3]), ...Object.values(EMAIL_COPY).flatMap((c) => [c.line1, c.button, c.line3]), ...Object.values(SUBJECTS), ...Object.values(NO_NAME_OPENER).map((o) => o.noName), EMAIL_OPENER, FOOTER.why, FOOTER.off, FOOTER.allOff, FOOTER.sentTo("user@example.com")];
   for (const s of all) { assert(!/[\u2014\u2013]/.test(s), s); assert(!/ - /.test(s), s); }
 });
 
@@ -81,11 +81,11 @@ const LINKS = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https:
 const count = (hay: string, needle: string) => hay.split(needle).length - 1;
 Deno.test("email opener: Branch A says \"ROMBot here.\" exactly once (text and html, named and no-name); B and C open with it", () => {
   for (const first_name of ["Sam", null]) {
-    const A = buildCheckinEmail(render("A", { first_name, today_area: "hips", n: 0, next_check_date: null }), "user@example.com", LINKS, "P");
+    const A = buildCheckinEmail(renderEmail("A", { first_name, today_area: "hips", n: 0, next_check_date: null }), "user@example.com", LINKS, "P");
     assertEquals([count(A.text, "ROMBot here."), count(A.html, "ROMBot here.")], [1, 1], String(first_name));
-    assert(A.text.startsWith(first_name ? "Hey Sam, ROMBot here." : "Hey there, ROMBot here."));
+    assert(A.text.startsWith(first_name ? "Hey Sam, ROMBot here. Your plan is ready whenever you are." : "Hey there, ROMBot here. Your plan is ready whenever you are."));
     for (const [b, n, nc] of [["B", 1, null], ["C", 3, "Monday, Dec 28"]] as const) {
-      const E = buildCheckinEmail(render(b, { first_name, today_area: "hips", n, next_check_date: nc }), "user@example.com", LINKS, "P");
+      const E = buildCheckinEmail(renderEmail(b, { first_name, today_area: "hips", n, next_check_date: nc }), "user@example.com", LINKS, "P");
       assert(E.text.startsWith("ROMBot here.\n\n"), b);
       assert(E.html.includes(">ROMBot here.</p>"), b);
       assertEquals([count(E.text, "ROMBot here."), count(E.html, "ROMBot here.")], [1, 1], b);

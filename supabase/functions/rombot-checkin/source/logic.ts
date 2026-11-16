@@ -7,7 +7,7 @@
 // Grant Q3 (Nov 16, 9:49 AM ET): the email is never in the note's run; it goes in the first run at least 24 h after the note,
 // at the same send hour, on a plan day, only with no app activity since the note (planEmails). Q4: the note itself goes to
 // every eligible Base user whatever their email opt-in (plan).
-import { type Branch, type Fill, render, type Rendered } from "./copy.ts";
+import { type Branch, type Fill, render, renderEmail, type Rendered } from "./copy.ts";
 
 /** P1-17 default send hour (Grant 9:28 AM ET Nov 16, overriding the spec's 7:00). Used ONLY when reminder_time is empty or unreadable. */
 export const DEFAULT_HOUR = 9;
@@ -188,8 +188,9 @@ function commonGate(c: Candidate, opts: Opts): Gate | null {
   if (c.deletion_requested) return "deletion_requested";
   return null;
 }
-/** Branch and words for `now`: n = sessions since the assessment; {today_area} for the user's local weekday now. */
-function renderFor(c: Candidate, now: Date, st: SendTime, lp: { date: string; dow: number }, assessedAt: number):
+/** Branch and words for `now`: n = sessions since the assessment; {today_area} for the user's local weekday NOW (for an email,
+ *  the send day, never the note's day: Stacy 9d8fe291). `email` picks the email words (EMAIL_COPY) instead of the note's. */
+function renderFor(c: Candidate, now: Date, st: SendTime, lp: { date: string; dow: number }, assessedAt: number, email = false):
   { branch: Branch; rendered: Rendered; newestSession: number } | "no_plan" | "no_next_check" {
   const area = todayArea(c.ranked_joint_keys, lp.dow);
   if (!area) return "no_plan";
@@ -205,7 +206,7 @@ function renderFor(c: Candidate, now: Date, st: SendTime, lp: { date: string; do
     if (!nextCheck) return "no_next_check";
   }
   const f: Fill = { first_name: firstName(c.full_name), today_area: area, n, next_check_date: nextCheck };
-  return { branch, rendered: render(branch, f), newestSession: n ? Math.max(...sessions.map((s) => Date.parse(s))) : NaN };
+  return { branch, rendered: email ? renderEmail(branch, f) : render(branch, f), newestSession: n ? Math.max(...sessions.map((s) => Date.parse(s))) : NaN };
 }
 
 /** Note phase: the in-app note goes to EVERY eligible Base user on local day 3 at their send hour, whatever their email
@@ -274,7 +275,7 @@ export function planEmails(now: Date, cands: Candidate[], opts: Opts) {
     const lp = localParts(now, st.tz);
     if (!inWindow(lp.hour, st.hour)) { skip("outside_send_window"); continue; }
     if (!isPlanDay(lp.dow, opts.planDays ?? PLAN_DAYS)) { skip("not_plan_day"); continue; }
-    const r = renderFor(c, now, st, lp, Date.parse(a.assessed_at));
+    const r = renderFor(c, now, st, lp, Date.parse(a.assessed_at), true);
     if (typeof r === "string") { skip(r); continue; }
     if (note.branch && note.branch !== r.branch) { skip("branch_changed"); continue; }
     due.push({ user_id: c.user_id, assessment_id: a.id, branch: r.branch, rendered: r.rendered, email_id: `checkin-d3-email-${a.id}`, email: c.email, local_date: lp.date, send: st, note_age_hours: Math.round(ageH * 100) / 100 });

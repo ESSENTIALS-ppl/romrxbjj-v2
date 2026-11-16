@@ -100,7 +100,9 @@ Deno.test("email fallback in a later run: Base sender ROMRx <hello@romrx.io>, St
   assertEquals(ROMRX_SENDER, { from: "ROMRx <hello@romrx.io>", replyTo: "hello@romrx.io" });
   assertEquals(b.subject, "Your plan is ready, Sam");
   // Stacy (Nov 16): Branch A drops the "ROMBot here." opener; its first line already says it.
-  assert(b.text.startsWith("Hey Sam, ROMBot here. It's been 3 days"));
+  assert(b.text.startsWith("Hey Sam, ROMBot here. Your plan is ready whenever you are. Today's focus is your shoulders.")); // Stacy 9d8fe291: no day count; Tuesday area
+  assert(b.text.includes("If something got in the way, open ROMBot and tell me. I'll help you find an easier way in."));
+  assert(!/tell me here|3 days/.test(b.text + b.html));
   assertEquals(b.text.split("ROMBot here.").length - 1, 1);
   assertEquals(b.html.split("ROMBot here.").length - 1, 1);
   assert(b.text.includes("Today's focus is your shoulders.")); // Tuesday's area

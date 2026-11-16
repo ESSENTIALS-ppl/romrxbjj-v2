@@ -3,6 +3,9 @@
 // "Final copy", "No-name fallback" and "Email subjects". Covered by L1031 via ledger L1036(c). Sign-off is plain "ROMBot".
 // Placeholders keep Stacy's spelling: {first_name} {today_area} {n} {session/sessions} {remaining} {next_check_date}.
 // The words test (test/words.test.ts) pins every string here against her file. Do not edit without a new Stacy file.
+// EMAIL_COPY (email-only words) is Stacy's addendum, byte for byte: /workspace/process/evidence/STACY-P1-17-CLIENT-WORDS-20261116-0958.md
+// (sha256 9d8fe2910ea9708ffbc5b6170ef593eb679c64d82d6ace5c67e6a06314f4e801), items 3 and 4 (Grant 10:00 AM ET Nov 16). Where that
+// file is silent (B and C first lines and buttons, B and C subjects, the B/C "ROMBot here." email opener), the 6fd272b6 words stay.
 // The only other user-facing words this function sends are the shared lifecycle footer strings (FOOTER below), reused
 // verbatim from lifecycle-emails live v3 (Stacy P1-16 e1e0a602 lines; ALL_OFF_TEXT; POSTAL_LINE). No new footer words.
 
@@ -24,6 +27,27 @@ export const BRANCH_COPY: Readonly<Record<Branch, { line1: string; button: strin
     line1: "{first_name}, {n} sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is {next_check_date}. That's when you measure again and see where you are.",
     button: "See my plan",
     line3: "If any move doesn't feel right, tell me here.",
+  },
+};
+
+/** Email-only words (Stacy 9d8fe291, items 3 and 4). A: her whole email body (no day count). B and C: ONLY the last line
+ *  changes (an email reply goes to the hello@ inbox, not ROMBot); their first line and button stay BRANCH_COPY (6fd272b6).
+ *  The in-app notes keep BRANCH_COPY ("tell me here"). */
+export const EMAIL_COPY: Readonly<Record<Branch, { line1: string; button: string; line3: string }>> = {
+  A: {
+    line1: "Hey {first_name}, ROMBot here. Your plan is ready whenever you are. Today's focus is your {today_area}. It's short, and you can do it now. Want to start?",
+    button: "Start today's session",
+    line3: "If something got in the way, open ROMBot and tell me. I'll help you find an easier way in.",
+  },
+  B: {
+    line1: BRANCH_COPY.B.line1,
+    button: BRANCH_COPY.B.button,
+    line3: "Anything feel too easy or too hard? Open ROMBot and tell me, and I'll help you adjust how you do it.",
+  },
+  C: {
+    line1: BRANCH_COPY.C.line1,
+    button: BRANCH_COPY.C.button,
+    line3: "If any move doesn't feel right, open ROMBot and tell me.",
   },
 };
 
@@ -89,8 +113,12 @@ export function fill(t: string, f: Fill): string {
 }
 
 export interface Rendered { branch: Branch; line1: string; button: string; line3: string; subject: string; }
-export function render(branch: Branch, f: Fill): Rendered {
-  const c = BRANCH_COPY[branch];
+/** In-app note words (BRANCH_COPY). */
+export function render(branch: Branch, f: Fill): Rendered { return renderWith(BRANCH_COPY, branch, f); }
+/** Email words (EMAIL_COPY). Same no-name opener and subject rules; Stacy 9d8fe291 item 3 keeps A's no-name opener and subject. */
+export function renderEmail(branch: Branch, f: Fill): Rendered { return renderWith(EMAIL_COPY, branch, f); }
+function renderWith(table: typeof BRANCH_COPY, branch: Branch, f: Fill): Rendered {
+  const c = table[branch];
   let line1 = c.line1;
   let subject = SUBJECTS[branch];
   if (!f.first_name) {
