@@ -1,4 +1,4 @@
-// submit-assessment from live v44 plus P1-07 user_mobility_schedule upsert. BRANCH ONLY, not deployed. Migration UNAPPLIED.
+// submit-assessment from live v44 plus P1-07 schedule and P1-06 quick re-check. BRANCH ONLY, not deployed. Migrations UNAPPLIED.
 // - v31: marketing opt-out now read from public.users (the `profiles` table never existed, so the
 //        opt-out was silently ignored). Removed the v1 BJJ-flavored users upsert (platforms ['bjj'],
 //        subscription_status 'pending' which the check constraint rejects). Logs product_events.
@@ -10,7 +10,7 @@ import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
 import { buildMoodBlockForUser } from "./mood_block.ts";
-import { scheduleRow } from "./schedule.ts";
+import { nextCheckAfterQuick, parseCheckKind, pickCheckJoints, QUICK_ERRORS, rejectQuickSubmit, type ScheduleRead, scheduleRow } from "./schedule.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -253,6 +253,18 @@ Deno.serve(async (req) => {
   }
   const hasAny = NUMERIC_FIELDS.some((f) => row[f] !== null);
   if (!hasAny) return json({ error: "At least one ROM measurement is required" }, 400);
+  const checkKind = parseCheckKind(body);
+  if (checkKind === "invalid") return json({ error: "check_kind must be full or quick" }, 400);
+  let sched: ScheduleRead | null = null;
+  try {
+    const { data: sch, error: schErr } = await admin.from("user_mobility_schedule").select("last_assessed_at, next_retest_at, next_check_at, check_joints").eq("user_id", user.id).maybeSingle();
+    if (!schErr && sch) sched = sch as unknown as ScheduleRead;
+  } catch { sched = null; }
+  if (checkKind === "quick") {
+    const rejected = rejectQuickSubmit(body, sched?.check_joints, NUMERIC_FIELDS);
+    if (rejected) return json({ error: QUICK_ERRORS[rejected] }, 400);
+    row.check_kind = "quick"; // omit on full submits so insert still works before the unapplied check_kind migration
+  }
   // Optional capture-method marker (Oct 22 2026). Absent or invalid = key not sent, so older clients and
   // rows are unchanged (column stays NULL = unknown). Needs migration 20261022090000 applied first.
   const captureMethods = sanitizeCaptureMethods(body.capture_methods, NUMERIC_FIELDS, row);
@@ -263,17 +275,30 @@ Deno.serve(async (req) => {
     .select("id, assessed_at, sport")
     .single();
   if (error) return json({ error: error.message }, 400);
-  // P1-07: store next_retest_at (+42d) and next_check_at (+7d). Non-blocking so a missing table cannot fail the submit.
-  // The migration is UNAPPLIED; this upsert no-ops until the table exists. Never logs emails or secrets.
+  // Schedule upsert is non-blocking so a missing table cannot fail the submit. Migrations UNAPPLIED.
   try {
-    await admin.from("user_mobility_schedule").upsert(
-      scheduleRow(user.id, inserted.id as string, inserted.assessed_at as string, new Date().toISOString()),
-    );
+    if (checkKind === "quick") {
+      // Grant rule 2 (9:38 PM ET Nov 15): a saved quick check sets next_check_at = next_retest_at.
+      // Do not move next_retest_at, last_assessment_id, or last_assessed_at.
+      const next = nextCheckAfterQuick(sched);
+      await admin.from("user_mobility_schedule").update({
+        next_check_at: next,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id);
+    } else {
+      const joints = pickCheckJoints(null, row); // worst_joints is filled later by compute-tiers; use computed worst at submit time
+      await admin.from("user_mobility_schedule").upsert(
+        scheduleRow(user.id, inserted.id as string, inserted.assessed_at as string, new Date().toISOString(), joints),
+      );
+    }
   } catch (schedErr) {
     console.error("user_mobility_schedule upsert failed (non-blocking)");
   }
+  if (checkKind === "quick") {
+    return json({ ok: true, assessment_id: inserted.id, assessed_at: inserted.assessed_at, sport: inserted.sport, check_kind: "quick" }, 200);
+  }
   // Assessment-done (great-job) email is transactional: sent regardless of users.marketing_opt_out.
-  // The opt-out still blocks drips (handled elsewhere).
+  // The opt-out still blocks drips (handled elsewhere). Not sent for a quick re-check.
   try {
     const fullName = (meta.full_name ?? meta.name ?? profile?.full_name ?? "") as string;
     const firstName = fullName.split(" ")[0] || "there";
