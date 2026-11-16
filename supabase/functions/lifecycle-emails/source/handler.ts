@@ -1,7 +1,7 @@
 // lifecycle-emails handler (FG-09/10/11). Staged 2026-11-02, nothing deployed, nothing set.
 // All I/O is injected so every rule is testable without a network. Default is DRY RUN: real sends need
 // LIFECYCLE_EMAILS_SEND to be exactly "on". Audience is canary-only unless LIFECYCLE_AUDIENCE is exactly "all".
-import { audienceAll, type Candidate, type Due, flagOn, KINDS, type Kind, maskEmail, planKind } from "./logic.ts";
+import { audienceAll, type Candidate, type Due, flagOn, KINDS, type Kind, maskEmail, planKind, quickCheckOn } from "./logic.ts";
 import { brandFor, buildEmail } from "./email.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { signUnsubToken, type UnsubScope } from "../_shared/unsub_token.ts";
@@ -46,7 +46,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
   const loaded = (await d.load([...kinds])).map((c) => suppress.has(c.user_id.toLowerCase()) ? { ...c, deletion_requested: true } : c);
   const plan: Record<string, { due: Due[]; skipped: Record<string, number> }> = {};
   for (const k of kinds) {
-    const p = planKind(k, now, loaded, { all, canary });
+    const p = planKind(k, now, loaded, { all, canary, quickCheckOn: quickCheckOn(d.env("QUICK_CHECK_ON")) });
     plan[k] = { due: p.due, skipped: p.skipped as Record<string, number> };
   }
   if (!sendOn) {

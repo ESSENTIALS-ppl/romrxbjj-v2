@@ -18,7 +18,7 @@ function cand(over: Partial<Omit<Candidate, "pref">> & { pref?: Partial<NonNulla
     session_dates: [], has_protocol: true, ...rest,
   };
 }
-const canaryAll = { all: true, canary: new Set<string>() };
+const canaryAll = { all: true, canary: new Set<string>(), quickCheckOn: true }; // scheduling tests assume the quick-check flag is on; the off state is in quick-check-guard.test.ts
 
 // Assessed 2026-10-25 15:00Z = 2026-10-25 10:00 America/Chicago (CST, UTC-6). Day 7 = 2026-11-01, day 14 = 2026-11-08, day 15 = 2026-11-09.
 const ASSESSED = "2026-10-25T15:00:00Z";

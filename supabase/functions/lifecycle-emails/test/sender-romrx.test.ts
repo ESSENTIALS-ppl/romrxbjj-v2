@@ -32,7 +32,7 @@ export const SCEN: Record<Kind, { now: Date; c: Partial<Candidate> }> = {
 type Sent = { from: string; replyTo: string; to: string; subject: string; html: string; text: string; headers: Record<string, string> };
 export async function sendOne(kind: Kind, sport: string | null): Promise<Sent[]> {
   const sends: Sent[] = [];
-  const env: Record<string, string> = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET };
+  const env: Record<string, string> = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET, QUICK_CHECK_ON: "on" };
   const d: Deps = {
     env: (k) => env[k], cronOk: () => Promise.resolve(true), now: () => SCEN[kind].now, load: () => Promise.resolve([cand(sport, SCEN[kind].c)]),
     claim: () => Promise.resolve(true), release: () => Promise.resolve(), send: (p) => { sends.push(p as Sent); return Promise.resolve(true); },

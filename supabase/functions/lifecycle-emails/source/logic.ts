@@ -13,6 +13,9 @@ export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed",
 
 /** Fail-safe flag rule: ON only when the value is exactly the lowercase string "on". */
 export function flagOn(v: string | null | undefined): boolean { return v === "on"; }
+/** Server equivalent of the client's QUICK_CHECK_ON constant (app/src/lib/quickCheck.ts, currently false).
+ *  Read from env QUICK_CHECK_ON. ON only when the value is exactly "on" (same rule as flagOn). Unset, empty, or any other value is off. */
+export function quickCheckOn(v: string | null | undefined): boolean { return flagOn(v); }
 /** Audience rule: everyone explicit-on only when LIFECYCLE_AUDIENCE is exactly "all"; anything else is canary (listed user ids only). */
 export function audienceAll(v: string | null | undefined): boolean { return v === "all"; }
 
@@ -137,7 +140,8 @@ export function firstName(full: string | null | undefined, email: string): strin
 
 export type SkipReason =
   | "not_canary" | "no_pref" | "toggle_off" | "not_explicit" | "marketing_opt_out" | "deletion_requested" | "no_email"
-  | "outside_send_window" | "wrong_weekday" | "no_assessment" | "not_due" | "no_protocol" | "session_already_logged" | "no_score";
+  | "outside_send_window" | "wrong_weekday" | "no_assessment" | "not_due" | "no_protocol" | "session_already_logged" | "no_score"
+  | "quick_check_off";
 
 
 /** Calendar-day add on a YYYY-MM-DD string (UTC date arithmetic, no timezone shift). */
@@ -267,7 +271,7 @@ function retestIsoOf(c: Candidate): string | null {
   return new Date(t + RETEST_DAYS * 86400000).toISOString();
 }
 
-export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string> }) {
+export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string>; quickCheckOn?: boolean }) {
   const due: Due[] = [];
   const skipped: Partial<Record<SkipReason, number>> = {};
   const skip = (r: SkipReason) => { skipped[r] = (skipped[r] ?? 0) + 1; };
@@ -304,6 +308,10 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       const done = quickCheckDone(c);
       // Skip the day-7 "quick check is ready" email when a quick check already exists after the last full assessment.
       if (kind === "check7" && done) { skip("not_due"); continue; }
+      // Version A (check7, or check14 with no current-cycle quick row) links to /dashboard/quick-check.
+      // Choose A only when QUICK_CHECK_ON is on (defaults off). Version B (check14 with a quick row) does not use that path and still sends when the flag is off.
+      const isVersionA = kind === "check7" || !done;
+      if (isVersionA && !opts.quickCheckOn) { skip("quick_check_off"); continue; }
       due.push({
         ...base,
         email_id: `lc-${kind}-${id}`,

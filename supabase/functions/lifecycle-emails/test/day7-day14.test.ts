@@ -19,7 +19,7 @@ function cand(over: Partial<Omit<Candidate, "pref">> & { pref?: Partial<NonNulla
     session_dates: [], has_protocol: true, ...rest,
   };
 }
-const canaryAll = { all: true, canary: new Set<string>() };
+const canaryAll = { all: true, canary: new Set<string>(), quickCheckOn: true }; // scheduling tests assume the quick-check flag is on; the off state is in quick-check-guard.test.ts
 
 Deno.test("P1-08 check7 and check14: due on the local due date and one grace day, once per assessment", () => {
   // Assessed local Chicago 2026-10-25. Day 7 = 2026-11-01, day 14 = 2026-11-08.

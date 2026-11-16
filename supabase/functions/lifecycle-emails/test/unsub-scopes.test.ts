@@ -21,7 +21,7 @@ function cand(over: Partial<Candidate> = {}): Candidate {
     session_dates: [], has_protocol: true, ...over,
   };
 }
-const canaryAll = { all: true, canary: new Set<string>() };
+const canaryAll = { all: true, canary: new Set<string>(), quickCheckOn: true }; // scope tests cover A sends; they need the flag on (check7 has no B)
 /** One fixture per kind at a moment when that kind is due (America/Chicago, reminder 08:00). */
 const SCEN: Record<Kind, { now: Date; c: Partial<Candidate> }> = {
   retest: { now: new Date("2026-11-02T14:00:00Z"), c: { latest_assessment: { id: "a-rt", assessed_at: "2026-09-21T13:00:00Z" } } },
@@ -54,7 +54,7 @@ function deps(env: Record<string, string>, cands: Candidate[], now: Date) {
   };
   return { d, log };
 }
-const ON = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET };
+const ON = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET, QUICK_CHECK_ON: "on" };
 const tokenOf = (h: string) => decodeURIComponent(/\?t=([^&>]+)/.exec(h)![1]);
 
 Deno.test("P1 scopes: every send kind has a scope (a P1 send can no longer fail closed for lack of one)", () => {
@@ -133,7 +133,7 @@ Deno.test("tampered or unknown scope is still rejected; nothing is switched off"
 });
 Deno.test("no signing secret: P1 kinds still fail closed (no email without opt-out links)", async () => {
   for (const kind of ["check7", "check14", "lapsed"] as const) {
-    const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all" }, [cand(SCEN[kind].c)], SCEN[kind].now);
+    const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", QUICK_CHECK_ON: "on" }, [cand(SCEN[kind].c)], SCEN[kind].now);
     const b = await (await handle(new Request(`https://x.test/lifecycle-emails?kind=${kind}`, { method: "POST" }), d)).json();
     assertEquals([b.results[kind].failed, log.sends.length], [1, 0], kind);
   }
