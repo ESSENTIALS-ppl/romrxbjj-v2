@@ -1,0 +1,178 @@
+[
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-05-31T22:40:36.386467+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "d12e4ef1da8ea7fa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-05-31T23:00:55.533611+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "d12e4ef1da8ea7fa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-01T22:26:26.737256+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "d12e4ef1da8ea7fa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-04T17:27:54.980081+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "67a3902e88899aaa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-05T12:47:29.530533+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-06T01:24:08.695622+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-07T00:41:17.173611+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "d12e4ef1da8ea7fa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-08T15:28:32.10897+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-08T23:53:51.722009+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-13T01:50:39.679095+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "d12e4ef1da8ea7fa",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-13T16:32:20.815365+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-29T00:19:01.456612+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-06-30T22:59:17.880905+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-02T00:57:08.344859+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "db6567680efadbd1",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-03T22:45:47.395516+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-06T18:57:15.124556+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-07T13:03:55.887211+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-08T23:38:22.583604+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-20T12:57:36.197713+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-07-24T20:23:49.175226+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-10-06T23:28:43.109966+00:00",
+  "session_level": true
+ },
+ {
+  "uh": "e600d8fdac2d8e82",
+  "has_sid": true,
+  "excluded": false,
+  "stored_tz": "America/New_York",
+  "completed_at": "2026-10-28T15:55:24.124544+00:00",
+  "session_level": true
+ }
+]

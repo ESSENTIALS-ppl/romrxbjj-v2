@@ -1,0 +1,122 @@
+{
+ "engine": "PostgreSQL 18.6 (PGlite 0.5.16) on wasm32-unknown-emscripten, compiled by emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a), 32-bit",
+ "results": {
+  "T0 PGlite reproduces the live value_actions viewdef md5 (758e3d8a…)": {
+   "pass": true,
+   "info": {
+    "md5": "758e3d8ad5cd04297470b0a4af8e3d3b"
+   }
+  },
+  "T1 session-level row + 3 per-movement rows (+ an evening-ET row) on one local day count as 1": {
+   "pass": true,
+   "info": {
+    "day": {
+     "d": "2026-11-20",
+     "n": 5,
+     "tz_used": "America/New_York"
+    }
+   }
+  },
+  "T2 two different local days count as 2": {
+   "pass": true,
+   "info": {
+    "days": [
+     "2026-11-20",
+     "2026-11-22"
+    ],
+    "value_actions_rows_before": 8
+   }
+  },
+  "T3a ET day boundary: 01:30Z belongs to the prior ET day (a UTC count would give 2 days)": {
+   "pass": true
+  },
+  "T3b stored zone America/Los_Angeles honored (Nov 20 PT has 2 rows, Nov 21 PT 1 row)": {
+   "pass": true
+  },
+  "T3c invalid stored zone falls back to America/New_York": {
+   "pass": true
+  },
+  "T4 fixtures excluded (no days, no value_actions completion rows)": {
+   "pass": true,
+   "info": {
+    "fixture_rows_before": 1
+   }
+  },
+  "T4b ops.internal_accounts excluded": {
+   "pass": true
+  },
+  "T5 value_actions: same columns, owner, grants, reloptions, oid": {
+   "pass": true,
+   "info": {
+    "cols": "user_id:uuid,at:timestamp with time zone,kind:text",
+    "acl": "{postgres=arwdDxtm/postgres,service_role=r/postgres}",
+    "md5_after": "16f3d342b4319c1e6df994a3ec0f65ae"
+   }
+  },
+  "T6 new view grants: service_role SELECT only (+postgres owner), no anon/authenticated": {
+   "pass": true,
+   "info": {
+    "acl": "{postgres=arwdDxtm/postgres,service_role=r/postgres}",
+    "cols": "user_id:uuid,local_date:date,tz_used:text,raw_rows:bigint,first_at:timestamp with time zone,last_at:timestamp with time zone",
+    "md5": "3b79c2610b598f61c3203f9fe30ee7e3"
+   }
+  },
+  "T7 dependents unbroken: retention_m1 and retention_daily keep oid/md5 and still query": {
+   "pass": true
+  },
+  "T8 M1 answers identical for non-excluded users": {
+   "pass": true,
+   "info": {
+    "m1": [
+     {
+      "day_n": 1,
+      "eligible": 3,
+      "returned_any_action": 0,
+      "returned_value_action": 3
+     },
+     {
+      "day_n": 7,
+      "eligible": 3,
+      "returned_any_action": 0,
+      "returned_value_action": 3
+     },
+     {
+      "day_n": 14,
+      "eligible": 3,
+      "returned_any_action": 0,
+      "returned_value_action": 3
+     },
+     {
+      "day_n": 30,
+      "eligible": 3,
+      "returned_any_action": 0,
+      "returned_value_action": 3
+     }
+    ]
+   }
+  },
+  "T9 rollback restores live value_actions viewdef byte for byte (pg_get_viewdef text equal, md5 758e3d8a…) and oid/columns/grants": {
+   "pass": true,
+   "info": {
+    "md5": "758e3d8ad5cd04297470b0a4af8e3d3b"
+   }
+  },
+  "T9b rollback drops ops.protocol_completion_days and restores per-row counts": {
+   "pass": true
+  },
+  "T10 re-apply after rollback is clean": {
+   "pass": true
+  },
+  "T11 live replica: 22 rows give the same completion counts as today (no doubles yet)": {
+   "pass": true,
+   "info": {
+    "rows": 22,
+    "before": 22,
+    "after": 22,
+    "days": 22,
+    "max_rows": 1
+   }
+  }
+ },
+ "fails": 0
+}
