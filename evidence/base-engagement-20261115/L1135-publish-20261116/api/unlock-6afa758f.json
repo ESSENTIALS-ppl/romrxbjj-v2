@@ -1,0 +1,16 @@
+{
+  "id": "6afa758f6527e4ba908c3797",
+  "state": "ready",
+  "locked": false,
+  "published_at": "2026-11-16T03:17:28.941Z",
+  "created_at": "2026-11-16T03:16:31.425Z",
+  "updated_at": "2026-11-16T15:04:51.976Z",
+  "commit_ref": null,
+  "branch": "main",
+  "context": "deploy-preview",
+  "error_message": null,
+  "deploy_time": 23,
+  "deploy_ssl_url": "https://6afa758f6527e4ba908c3797--incomparable-pastelito-849104.netlify.app",
+  "manual_deploy": false,
+  "title": "360510f L1117 draft (not published)"
+}

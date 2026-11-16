@@ -1,0 +1,25 @@
+{
+  "id": "6afb1b2f452d5c9003a7adf4",
+  "name": "incomparable-pastelito-849104",
+  "url": "https://romrx.io",
+  "ssl_url": "https://romrx.io",
+  "custom_domain": null,
+  "stop_builds": null,
+  "stopped_builds": null,
+  "published_deploy": {
+    "id": null,
+    "state": null,
+    "locked": null,
+    "published_at": null,
+    "created_at": null,
+    "updated_at": null,
+    "commit_ref": null,
+    "branch": null,
+    "context": null,
+    "error_message": null,
+    "deploy_time": null,
+    "deploy_ssl_url": null,
+    "manual_deploy": null,
+    "title": null
+  }
+}
