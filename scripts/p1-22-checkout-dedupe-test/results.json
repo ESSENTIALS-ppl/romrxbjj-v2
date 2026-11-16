@@ -1,0 +1,75 @@
+{
+ "engine": "PostgreSQL 18.6 (PGlite 0.5.16) on wasm32-unknown-emscripten, compiled by emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a), 32-bit",
+ "results": {
+  "T0 pre (live view): fixtures are counted today": {
+   "pass": true,
+   "info": {
+    "pre_rows": 9
+   }
+  },
+  "T1 fixtures excluded (flagged jim+romrx-* accounts, with and without a session id)": {
+   "pass": true
+  },
+  "T2 real buyer rows kept, identical to the live view": {
+   "pass": true,
+   "info": {
+    "buyer_rows": 3
+   }
+  },
+  "T2b 2-hour window and purpose split unchanged for the buyer (base window, sport_pack, session-id row)": {
+   "pass": true
+  },
+  "T3 internal_accounts row excluded (same hook as ops.v_real_assessed)": {
+   "pass": true
+  },
+  "T4 unflagged jim+romrx-* address is NOT a fixture and is kept": {
+   "pass": true
+  },
+  "T5 anonymous (NULL user_id) row kept": {
+   "pass": true
+  },
+  "T6 column list unchanged": {
+   "pass": true,
+   "info": {
+    "cols": "id:bigint,user_id:uuid,anon_id:text,session_id:text,event:text,props:jsonb,sport:text,source:text,path:text,created_at:timestamp with time zone"
+   }
+  },
+  "T7 owner, reloptions, grants and oid unchanged": {
+   "pass": true,
+   "info": {
+    "owner": "postgres",
+    "reloptions": null,
+    "acl": "{postgres=arwdDxtm/postgres,service_role=r/postgres}"
+   }
+  },
+  "T8 viewdef changed only by the exclusion": {
+   "pass": true,
+   "info": {
+    "pre_md5": "2076aed0fd2afe662de97af68e7a48fb",
+    "post_md5": "ec4991f75c19cca6ffa71639821cd766"
+   }
+  },
+  "T9 comment updated with the exclusion note": {
+   "pass": true
+  },
+  "T10 page_view and other events still ignored": {
+   "pass": true,
+   "info": {
+    "post_rows": 5
+   }
+  },
+  "T11 rollback restores viewdef md5, comment, columns, owner, grants, reloptions": {
+   "pass": true,
+   "info": {
+    "rb_md5": "2076aed0fd2afe662de97af68e7a48fb"
+   }
+  },
+  "T11b rollback returns the live rows again": {
+   "pass": true
+  },
+  "T12 re-apply after rollback is clean": {
+   "pass": true
+  }
+ },
+ "fails": 0
+}
