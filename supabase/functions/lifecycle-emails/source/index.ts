@@ -57,14 +57,7 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
     try {
       const { data: sch, error: schErr } = await sb.from("user_mobility_schedule").select("last_assessment_id, last_assessed_at, next_retest_at, next_check_at").eq("user_id", p.user_id).maybeSingle();
       if (!schErr && sch) schedule = sch as Candidate["schedule"];
-    } catch { schedule = null; } // table may not exist until the P1-07 migration is applied
-    let hasQuick = false;
-    try {
-      if (a?.assessed_at) {
-        const { data: q, error: qErr } = await sb.from("assessments").select("id").eq("user_id", p.user_id).eq("check_kind", "quick").gt("assessed_at", a.assessed_at).limit(1);
-        if (!qErr && q && q.length) hasQuick = true;
-      }
-    } catch { hasQuick = false; } // column may not exist until the P1-06 check_kind migration is applied
+    } catch { schedule = null; } // table may not exist yet; nextCheck omits the line in both emails
     let lastSignIn: string | null = null;
     try {
       const { data: au } = await sb.auth.admin.getUserById(p.user_id);

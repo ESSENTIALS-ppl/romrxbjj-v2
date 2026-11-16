@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertFalse, assertMatch } from "jsr:@std/assert@1";
-import { audienceAll, type Candidate, explicitOn, flagOn, localParts, planKind, reminderHour, streakDays } from "../source/logic.ts";
+import { audienceAll, type Candidate, explicitOn, flagOn, localParts, nextCheck, planKind, reminderHour, streakDays } from "../source/logic.ts";
 import { BRANDS, brandFor, buildEmail, COPY, copyFor } from "../source/email.ts";
 import { signUnsubToken, verifyUnsubToken } from "../_shared/unsub_token.ts";
 import { CONFIRM_PAGES, type Deps, handle, idList, UNSUB_BASE } from "../source/handler.ts";
@@ -289,14 +289,14 @@ Deno.test("P1-16 Stacy final words: exact subject and lines, no scores or em das
   const links = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https://romrx.io/app/unsubscribe?t=a", oneClick: "https://example.com/unsub" };
   const postal = "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774";
   const d = buildEmail(
-    { kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "lc-lapsed-x", local_date: "2026-11-03", next_check_line: "Your next check: Monday, December 28" },
+    { kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "lc-lapsed-x", local_date: "2026-11-03", next_check_line: "Your next check is in 6 days." },
     BRANDS.base, links, postal,
   );
   assertEquals(d.subject, "Your ROMRx plan is still here");
   assertEquals(copyFor({ kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "x", local_date: "2026-11-03" }, BRANDS.base).preheader, "Pick up where you left off.");
   assert(d.text.includes("We haven't seen you in a couple of weeks. Your plan is saved and ready."));
   assert(d.text.includes("You can start again with today's session."));
-  assert(d.text.includes("Your next check: Monday, December 28"));
+  assert(d.text.includes("Your next check is in 6 days."));
   assert(d.text.includes("Open today's session: https://romrx.io/app/dashboard/my-protocol"));
   assert(d.text.includes("You're getting this because Plan day reminders is on in your ROMRx settings."));
   assert(d.text.includes("Want fewer emails? Change your reminders in Settings: https://romrx.io/app/dashboard/settings"));
@@ -358,10 +358,68 @@ Deno.test("P1-15 digest: omit next-check line when the schedule table/row is abs
   const builtOne = buildEmail(one.due[0], BRANDS.base, { offKind: "https://x/k", offAll: "https://x/a", oneClick: "https://x/o" }, "ROMRx LLC");
   assert(builtOne.text.includes("Your next check is in 1 day."));
 
-  // next_check_at in the past -> fall back to next_retest_at
-  const fallback = planKind("digest", SUN_9_CST, [cand({
+  // next_check_at in the past: still next_check_at only (no fallback to next_retest_at). Label is "today."
+  const past = planKind("digest", SUN_9_CST, [cand({
     session_dates: dates,
     schedule: { last_assessment_id: "a1", last_assessed_at: "2026-10-01T12:00:00Z", next_retest_at: "2026-11-12T12:00:00Z", next_check_at: "2026-11-01T12:00:00Z" },
   })], canaryAll);
-  assertEquals(fallback.due[0].digest?.days_to_next_check, 4); // 11/08 -> 11/12
+  assertEquals(past.due[0].digest?.days_to_next_check, -7); // 11/08 vs next_check_at 11/01
+  assertEquals(past.due[0].next_check_line, "Your next check is today.");
+  const builtPast = buildEmail(past.due[0], BRANDS.base, { offKind: "https://x/k", offAll: "https://x/a", oneClick: "https://x/o" }, "ROMRx LLC");
+  assert(builtPast.text.includes("Your next check is today."));
+  assertFalse(builtPast.text.includes("in 4 days"));
+});
+
+Deno.test("W1: digest and lapsed give the same next-check answer on days 1, 8, 20, 42, and 43 after assessment", () => {
+  // Column meaning from the user_mobility_schedule migration: next_check_at is the quick re-check due date
+  // (last_assessed_at + 7 days; day 14 is derived). next_retest_at is the 42-day full retest and is not read.
+  // Assessed 2026-11-01 12:00Z → next_check_at 2026-11-08, next_retest_at 2026-12-13 (Chicago local dates).
+  const schedule = {
+    last_assessment_id: "a1",
+    last_assessed_at: "2026-11-01T12:00:00.000Z",
+    next_check_at: "2026-11-08T12:00:00.000Z",
+    next_retest_at: "2026-12-13T12:00:00.000Z",
+  };
+  const tz = "America/Chicago";
+  const links = { offKind: "https://x/k", offAll: "https://x/a", oneClick: "https://x/o" };
+  const cases: { day: number; today: string; label: string }[] = [
+    { day: 1, today: "2026-11-02", label: "Your next check is in 6 days." },
+    { day: 8, today: "2026-11-09", label: "Your next check is today." },
+    { day: 20, today: "2026-11-21", label: "Your next check is today." },
+    { day: 42, today: "2026-12-13", label: "Your next check is today." },
+    { day: 43, today: "2026-12-14", label: "Your next check is today." },
+  ];
+  for (const { today, label } of cases) {
+    const n = nextCheck(schedule, today, tz);
+    assertEquals(n?.label, label, today);
+    const digestDue = {
+      kind: "digest" as const, user_id: U1, email: "alex@example.com", first_name: "Alex",
+      active_sport: "general", email_id: "x", local_date: today, next_check_line: n?.label ?? null,
+      digest: { score: 70, delta: 4, streak: 0, sessions_this_week: 0, days_to_next_check: n ? n.days : null },
+    };
+    const lapsedDue = {
+      kind: "lapsed" as const, user_id: U1, email: "alex@example.com", first_name: "Alex",
+      active_sport: "general", email_id: "x", local_date: today, next_check_line: n?.label ?? null,
+    };
+    const digestText = buildEmail(digestDue, BRANDS.base, links, "ROMRx LLC").text;
+    const lapsedText = buildEmail(lapsedDue, BRANDS.base, links, "ROMRx LLC").text;
+    const digestLine = digestText.split("\n").find((l) => l.startsWith("Your next check")) ?? null;
+    const lapsedLine = lapsedText.split("\n").find((l) => l.startsWith("Your next check")) ?? null;
+    assertEquals(digestLine, lapsedLine, today);
+    assertEquals(digestLine, label, today);
+  }
+  // Fail-soft: no table/row, or next_check_at cleared, omits the line in both emails.
+  assertEquals(nextCheck(null, "2026-11-02", tz), null);
+  assertEquals(nextCheck(undefined, "2026-11-02", tz), null);
+  assertEquals(nextCheck({ last_assessment_id: "a1", last_assessed_at: "2026-11-01T12:00:00.000Z", next_retest_at: "2026-12-13T12:00:00.000Z", next_check_at: null }, "2026-11-02", tz), null);
+  const omittedDigest = buildEmail({
+    kind: "digest", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general",
+    email_id: "x", local_date: "2026-11-02", digest: { score: 70, delta: 4, streak: 0, sessions_this_week: 0, days_to_next_check: null },
+  }, BRANDS.base, links, "ROMRx LLC").text;
+  const omittedLapsed = buildEmail({
+    kind: "lapsed", user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general",
+    email_id: "x", local_date: "2026-11-02",
+  }, BRANDS.base, links, "ROMRx LLC").text;
+  assertFalse(omittedDigest.includes("Your next check"));
+  assertFalse(omittedLapsed.includes("Your next check"));
 });

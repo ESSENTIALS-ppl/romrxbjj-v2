@@ -55,8 +55,6 @@ export interface Candidate {
   has_protocol: boolean;
   /** P1-07 schedule, when the unapplied table exists. Missing row = fall back to latest_assessment. */
   schedule?: { last_assessment_id: string | null; last_assessed_at: string | null; next_retest_at: string | null; next_check_at: string | null } | null;
-  /** True when a check_kind=quick assessment exists after the last full one, or the schedule has moved off day 7. */
-  has_quick_check?: boolean;
   /** auth.users.last_sign_in_at, when loaded. */
   last_sign_in_at?: string | null;
 }
@@ -148,10 +146,6 @@ export function assessmentLocalDate(c: Candidate, tz: string | null | undefined)
   if (!Number.isFinite(t)) return null;
   return localParts(new Date(t), tz).date;
 }
-export function assessmentIdOf(c: Candidate): string | null {
-  const id = c.schedule?.last_assessment_id || c.latest_assessment?.id;
-  return id ? String(id) : null;
-}
 /** True when the user's local date is on the check due day or the one grace day after it. */
 export function checkDueOn(kind: "check7" | "check14", nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
   if (kind === "check7" && c.schedule?.next_check_at) {
@@ -180,28 +174,6 @@ export function friendlyDate(iso: string | null | undefined, tz: string | null |
   return g("year") && g("year") !== nowYear ? `${body}, ${g("year")}` : body;
 }
 
-/** Day-14 email version B if a quick check already happened. */
-export function quickCheckDone(c: Candidate): boolean {
-  if (c.has_quick_check) return true;
-  const last = c.schedule?.last_assessed_at;
-  if (!last) return false;
-  const start = Date.parse(last);
-  if (!Number.isFinite(start)) return false;
-  const day14 = start + 14 * 86400000;
-  if (c.schedule?.next_check_at == null) return true;
-  const nxt = Date.parse(c.schedule.next_check_at);
-  return Number.isFinite(nxt) && nxt >= day14 - 1000;
-}
-
-function retestIsoOf(c: Candidate): string | null {
-  if (c.schedule?.next_retest_at) return c.schedule.next_retest_at;
-  const a = c.schedule?.last_assessed_at || c.latest_assessment?.assessed_at;
-  if (!a) return null;
-  const t = Date.parse(a);
-  if (!Number.isFinite(t)) return null;
-  return new Date(t + RETEST_DAYS * 86400000).toISOString();
-}
-
 export function lastActivityLocalDate(c: Candidate, tz: string | null | undefined): string | null {
   const dates = [...c.session_dates];
   const a = assessmentLocalDate(c, tz);
@@ -224,43 +196,36 @@ export function lapsedDueOn(nowDate: string, c: Candidate, tz: string | null | u
   return nowDate >= due && nowDate < ymdAdd(due, LAPSED_GRACE_DAYS + 1);
 }
 
-/** Stacy P1-16 next-check line. Omit if unknown. Never show a past date; if the retest is due: "Your retest is ready now." */
-export function lapsedNextLine(c: Candidate, tz: string | null | undefined, now: Date, today: string): string | null {
-  const retest = retestIsoOf(c);
-  const check = c.schedule?.next_check_at ?? null;
-  const retestDay = retest && Number.isFinite(Date.parse(retest)) ? localParts(new Date(Date.parse(retest)), tz).date : null;
-  const checkDay = check && Number.isFinite(Date.parse(check)) ? localParts(new Date(Date.parse(check)), tz).date : null;
-  if (retestDay && retestDay <= today) return "Your retest is ready now.";
-  if (checkDay && checkDay <= today) return "Your next check is ready now.";
-  const upcoming = (check && checkDay && checkDay > today) ? check : (retest && retestDay && retestDay > today) ? retest : null;
-  const formatted = friendlyDate(upcoming, tz, now);
-  return formatted ? `Your next check: ${formatted}` : null;
-}
-
-
 /** Monday of the local week that ends on Sunday `sunday` (YYYY-MM-DD). */
 export function weekStartMonday(sunday: string): string { return ymdAdd(sunday, -6); }
 export function sessionsThisWeek(dates: string[], sunday: string): number {
   const mon = weekStartMonday(sunday);
   return dates.filter((d) => d >= mon && d <= sunday).length;
 }
-/** Whole local days from today to the next check (or retest). Null if the schedule table/row is absent (omit the line).
- *  Uses next_check_at when that local date is today or later; otherwise next_retest_at. */
-export function daysToNextCheck(today: string, c: Candidate, tz: string | null | undefined): number | null {
-  if (!c.schedule) return null;
-  const localDateOf = (iso: string | null | undefined): string | null => {
-    if (!iso) return null;
-    const t = Date.parse(iso);
-    if (!Number.isFinite(t)) return null;
-    return localParts(new Date(t), tz).date;
-  };
-  const checkDay = localDateOf(c.schedule.next_check_at);
-  const useIso = (checkDay && checkDay >= today) ? c.schedule.next_check_at : (c.schedule.next_retest_at ?? null);
-  const due = localDateOf(useIso ?? null);
-  if (!due) return null;
-  const days = Math.round((Date.parse(due + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
-  return Number.isFinite(days) ? days : null;
+/** One source for the next-check line in both the digest and the lapsed email (L1049 / W1).
+ *  Reads user_mobility_schedule.next_check_at only. Fail-soft: no row, or no/unparseable next_check_at, returns null
+ *  (both emails omit the line). No 7-day or 42-day math, and no fallback to next_retest_at.
+ *  The loader resolves the row by user_id; this helper is pure and does not import P1-07 code. */
+export interface NextCheck { date: string; label: string; days: number; }
+export function nextCheck(
+  schedule: Candidate["schedule"] | { next_check_at?: string | null } | null | undefined,
+  today: string,
+  tz?: string | null,
+): NextCheck | null {
+  if (!schedule) return null;
+  const iso = schedule.next_check_at;
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const date = localParts(new Date(t), tz).date;
+  const days = Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
+  if (!Number.isFinite(days)) return null;
+  const label = days <= 0
+    ? "Your next check is today."
+    : `Your next check is in ${days} ${days === 1 ? "day" : "days"}.`;
+  return { date, label, days };
 }
+
 
 export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string> }) {
   const due: Due[] = [];
@@ -291,7 +256,7 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       // If the day-14 check-in is also due, skip lapsed (Stacy: send only the day-14 check). Works without the P1-08 email kind; uses the same day-14 math.
       if (checkDueOn("check14", lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
       const last = lastActivityLocalDate(c, c.pref.timezone) ?? lp.date;
-      due.push({ ...base, email_id: `lc-lapsed-${last}`, next_check_line: lapsedNextLine(c, c.pref.timezone, now, lp.date) });
+      due.push({ ...base, email_id: `lc-lapsed-${last}`, next_check_line: nextCheck(c.schedule, lp.date, c.pref.timezone)?.label ?? null });
     } else if (kind === "protocol") {
       if (!PROTOCOL_DAYS.includes(lp.dow)) { skip("wrong_weekday"); continue; }
       if (!c.has_protocol) { skip("no_protocol"); continue; }
@@ -303,7 +268,8 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
       if (!c.latest_assessment || typeof score !== "number") { skip("no_score"); continue; }
       // Delta is against the PREVIOUS assessment (the comparison My Body shows), never "last week". One assessment = no delta.
       const delta = typeof c.previous_score === "number" ? score - c.previous_score : null;
-      due.push({ ...base, email_id: `lc-digest-${lp.date}`, digest: { score, delta, streak: streakDays(c.session_dates, lp.date), sessions_this_week: sessionsThisWeek(c.session_dates, lp.date), days_to_next_check: daysToNextCheck(lp.date, c, c.pref.timezone) } });
+      const nxt = nextCheck(c.schedule, lp.date, c.pref.timezone);
+      due.push({ ...base, email_id: `lc-digest-${lp.date}`, next_check_line: nxt?.label ?? null, digest: { score, delta, streak: streakDays(c.session_dates, lp.date), sessions_this_week: sessionsThisWeek(c.session_dates, lp.date), days_to_next_check: nxt ? nxt.days : null } });
     }
   }
   return { due, skipped };

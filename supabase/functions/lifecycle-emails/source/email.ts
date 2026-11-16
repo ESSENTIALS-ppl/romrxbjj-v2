@@ -43,9 +43,8 @@ export const COPY: Record<StaticKind, { subject: string; preheader: string; line
       // P1-15: Stacy CLEAR (ruling 8ce215ca). Words byte-identical to the current previews.
       const extra: string[] = [];
       if (typeof x.sessions_this_week === "number") extra.push(`Sessions this week: ${x.sessions_this_week}.`);
-      if (typeof x.days_to_next_check === "number") {
-        extra.push(x.days_to_next_check <= 0 ? "Your next check is today." : `Your next check is in ${x.days_to_next_check} ${x.days_to_next_check === 1 ? "day" : "days"}.`);
-      }
+      // Next-check words come from nextCheck() in logic.ts (one source, one label) via d.next_check_line.
+      if (d.next_check_line) extra.push(d.next_check_line);
       return ["Here is your ROMRx week.", `${SCORE_LABEL[brandFor(d.active_sport).key]}: ${x.score}${trend}.`, `Current streak: ${x.streak} ${x.streak === 1 ? "day" : "days"}.`, ...extra];
     },
     button: "Open ROMRx", path: "/dashboard",
