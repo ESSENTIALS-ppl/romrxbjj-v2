@@ -83,8 +83,11 @@ export function buildEmail(brand: Brand, name: string, plan: string, price: stri
 <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}.</p></div></body></html>`;
 }
 
-/** Subject line. Same expression v26 had inline in index.ts. */
+/** Subject line. Sport brands keep the v26 expression (hyphen). Base 2-day uses a colon. */
 export function subjectFor(brand: Brand, daysUntil: number, label: string): string {
+  if (brand.key === "base" && daysUntil <= 2) {
+    return `Your ${brand.name} membership renews in ${label}: last chance to cancel`;
+  }
   return daysUntil <= 2
     ? `Your ${brand.name} membership renews in ${label} - last chance to cancel`
     : `Your ${brand.name} membership renews in ${label}`;
