@@ -1,0 +1,4 @@
+-- ROLLBACK for 20261116040300_coaches_updated_at_column (UNAPPLIED companion).
+-- Drops only the added column (its timestamps are lost). This brings back the 42703 bug on every
+-- coaches UPDATE / upsert-update, because trigger coaches_updated_at stays in place.
+ALTER TABLE public.coaches DROP COLUMN IF EXISTS updated_at;
