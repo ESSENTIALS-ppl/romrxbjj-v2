@@ -1,0 +1,1 @@
+{ "name": "p1-07-roll-test", "private": true, "type": "module", "dependencies": { "@electric-sql/pglite": "^0.5.16" } }

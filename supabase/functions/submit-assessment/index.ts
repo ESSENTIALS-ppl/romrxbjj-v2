@@ -1,4 +1,4 @@
-// submit-assessment v31 (ROMRx Base audit 2026-09-15)
+// submit-assessment from live v44 plus P1-07 user_mobility_schedule upsert. BRANCH ONLY, not deployed. Migration UNAPPLIED.
 // - v31: marketing opt-out now read from public.users (the `profiles` table never existed, so the
 //        opt-out was silently ignored). Removed the v1 BJJ-flavored users upsert (platforms ['bjj'],
 //        subscription_status 'pending' which the check constraint rejects). Logs product_events.
@@ -10,6 +10,7 @@ import { logEvent } from "../_shared/events.ts";
 import { POSTAL_LINE } from "../_shared/email_footer.ts";
 import { sanitizeCaptureMethods } from "../_shared/capture_methods.ts";
 import { buildMoodBlockForUser } from "./mood_block.ts";
+import { scheduleRow } from "./schedule.ts";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -262,6 +263,15 @@ Deno.serve(async (req) => {
     .select("id, assessed_at, sport")
     .single();
   if (error) return json({ error: error.message }, 400);
+  // P1-07: store next_retest_at (+42d) and next_check_at (+7d). Non-blocking so a missing table cannot fail the submit.
+  // The migration is UNAPPLIED; this upsert no-ops until the table exists. Never logs emails or secrets.
+  try {
+    await admin.from("user_mobility_schedule").upsert(
+      scheduleRow(user.id, inserted.id as string, inserted.assessed_at as string, new Date().toISOString()),
+    );
+  } catch (schedErr) {
+    console.error("user_mobility_schedule upsert failed (non-blocking)");
+  }
   // Assessment-done (great-job) email is transactional: sent regardless of users.marketing_opt_out.
   // The opt-out still blocks drips (handled elsewhere).
   try {
