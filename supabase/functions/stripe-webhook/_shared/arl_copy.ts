@@ -10,7 +10,7 @@
 import { POSTAL_LINE } from "./email_footer.ts";
 
 export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v3";
-export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
+export const ARL_ACK_VERSION = "ca-arl-3c-2026-11-15-v4";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
 export const BETA_TRIAL_END_UNIX = 1798822800;
@@ -70,7 +70,7 @@ export function ackLines(basePrice: string, sportPack?: string | null, sportPric
     "Renewal: your plan renews automatically every year at the same price until you cancel. We will tell you before any price change.",
     `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
     "Cancel before January 1, 2027 and you will not be charged anything.",
-    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, including unused portions of an annual term, except where the law requires a refund.",
     "Canceling Base also cancels any sport packs.",
     "Reminders: we will email you before your free period ends and before each yearly renewal.",
   ];
@@ -94,7 +94,7 @@ export function ackSportLines(sportPrice: string, sportPack: string, freePeriod:
     `Renewal: your ${sportPack} renews automatically every year at the same price until you cancel. We will tell you before any price change.`,
     `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
     ...(freePeriod ? ["Cancel before January 1, 2027 and you will not be charged anything."] : []),
-    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, including unused portions of an annual term, except where the law requires a refund.",
     "Canceling Base also cancels any sport packs.",
     ...(packCancelsAlone ? [`Canceling ${sportPack} does not cancel your Base plan.`] : []),
     "Reminders: we will email you before your free period ends and before each yearly renewal.",
