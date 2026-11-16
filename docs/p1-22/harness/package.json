@@ -1,0 +1,8 @@
+{
+  "name": "p1-22-harness",
+  "private": true,
+  "type": "module",
+  "description": "Local PGlite write-path checks for P1-22. No live credentials.",
+  "scripts": { "test": "node test.mjs" },
+  "dependencies": { "@electric-sql/pglite": "0.3.16" }
+}
