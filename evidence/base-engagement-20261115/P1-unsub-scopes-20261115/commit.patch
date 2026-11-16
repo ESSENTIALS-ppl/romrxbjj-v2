@@ -1,0 +1,784 @@
+diff --git a/supabase/functions/lifecycle-emails/_shared/unsub_token.ts b/supabase/functions/lifecycle-emails/_shared/unsub_token.ts
+index f0a0c8e..1c9d11f 100644
+--- a/supabase/functions/lifecycle-emails/_shared/unsub_token.ts
++++ b/supabase/functions/lifecycle-emails/_shared/unsub_token.ts
+@@ -2,8 +2,16 @@
+ // A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
+ // switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
+ // Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
+-export type UnsubScope = "retest" | "protocol" | "digest" | "all";
+-export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all"];
++export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "check7" | "check14" | "lapsed";
++export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "check7", "check14", "lapsed"];
++/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
++export type SettingScope = "retest" | "protocol" | "digest";
++/** Which settings toggle each scope switches off. P1 scopes (L1031) follow the toggle their email already names, with no new words:
++ *  check7 and check14 say "Turn off check reminders" (Settings "Check reminders" = retest_reminders, which also gates the retest email);
++ *  lapsed says "Turn off plan day reminders" (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). */
++export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
++  retest: "retest", protocol: "protocol", digest: "digest", check7: "retest", check14: "retest", lapsed: "protocol",
++};
+ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ 
+ const enc = new TextEncoder();
+diff --git a/supabase/functions/lifecycle-emails/test/unsub-scopes.test.ts b/supabase/functions/lifecycle-emails/test/unsub-scopes.test.ts
+new file mode 100644
+index 0000000..9b3489d
+--- /dev/null
++++ b/supabase/functions/lifecycle-emails/test/unsub-scopes.test.ts
+@@ -0,0 +1,140 @@
++// P1 unsubscribe scopes (L1031, 2026-11-15, BUILD ONLY). Every P1 email kind now gets a working scoped opt-out link.
++// The unsubscribe write is simulated with the real unsubscribe token path and column map (supabase/functions/unsubscribe).
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { type Candidate, KINDS, type Kind, planKind } from "../source/logic.ts";
++import { type Deps, handle } from "../source/handler.ts";
++import { SCOPE_SETTING, SCOPES, signUnsubToken, type UnsubScope, verifyUnsubToken } from "../_shared/unsub_token.ts";
++import { handleTokenRequest, ONE_CLICK_BODY, SCOPE_COLUMN } from "../../unsubscribe/source/token_path.ts";
++
++const U1 = "11111111-1111-4111-8111-111111111111";
++const SECRET = "s".repeat(40);
++const saved = "2026-10-02T00:00:00Z";
++type Pref = NonNullable<Candidate["pref"]>;
++const basePref = (): Pref => ({
++  user_id: U1, reminder_time: "08:00", timezone: "America/Chicago", retest_reminders: true, email_reminders: true, weekly_digest: true,
++  created_at: "2026-10-01T00:00:00Z", updated_at: saved, retest_opt_in_at: saved, protocol_opt_in_at: saved, digest_opt_in_at: saved,
++});
++function cand(over: Partial<Candidate> = {}): Candidate {
++  return {
++    user_id: U1, email: "alex@example.com", full_name: "Alex Rider", active_sport: "bjj", marketing_opt_out: false, deletion_requested: false,
++    pref: basePref(), latest_assessment: { id: "a1", assessed_at: "2026-09-20T12:00:00Z" }, latest_score: 70, previous_score: 66,
++    session_dates: [], has_protocol: true, ...over,
++  };
++}
++const canaryAll = { all: true, canary: new Set<string>() };
++/** One fixture per kind at a moment when that kind is due (America/Chicago, reminder 08:00). */
++const SCEN: Record<Kind, { now: Date; c: Partial<Candidate> }> = {
++  retest: { now: new Date("2026-11-02T14:00:00Z"), c: { latest_assessment: { id: "a-rt", assessed_at: "2026-09-21T13:00:00Z" } } },
++  protocol: { now: new Date("2026-11-02T14:00:00Z"), c: {} },
++  digest: { now: new Date("2026-11-08T15:00:00Z"), c: {} },
++  check7: { now: new Date("2026-11-01T14:00:00Z"), c: { latest_assessment: { id: "a-ck", assessed_at: "2026-10-25T15:00:00Z" } } },
++  check14: { now: new Date("2026-11-08T15:00:00Z"), c: { latest_assessment: { id: "a-ck", assessed_at: "2026-10-25T15:00:00Z" } } },
++  lapsed: { now: new Date("2026-11-02T14:00:00Z"), c: { session_dates: ["2026-10-19"] } },
++};
++const dueKinds = (pref: Pref, marketing = false) =>
++  KINDS.filter((k) => planKind(k, SCEN[k].now, [cand({ ...SCEN[k].c, pref, marketing_opt_out: marketing })], canaryAll).due.length === 1);
++
++/** Runs the real token path; apply mirrors unsubscribe/source/index.ts (all: marketing_opt_out + three toggles; else SCOPE_COLUMN[SCOPE_SETTING]). */
++async function unsubscribe(token: string, state: { pref: Pref; marketing: boolean }) {
++  return await handleTokenRequest(new Request(`https://x.test/unsubscribe?t=${encodeURIComponent(token)}`, { method: "POST", body: ONE_CLICK_BODY }), {
++    secret: SECRET,
++    apply: (_u, scope) => {
++      if (scope === "all") { state.marketing = true; state.pref = { ...state.pref, retest_reminders: false, email_reminders: false, weekly_digest: false }; }
++      else state.pref = { ...state.pref, [SCOPE_COLUMN[SCOPE_SETTING[scope]]]: false };
++      return Promise.resolve(1);
++    },
++    log: () => Promise.resolve(),
++  });
++}
++function deps(env: Record<string, string>, cands: Candidate[], now: Date) {
++  const log = { sends: [] as { headers: Record<string, string>; html: string; text: string }[] };
++  const d: Deps = {
++    env: (k) => env[k], cronOk: () => Promise.resolve(true), now: () => now, load: () => Promise.resolve(cands),
++    claim: () => Promise.resolve(true), release: () => Promise.resolve(), send: (p) => { log.sends.push(p as never); return Promise.resolve(true); },
++  };
++  return { d, log };
++}
++const ON = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET };
++const tokenOf = (h: string) => decodeURIComponent(/\?t=([^&>]+)/.exec(h)![1]);
++
++Deno.test("P1 scopes: every send kind has a scope (a P1 send can no longer fail closed for lack of one)", () => {
++  for (const k of KINDS) assert(SCOPES.includes(k as UnsubScope), k);
++  assertEquals([...KINDS], ["retest", "protocol", "digest", "lapsed", "check7", "check14"]);
++});
++Deno.test("fixtures: each kind is due on its own scenario with a fully opted-in user", () => {
++  assertEquals(dueKinds(basePref()), [...KINDS]);
++});
++
++const EXPECT: Record<UnsubScope, Kind[]> = {
++  // new P1 scopes: the toggle the email names ("Turn off check reminders" / "Turn off plan day reminders")
++  check7: ["protocol", "digest", "lapsed"],
++  check14: ["protocol", "digest", "lapsed"],
++  lapsed: ["retest", "digest", "check7", "check14"],
++  // the four existing scopes (regression: same writes as unsubscribe v12)
++  retest: ["protocol", "digest", "lapsed"],
++  protocol: ["retest", "digest", "check7", "check14"],
++  digest: ["retest", "protocol", "lapsed", "check7", "check14"],
++  all: [],
++};
++
++for (const kind of ["check7", "check14", "lapsed"] as const) {
++  Deno.test(`P1 scope ${kind}: the email sends with a signed ${kind} token; unsubscribing stops it (and only its toggle's emails)`, async () => {
++    const { d, log } = deps(ON, [cand(SCEN[kind].c)], SCEN[kind].now);
++    const body = await (await handle(new Request(`https://x.test/lifecycle-emails?kind=${kind}`, { method: "POST" }), d)).json();
++    assertEquals(body.results[kind], { sent: 1, already: 0, failed: 0 }, "was failed:1 before (no scope, fail closed)");
++    const t = tokenOf(log.sends[0].headers["List-Unsubscribe"]);
++    assertEquals(await verifyUnsubToken(SECRET, t), { userId: U1, scope: kind });
++    const footerKind = tokenOf(/href="(https:\/\/romrxbjj\.com\/unsubscribe\?t=[^"]+)"/.exec(log.sends[0].html)![1]);
++    assertEquals((await verifyUnsubToken(SECRET, footerKind))?.scope, kind, "visible footer link carries the same scope");
++    const state = { pref: basePref(), marketing: false };
++    assertEquals(await unsubscribe(t, state), { status: 200, body: { ok: true } });
++    const left = dueKinds(state.pref, state.marketing);
++    assert(!left.includes(kind), `${kind} suppressed`);
++    assertEquals(left, EXPECT[kind]);
++    // and the real sender agrees: nothing goes out for this kind after the opt-out
++    const after = deps(ON, [cand({ ...SCEN[kind].c, pref: state.pref })], SCEN[kind].now);
++    const b2 = await (await handle(new Request(`https://x.test/lifecycle-emails?kind=${kind}`, { method: "POST" }), after.d)).json();
++    assertEquals([b2.results[kind].sent, after.log.sends.length], [0, 0]);
++  });
++}
++Deno.test("regression: the four existing scopes switch off exactly what they did in v12", async () => {
++  for (const scope of ["retest", "protocol", "digest", "all"] as const) {
++    const state = { pref: basePref(), marketing: false };
++    assertEquals(await unsubscribe((await signUnsubToken(SECRET, U1, scope))!, state), { status: 200, body: { ok: true } });
++    assertEquals(dueKinds(state.pref, state.marketing), EXPECT[scope], scope);
++  }
++});
++Deno.test("'all' blocks check7, check14, lapsed and every other P1 kind (also each half alone: marketing_opt_out, toggles off)", async () => {
++  for (const scope of ["check7", "check14", "lapsed", "retest", "protocol", "digest"] as const) {
++    const state = { pref: basePref(), marketing: false };
++    await unsubscribe((await signUnsubToken(SECRET, U1, scope))!, state);
++    await unsubscribe((await signUnsubToken(SECRET, U1, "all"))!, state);
++    assertEquals(dueKinds(state.pref, state.marketing), [], `after ${scope} then all`);
++  }
++  assertEquals(dueKinds(basePref(), true), [], "marketing_opt_out alone");
++  assertEquals(dueKinds({ ...basePref(), retest_reminders: false, email_reminders: false, weekly_digest: false }, false), [], "three toggles off alone");
++  // live sender: an 'all' opt-out user gets nothing in any kind
++  for (const k of KINDS) {
++    const { d, log } = deps(ON, [cand({ ...SCEN[k].c, marketing_opt_out: true, pref: { ...basePref(), retest_reminders: false, email_reminders: false, weekly_digest: false } })], SCEN[k].now);
++    const b = await (await handle(new Request(`https://x.test/lifecycle-emails?kind=${k}`, { method: "POST" }), d)).json();
++    assertEquals([b.results[k].sent, log.sends.length], [0, 0], k);
++  }
++});
++Deno.test("tampered or unknown scope is still rejected; nothing is switched off", async () => {
++  const t = (await signUnsubToken(SECRET, U1, "check7"))!;
++  const [, sig] = t.split(".");
++  const forged = btoa(JSON.stringify({ u: U1, s: "all" })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") + "." + sig;
++  for (const bad of [forged, `${t}x`, "junk"]) {
++    const state = { pref: basePref(), marketing: false };
++    assertEquals(await unsubscribe(bad, state), { status: 400, body: { ok: false, error: "invalid_token" } });
++    assertEquals(dueKinds(state.pref, state.marketing), [...KINDS]);
++  }
++  assertEquals(await signUnsubToken(SECRET, U1, "check21" as UnsubScope), null);
++});
++Deno.test("no signing secret: P1 kinds still fail closed (no email without opt-out links)", async () => {
++  for (const kind of ["check7", "check14", "lapsed"] as const) {
++    const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all" }, [cand(SCEN[kind].c)], SCEN[kind].now);
++    const b = await (await handle(new Request(`https://x.test/lifecycle-emails?kind=${kind}`, { method: "POST" }), d)).json();
++    assertEquals([b.results[kind].failed, log.sends.length], [1, 0], kind);
++  }
++});
+diff --git a/supabase/functions/unsubscribe/_shared/events.ts b/supabase/functions/unsubscribe/_shared/events.ts
+new file mode 100644
+index 0000000..05fe39f
+--- /dev/null
++++ b/supabase/functions/unsubscribe/_shared/events.ts
+@@ -0,0 +1,34 @@
++// _shared/events.ts - server-side product event logging (ROMRx Base audit 2026-09-15)
++// Writes to public.product_events with the service role. Never throws.
++import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
++
++let _admin: SupabaseClient | null = null;
++function admin(): SupabaseClient | null {
++  if (_admin) return _admin;
++  const url = Deno.env.get("SUPABASE_URL");
++  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
++  if (!url || !key) return null;
++  _admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
++  return _admin;
++}
++
++export async function logEvent(
++  event: string,
++  opts: { userId?: string | null; props?: Record<string, unknown>; sport?: string | null; source?: string; path?: string | null } = {},
++): Promise<void> {
++  try {
++    const a = admin();
++    if (!a) return;
++    const { error } = await a.from("product_events").insert({
++      user_id: opts.userId ?? null,
++      event: event.slice(0, 64),
++      props: opts.props ?? {},
++      sport: opts.sport ?? null,
++      source: opts.source ?? "edge",
++      path: opts.path ?? null,
++    });
++    if (error) console.error(`[events] ${event} failed:`, error.message);
++  } catch (e) {
++    console.error(`[events] ${event} threw:`, String(e));
++  }
++}
+diff --git a/supabase/functions/unsubscribe/_shared/rate_limit.ts b/supabase/functions/unsubscribe/_shared/rate_limit.ts
+new file mode 100644
+index 0000000..f57a3bd
+--- /dev/null
++++ b/supabase/functions/unsubscribe/_shared/rate_limit.ts
+@@ -0,0 +1,86 @@
++import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
++export type RateLimitConfig = { limit: number; windowMs: number };
++export type RateLimitResult = { allowed: boolean; limit: number; remaining: number; resetAt: number; key: string };
++export const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
++  "ai-chat": { limit: 60, windowMs: 3600000 },
++  "ai-chat-monthly": { limit: 1000, windowMs: 2592000000 },
++  "submit-assessment": { limit: 20, windowMs: 3600000 },
++  "submit-lead-assessment": { limit: 10, windowMs: 3600000 },
++  "create-checkout-session": { limit: 15, windowMs: 3600000 },
++  "notify-coach-signup": { limit: 10, windowMs: 3600000 },
++  "set-password": { limit: 10, windowMs: 3600000 },
++  default: { limit: 30, windowMs: 3600000 },
++};
++let _admin: SupabaseClient | null = null;
++function serviceClient(): SupabaseClient | null {
++  if (_admin) return _admin;
++  const url = Deno.env.get("SUPABASE_URL");
++  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
++  if (!url || !key) { console.error("[rate_limit] missing env"); return null; }
++  _admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
++  return _admin;
++}
++export function clientIp(req: Request): string {
++  const xf = req.headers.get("x-forwarded-for");
++  if (xf) return xf.split(",")[0]!.trim() || "unknown";
++  return req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip") ?? "unknown";
++}
++export function rateLimitKey(edgeName: string, identity: { userId?: string | null; ip?: string | null }): string {
++  return `${edgeName}:${identity.userId?.trim() || identity.ip?.trim() || "anon"}`;
++}
++export async function checkRateLimit(key: string, config: RateLimitConfig): Promise<RateLimitResult> {
++  if ((Deno.env.get("RATE_LIMIT_DISABLED") ?? "").toLowerCase() === "true") {
++    return { allowed: true, limit: config.limit, remaining: config.limit, resetAt: Date.now() + config.windowMs, key };
++  }
++  const admin = serviceClient();
++  if (!admin) {
++    console.error("[rate_limit] fail-open: no service client", { key });
++    return { allowed: true, limit: config.limit, remaining: config.limit, resetAt: Date.now() + config.windowMs, key };
++  }
++  try {
++    const { data, error } = await admin.rpc("rate_limit_hit", { p_key: key, p_limit: config.limit, p_window_ms: config.windowMs });
++    if (error) {
++      console.error("[rate_limit] RPC error — fail-open", { key, error });
++      return { allowed: true, limit: config.limit, remaining: config.limit, resetAt: Date.now() + config.windowMs, key };
++    }
++    const row = data as { allowed?: boolean; limit?: number; remaining?: number; reset_at?: number } | null;
++    if (!row || typeof row.allowed !== "boolean") {
++      console.error("[rate_limit] unexpected RPC payload — fail-open", { key, data });
++      return { allowed: true, limit: config.limit, remaining: config.limit, resetAt: Date.now() + config.windowMs, key };
++    }
++    return {
++      allowed: row.allowed,
++      limit: typeof row.limit === "number" ? row.limit : config.limit,
++      remaining: typeof row.remaining === "number" ? row.remaining : 0,
++      resetAt: typeof row.reset_at === "number" ? row.reset_at : Date.now() + config.windowMs,
++      key,
++    };
++  } catch (err) {
++    console.error("[rate_limit] exception — fail-open", { key, err });
++    return { allowed: true, limit: config.limit, remaining: config.limit, resetAt: Date.now() + config.windowMs, key };
++  }
++}
++export function rateLimitHeaders(result: RateLimitResult): Record<string, string> {
++  const retryAfterSec = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000));
++  return {
++    "X-RateLimit-Limit": String(result.limit),
++    "X-RateLimit-Remaining": String(result.remaining),
++    "X-RateLimit-Reset": String(Math.ceil(result.resetAt / 1000)),
++    ...(result.allowed ? {} : { "Retry-After": String(retryAfterSec) }),
++  };
++}
++export function tooManyRequests(result: RateLimitResult, extraHeaders: Record<string, string> = {}): Response {
++  return new Response(JSON.stringify({
++    error: "rate_limit_exceeded",
++    message: "Too many requests. Please try again later.",
++    limit: result.limit,
++    reset_at: new Date(result.resetAt).toISOString(),
++  }), { status: 429, headers: { "Content-Type": "application/json", ...rateLimitHeaders(result), ...extraHeaders } });
++}
++export async function enforceRateLimit(req: Request, edgeName: string, opts: { userId?: string | null; config?: RateLimitConfig; corsHeaders?: Record<string, string> } = {}): Promise<Response | null> {
++  const config = opts.config ?? DEFAULT_LIMITS[edgeName] ?? DEFAULT_LIMITS.default!;
++  const key = rateLimitKey(edgeName, { userId: opts.userId, ip: clientIp(req) });
++  const result = await checkRateLimit(key, config);
++  if (result.allowed) return null;
++  return tooManyRequests(result, opts.corsHeaders ?? {});
++}
+diff --git a/supabase/functions/unsubscribe/_shared/unsub_token.ts b/supabase/functions/unsubscribe/_shared/unsub_token.ts
+new file mode 100644
+index 0000000..1c9d11f
+--- /dev/null
++++ b/supabase/functions/unsubscribe/_shared/unsub_token.ts
+@@ -0,0 +1,58 @@
++// unsub_token.ts (FG-09/10/11, staged 2026-11-02). Scoped, signed opt-out token for lifecycle emails.
++// A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
++// switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
++// Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
++export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "check7" | "check14" | "lapsed";
++export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "check7", "check14", "lapsed"];
++/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
++export type SettingScope = "retest" | "protocol" | "digest";
++/** Which settings toggle each scope switches off. P1 scopes (L1031) follow the toggle their email already names, with no new words:
++ *  check7 and check14 say "Turn off check reminders" (Settings "Check reminders" = retest_reminders, which also gates the retest email);
++ *  lapsed says "Turn off plan day reminders" (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). */
++export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
++  retest: "retest", protocol: "protocol", digest: "digest", check7: "retest", check14: "retest", lapsed: "protocol",
++};
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++
++const enc = new TextEncoder();
++function b64u(bytes: Uint8Array): string {
++  let s = "";
++  for (const b of bytes) s += String.fromCharCode(b);
++  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
++}
++function b64uDecode(s: string): Uint8Array | null {
++  try {
++    const p = s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4);
++    const bin = atob(p);
++    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
++  } catch { return null; }
++}
++async function key(secret: string): Promise<CryptoKey> {
++  return await crypto.subtle.importKey("raw", enc.encode(secret) as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
++}
++export function secretOk(secret: string | null | undefined): secret is string {
++  return typeof secret === "string" && secret.length >= 32;
++}
++export async function signUnsubToken(secret: string | null | undefined, userId: string, scope: UnsubScope): Promise<string | null> {
++  if (!secretOk(secret) || !UUID_RE.test(userId) || !SCOPES.includes(scope)) return null;
++  const payload = b64u(enc.encode(JSON.stringify({ u: userId.toLowerCase(), s: scope })));
++  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", await key(secret), enc.encode(payload) as BufferSource));
++  return `${payload}.${b64u(sig)}`;
++}
++export async function verifyUnsubToken(secret: string | null | undefined, token: string | null | undefined): Promise<{ userId: string; scope: UnsubScope } | null> {
++  if (!secretOk(secret) || typeof token !== "string" || token.length > 512) return null;
++  const parts = token.split(".");
++  if (parts.length !== 2) return null;
++  const sig = b64uDecode(parts[1]);
++  if (!sig) return null;
++  // crypto.subtle.verify compares in constant time.
++  const ok = await crypto.subtle.verify("HMAC", await key(secret), sig as BufferSource, enc.encode(parts[0]) as BufferSource);
++  if (!ok) return null;
++  const raw = b64uDecode(parts[0]);
++  if (!raw) return null;
++  try {
++    const p = JSON.parse(new TextDecoder().decode(raw));
++    if (typeof p?.u !== "string" || !UUID_RE.test(p.u) || !SCOPES.includes(p?.s)) return null;
++    return { userId: p.u.toLowerCase(), scope: p.s as UnsubScope };
++  } catch { return null; }
++}
+diff --git a/supabase/functions/unsubscribe/source/index.ts b/supabase/functions/unsubscribe/source/index.ts
+new file mode 100644
+index 0000000..15fe7ce
+--- /dev/null
++++ b/supabase/functions/unsubscribe/source/index.ts
+@@ -0,0 +1,81 @@
++// unsubscribe v9 (2026-11-02, FG-09/10/11): adds the scoped signed-token path (?t=...) for lifecycle emails on top of v8.
++// P1 scopes (2026-11-15, L1031, BUILD ONLY): check7, check14 and lapsed tokens verify and switch off the toggle their email names (SCOPE_SETTING).
++// The v8 email path below is UNCHANGED (kept verbatim from live v8, see v8_index_reference.ts.txt).
++// Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (>= 32 chars). With no secret, tokens never verify (fail closed).
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { enforceRateLimit } from "../_shared/rate_limit.ts";
++import { logEvent } from "../_shared/events.ts";
++import { handleTokenRequest, needsRateLimit, SCOPE_COLUMN } from "./token_path.ts";
++import { SCOPE_SETTING } from "../_shared/unsub_token.ts";
++
++const CORS = {
++  "Access-Control-Allow-Origin": "*",
++  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
++  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
++};
++const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
++function json(status: number, body: unknown) {
++  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS } });
++}
++const admin = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
++
++Deno.serve(async (req: Request) => {
++  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
++  if (req.method !== "POST" && req.method !== "GET") return json(405, { error: "Method not allowed" });
++
++  // A valid signed one-click POST (and any GET with a token, which only redirects) is never rate limited: a genuine opt-out must not be refused,
++  // even from a shared mail-provider IP. Everything else (v8 email path, bad or missing tokens) keeps the 20 per hour per IP limit.
++  if (await needsRateLimit(req.clone(), Deno.env.get("UNSUBSCRIBE_HMAC_SECRET"))) {
++    const limited = await enforceRateLimit(req, "unsubscribe", { corsHeaders: CORS, config: { limit: 20, windowMs: 3600000 } });
++    if (limited) return limited;
++  }
++
++  // v9: token path. POST one-click applies; GET only redirects to the brand confirm page (applies nothing).
++  const tok = await handleTokenRequest(req, {
++    secret: Deno.env.get("UNSUBSCRIBE_HMAC_SECRET"),
++    apply: async (userId, scope) => {
++      const a = admin();
++      let n = 0;
++      if (scope === "all") {
++        const u = await a.from("users").update({ marketing_opt_out: true }).eq("id", userId).select("id");
++        if (u.error) throw new Error("users update failed");
++        n += u.data?.length ?? 0;
++        const p = await a.from("notification_preferences")
++          .update({ retest_reminders: false, email_reminders: false, weekly_digest: false }).eq("user_id", userId).select("id");
++        if (p.error) throw new Error("preferences update failed");
++        n += p.data?.length ?? 0;
++      } else {
++        const p = await a.from("notification_preferences").update({ [SCOPE_COLUMN[SCOPE_SETTING[scope]]]: false }).eq("user_id", userId).select("id");
++        if (p.error) throw new Error("preferences update failed");
++        n += p.data?.length ?? 0;
++      }
++      return n;
++    },
++    log: (userId, scope) => logEvent("unsubscribed", { userId, props: { via: "email_token", scope } }),
++  });
++  if (tok) {
++    if (tok.redirect) return new Response(null, { status: tok.status, headers: { Location: tok.redirect, "Cache-Control": "no-store", ...CORS } });
++    return json(tok.status, tok.body ?? {});
++  }
++
++  // v8 email path (unchanged)
++  let email = "";
++  if (req.method === "GET") {
++    email = new URL(req.url).searchParams.get("email") ?? "";
++  } else {
++    try { const b = await req.json(); email = String(b?.email ?? ""); } catch { return json(400, { error: "Invalid JSON" }); }
++  }
++  email = email.toLowerCase().trim();
++  if (!EMAIL_RE.test(email) || email.length > 254) return json(400, { error: "Valid email required" });
++
++  const a = admin();
++  const { data, error } = await a.from("users").update({ marketing_opt_out: true }).ilike("email", email).select("id");
++  if (error) console.error("unsubscribe update failed:", error.message);
++  const matched = data?.length ?? 0;
++  if (matched > 0) {
++    await logEvent("unsubscribed", { userId: data![0].id as string, props: { via: "email_link" } });
++  }
++  console.log(`unsubscribe: ${matched} row(s) updated`);
++  return json(200, { ok: true });
++});
+diff --git a/supabase/functions/unsubscribe/source/token_path.ts b/supabase/functions/unsubscribe/source/token_path.ts
+new file mode 100644
+index 0000000..2dcc6f4
+--- /dev/null
++++ b/supabase/functions/unsubscribe/source/token_path.ts
+@@ -0,0 +1,75 @@
++// unsubscribe v9 token path (FG-09/10/11). Staged 2026-11-02, NOT deployed.
++// A signed scoped token (HMAC-SHA256, see _shared/unsub_token.ts) switches off exactly one lifecycle email kind, or all of them.
++// POST responses: 200 {ok:true} only for a valid signed token whose opt-out applied; 400 {ok:false,error:"invalid_token"} for a bad, forged, expired or unknown token;
++// 503 {ok:false,error:"unavailable"} when the write failed or the signing secret is missing. GET only redirects and never reveals token validity.
++import { type SettingScope, type UnsubScope, verifyUnsubToken } from "../_shared/unsub_token.ts";
++
++export interface TokenDeps {
++  secret: string | undefined;
++  /** Applies the opt-out. Returns the number of rows touched (for the server log only). */
++  apply: (userId: string, scope: UnsubScope) => Promise<number>;
++  log: (userId: string, scope: UnsubScope) => Promise<void>;
++}
++/** Column switched off per scope. "all" also sets users.marketing_opt_out and push_reminders (handled by the caller's apply). */
++/** P1 (v13, L1031): check7/check14/lapsed reach these same three columns through SCOPE_SETTING in _shared/unsub_token.ts. */
++export const SCOPE_COLUMN: Record<SettingScope, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
++  retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
++};
++
++/** Where the confirm page for each brand lives: the site's existing React route (Jules: /app/unsubscribe on Base, /unsubscribe on BJJ and BB; there is NO static
++ * unsubscribe-confirm.html, the SPA fallback would serve the app shell for it). With ?t=<token> that route shows a button and sends the one-click POST ONLY on click.
++ * The function only ever redirects to one of these fixed addresses. A `b` query value outside this map falls back to "base". */
++export const CONFIRM_PAGES: Record<string, string> = {
++  bjj: "https://romrxbjj.com/unsubscribe",
++  bodybuilding: "https://romrxbodybuilding.com/unsubscribe",
++  base: "https://romrx.io/app/unsubscribe",
++};
++export const ONE_CLICK_BODY = "List-Unsubscribe=One-Click";
++export type TokenResult = { status: number; body?: Record<string, unknown>; redirect?: string };
++
++/** Returns null when the request carries no token (caller falls through to the v8 email path).
++ * RFC 8058: ONLY a POST whose body is `List-Unsubscribe=One-Click` applies anything.
++ * GET (footer link, mail scanner prefetch, browser) applies NOTHING: it redirects to the confirm page, whose button sends the POST.
++ * A GET gives the same redirect for a good, bad or missing-secret token, so it never reveals whether a token or account is valid. */
++export async function handleTokenRequest(req: Request, d: TokenDeps): Promise<TokenResult | null> {
++  const url = new URL(req.url);
++  const t = url.searchParams.get("t");
++  if (t === null) return null;
++  if (req.method === "GET") {
++    const b = url.searchParams.get("b") ?? "";
++    const page = Object.prototype.hasOwnProperty.call(CONFIRM_PAGES, b) ? CONFIRM_PAGES[b] : CONFIRM_PAGES.base;
++    return { status: 302, redirect: `${page}?t=${encodeURIComponent(t.slice(0, 512))}` };
++  }
++  if (req.method !== "POST") return { status: 405, body: { error: "Method not allowed" } };
++  let raw = "";
++  try { raw = (await req.text()).slice(0, 256); } catch { raw = ""; }
++  if (!new URLSearchParams(raw).has("List-Unsubscribe") || new URLSearchParams(raw).get("List-Unsubscribe") !== "One-Click") {
++    return { status: 400, body: { error: "One-click body required" } };
++  }
++  // Grant 7:20 PM: a bad token is NOT a success. Tokens are HMAC signed, so telling a forged, expired, malformed or unknown token apart reveals nothing about any account.
++  if (!d.secret) return { status: 503, body: { ok: false, error: "unavailable" } };
++  const v = await verifyUnsubToken(d.secret, t);
++  if (!v) return { status: 400, body: { ok: false, error: "invalid_token" } };
++  // A genuine token whose write failed must not show success either: the person can retry. (Zero rows touched is still ok: nothing to switch off, and we do not reveal account state.)
++  try { await d.apply(v.userId, v.scope); } catch (_e) { return { status: 503, body: { ok: false, error: "unavailable" } }; }
++  try { await d.log(v.userId, v.scope); } catch (_e) { /* the log is for the server only; the opt-out already applied */ }
++  return { status: 200, body: { ok: true } };
++}
++
++/** Stacy 6:44 PM: a genuine opt-out must never be refused. Returns false (no rate limit) for:
++ *  - a request with a token that is a GET (it only redirects, applies nothing), and
++ *  - a POST with the one-click body and a token that VERIFIES (a real signed link we sent).
++ * Everything else (the v8 email path, a missing or bad token, a wrong body, other methods) stays under the per-IP limit.
++ * Pass req.clone() so the body is still readable afterwards. Never throws. */
++export async function needsRateLimit(req: Request, secret: string | undefined): Promise<boolean> {
++  try {
++    const url = new URL(req.url);
++    const t = url.searchParams.get("t");
++    if (t === null) return true;
++    if (req.method === "GET") return false;
++    if (req.method !== "POST") return true;
++    const raw = (await req.text()).slice(0, 256);
++    if (new URLSearchParams(raw).get("List-Unsubscribe") !== "One-Click") return true;
++    return !(await verifyUnsubToken(secret, t));
++  } catch { return true; }
++}
+diff --git a/supabase/functions/unsubscribe/test/p1-scopes.test.ts b/supabase/functions/unsubscribe/test/p1-scopes.test.ts
+new file mode 100644
+index 0000000..a229b5a
+--- /dev/null
++++ b/supabase/functions/unsubscribe/test/p1-scopes.test.ts
+@@ -0,0 +1,94 @@
++// P1 unsubscribe scopes (L1031, 2026-11-15, BUILD ONLY): check7, check14 and lapsed tokens on the v12 token path.
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { SCOPE_SETTING, SCOPES, signUnsubToken, type UnsubScope, verifyUnsubToken } from "../_shared/unsub_token.ts";
++import { CONFIRM_PAGES, handleTokenRequest, needsRateLimit, ONE_CLICK_BODY, SCOPE_COLUMN } from "../source/token_path.ts";
++
++const U = "11111111-1111-4111-8111-111111111111";
++const SECRET = "k".repeat(40);
++const NEW = ["check7", "check14", "lapsed"] as const;
++const OLD = ["retest", "protocol", "digest", "all"] as const;
++function run(method: string, q: string, secret: string | undefined, body: string | undefined = method === "POST" ? ONE_CLICK_BODY : undefined) {
++  const calls: string[] = [];
++  const p = handleTokenRequest(new Request(`https://x.test/unsubscribe${q}`, { method, body }), {
++    secret, apply: (u, s) => { calls.push(`apply:${u}:${s}`); return Promise.resolve(1); }, log: (u, s) => { calls.push(`log:${u}:${s}`); return Promise.resolve(); },
++  });
++  return { p, calls };
++}
++const enc = new TextEncoder();
++const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
++/** Signs ANY payload with the real secret, so a bad scope is rejected by the scope check, not by the signature. */
++async function signRaw(payloadObj: unknown): Promise<string> {
++  const payload = b64u(enc.encode(JSON.stringify(payloadObj)));
++  const k = await crypto.subtle.importKey("raw", enc.encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
++  return `${payload}.${b64u(new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(payload))))}`;
++}
++
++Deno.test("P1 scopes: each new scope signs, verifies, and a one-click POST applies exactly that scope", async () => {
++  for (const scope of NEW) {
++    const t = (await signUnsubToken(SECRET, U, scope))!;
++    assert(t, scope);
++    assertEquals(await verifyUnsubToken(SECRET, t), { userId: U, scope });
++    const r = run("POST", `?t=${t}`, SECRET);
++    assertEquals(await r.p, { status: 200, body: { ok: true } }, scope);
++    assertEquals(r.calls, [`apply:${U}:${scope}`, `log:${U}:${scope}`]);
++  }
++});
++Deno.test("P1 scopes: GET with a new-scope token only redirects to the brand confirm page and applies nothing", async () => {
++  for (const scope of NEW) {
++    const t = (await signUnsubToken(SECRET, U, scope))!;
++    for (const [b, page] of Object.entries(CONFIRM_PAGES)) {
++      const r = run("GET", `?t=${t}&b=${b}`, SECRET);
++      assertEquals(await r.p, { status: 302, redirect: `${page}?t=${encodeURIComponent(t)}` });
++      assertEquals(r.calls.length, 0);
++    }
++  }
++});
++Deno.test("P1 scopes: a genuine new-scope one-click is never rate limited", async () => {
++  for (const scope of NEW) {
++    const t = (await signUnsubToken(SECRET, U, scope))!;
++    assertEquals(await needsRateLimit(new Request(`https://x.test/unsubscribe?t=${t}`, { method: "POST", body: ONE_CLICK_BODY }), SECRET), false, scope);
++  }
++});
++Deno.test("P1 scopes: each scope switches off the column of the toggle its email names; the four old scopes are unchanged", () => {
++  assertEquals(SCOPE_COLUMN, { retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest" });
++  const col = (s: Exclude<UnsubScope, "all">) => SCOPE_COLUMN[SCOPE_SETTING[s]];
++  assertEquals(Object.fromEntries((["retest", "protocol", "digest", ...NEW] as const).map((s) => [s, col(s)])), {
++    retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
++    check7: "retest_reminders", check14: "retest_reminders", lapsed: "email_reminders",
++  });
++  assertEquals([...SCOPES], ["retest", "protocol", "digest", "all", "check7", "check14", "lapsed"]);
++});
++Deno.test("P1 scopes: tampered, unknown or re-scoped tokens are still rejected (400 invalid_token, nothing applied)", async () => {
++  const good = (await signUnsubToken(SECRET, U, "check7"))!;
++  const [payload, sig] = good.split(".");
++  const swapped = b64u(enc.encode(JSON.stringify({ u: U, s: "all" }))) + "." + sig; // scope swapped, old signature
++  const bad: string[] = [
++    `${good}x`, `${payload}.${sig.slice(0, -2)}AA`, swapped,
++    await signRaw({ u: U, s: "check21" }), await signRaw({ u: U, s: "CHECK7" }), await signRaw({ u: U, s: "check7 " }),
++    await signRaw({ u: U, s: "__proto__" }), await signRaw({ u: U, s: ["check7"] }), await signRaw({ u: U }), await signRaw({ u: "nope", s: "lapsed" }),
++  ];
++  for (const t of bad) {
++    assertEquals(await verifyUnsubToken(SECRET, t), null, t);
++    const r = run("POST", `?t=${encodeURIComponent(t)}`, SECRET);
++    assertEquals(await r.p, { status: 400, body: { ok: false, error: "invalid_token" } }, t);
++    assertEquals(r.calls.length, 0);
++  }
++  for (const s of ["check21", "weekly", "", "ALL"]) assertEquals(await signUnsubToken(SECRET, U, s as UnsubScope), null, s);
++  assertEquals(await verifyUnsubToken("z".repeat(40), good), null, "wrong secret");
++  assertEquals(await signUnsubToken(undefined, U, "lapsed"), null, "no secret: fail closed");
++});
++Deno.test("P1 scopes: old-scope tokens keep the exact v12 payload format and still verify", async () => {
++  for (const scope of OLD) {
++    const t = (await signUnsubToken(SECRET, U, scope))!;
++    assertEquals(t, await signRaw({ u: U, s: scope }), scope);
++    assertEquals(await verifyUnsubToken(SECRET, t), { userId: U, scope });
++  }
++});
++Deno.test("P1 scopes: index.ts keeps the v12 'all' write and routes every other scope through SCOPE_SETTING", async () => {
++  const src = await Deno.readTextFile(new URL("../source/index.ts", import.meta.url));
++  assert(src.includes(`if (scope === "all") {
++        const u = await a.from("users").update({ marketing_opt_out: true }).eq("id", userId).select("id");`));
++  assert(src.includes(`.update({ retest_reminders: false, email_reminders: false, weekly_digest: false }).eq("user_id", userId).select("id");`));
++  assert(src.includes(`.update({ [SCOPE_COLUMN[SCOPE_SETTING[scope]]]: false }).eq("user_id", userId).select("id");`));
++  assertEquals(src.split(".update(").length - 1, 4, "same four writes as v12 (users all, prefs all, prefs scoped, v8 email path)");
++});
+diff --git a/supabase/functions/unsubscribe/test/token_path.test.ts b/supabase/functions/unsubscribe/test/token_path.test.ts
+new file mode 100644
+index 0000000..101a489
+--- /dev/null
++++ b/supabase/functions/unsubscribe/test/token_path.test.ts
+@@ -0,0 +1,145 @@
++import { assert, assertEquals } from "jsr:@std/assert@1";
++import { signUnsubToken } from "../_shared/unsub_token.ts";
++import { CONFIRM_PAGES, handleTokenRequest, needsRateLimit, ONE_CLICK_BODY, SCOPE_COLUMN } from "../source/token_path.ts";
++
++const U = "11111111-1111-4111-8111-111111111111";
++const SECRET = "k".repeat(40);
++function run(method: string, q: string, secret: string | undefined, body: string | null | undefined = method === "POST" ? ONE_CLICK_BODY : undefined) {
++  const calls: string[] = [];
++  const p = handleTokenRequest(new Request(`https://x.test/unsubscribe${q}`, { method, body: body ?? undefined }), {
++    secret, apply: (u, s) => { calls.push(`apply:${u}:${s}`); return Promise.resolve(1); }, log: (u, s) => { calls.push(`log:${u}:${s}`); return Promise.resolve(); },
++  });
++  return { p, calls };
++}
++Deno.test("no t param falls through to the v8 email path", async () => {
++  const r = run("GET", "?email=a@b.co", SECRET);
++  assertEquals(await r.p, null);
++  assertEquals(r.calls.length, 0);
++});
++Deno.test("valid token: ONE-CLICK POST applies exactly its own scope", async () => {
++  for (const scope of ["retest", "protocol", "digest", "all"] as const) {
++    const t = await signUnsubToken(SECRET, U, scope);
++    const r = run("POST", `?t=${t}`, SECRET);
++    assertEquals(await r.p, { status: 200, body: { ok: true } });
++    assertEquals(r.calls, [`apply:${U}:${scope}`, `log:${U}:${scope}`]);
++  }
++});
++Deno.test("GET applies NOTHING for a valid token: redirect to the confirm page only", async () => {
++  for (const scope of ["retest", "protocol", "digest", "all"] as const) {
++    const t = (await signUnsubToken(SECRET, U, scope))!;
++    const r = run("GET", `?t=${t}&b=bjj`, SECRET);
++    const res = (await r.p)!;
++    assertEquals(res.status, 302);
++    assertEquals(res.redirect, `${CONFIRM_PAGES.bjj}?t=${encodeURIComponent(t)}`);
++    assertEquals(res.body, undefined);
++    assertEquals(r.calls.length, 0);
++  }
++});
++Deno.test("GET gives the same redirect for bad tokens and no secret (reveals nothing) and applies nothing", async () => {
++  const good = (await signUnsubToken(SECRET, U, "all"))!;
++  for (const [q, secret] of [["?t=junk&b=base", SECRET], [`?t=${good}&b=base`, undefined], [`?t=${good}x&b=base`, SECRET]] as const) {
++    const r = run("GET", q, secret);
++    const res = (await r.p)!;
++    assertEquals(res.status, 302);
++    assertEquals(res.redirect!.startsWith(CONFIRM_PAGES.base + "?t="), true);
++    assertEquals(r.calls.length, 0);
++  }
++});
++Deno.test("GET redirect goes only to the fixed brand pages; unknown or hostile b falls back to base", async () => {
++  const t = (await signUnsubToken(SECRET, U, "digest"))!;
++  for (const b of ["evil", "https://evil.test", "__proto__", "constructor", "", "BJJ"]) {
++    const res = (await run("GET", `?t=${t}&b=${encodeURIComponent(b)}`, SECRET).p)!;
++    assertEquals(res.redirect!.startsWith(CONFIRM_PAGES.base + "?t="), true, b);
++  }
++  for (const [b, page] of Object.entries(CONFIRM_PAGES)) assertEquals(((await run("GET", `?t=${t}&b=${b}`, SECRET).p)!).redirect!.startsWith(page + "?t="), true);
++  for (const page of Object.values(CONFIRM_PAGES)) assertEquals(new URL(page).protocol, "https:");
++});
++Deno.test("POST without the RFC 8058 body applies nothing (400)", async () => {
++  const t = await signUnsubToken(SECRET, U, "all");
++  for (const body of [null, "", "List-Unsubscribe=No", "x=1", "List-Unsubscribe=One-Click-Not"]) {
++    const r = run("POST", `?t=${t}`, SECRET, body);
++    assertEquals((await r.p)!.status, 400);
++    assertEquals(r.calls.length, 0);
++  }
++  // form-encoded with other fields still counts
++  const r = run("POST", `?t=${t}`, SECRET, "a=1&List-Unsubscribe=One-Click");
++  assertEquals((await r.p)!.status, 200);
++  assertEquals(r.calls.length, 2);
++});
++Deno.test("PUT, DELETE and others are 405", async () => {
++  const t = await signUnsubToken(SECRET, U, "all");
++  for (const m of ["PUT", "DELETE", "PATCH"]) { const r = run(m, `?t=${t}`, SECRET, "List-Unsubscribe=One-Click"); assertEquals((await r.p)!.status, 405); assertEquals(r.calls.length, 0); }
++});
++Deno.test("bad, tampered, wrong-secret or unsigned tokens: 400 invalid_token (never ok), nothing applied", async () => {
++  const t = (await signUnsubToken(SECRET, U, "digest"))!;
++  for (const [q, secret] of [["?t=junk", SECRET], [`?t=${t}x`, SECRET], [`?t=${t}`, "z".repeat(40)], [`?t=${t}`, "short"], ["?t=", SECRET]] as const) {
++    const r = run("POST", q, secret);
++    assertEquals(await r.p, { status: 400, body: { ok: false, error: "invalid_token" } }, q);
++    assertEquals(r.calls.length, 0, q);
++  }
++});
++Deno.test("missing signing secret: 503 unavailable, not ok, nothing applied", async () => {
++  const t = (await signUnsubToken(SECRET, U, "digest"))!;
++  const r = run("POST", `?t=${t}`, undefined);
++  assertEquals(await r.p, { status: 503, body: { ok: false, error: "unavailable" } });
++  assertEquals(r.calls.length, 0);
++});
++Deno.test("a valid token whose write fails is 503 unavailable (no false success); a log failure after a good write is still ok", async () => {
++  const t = (await signUnsubToken(SECRET, U, "all"))!;
++  const req = () => new Request(`https://x.test/unsubscribe?t=${t}`, { method: "POST", body: ONE_CLICK_BODY });
++  assertEquals(await handleTokenRequest(req(), { secret: SECRET, apply: () => Promise.reject(new Error("db down")), log: () => Promise.resolve() }), { status: 503, body: { ok: false, error: "unavailable" } });
++  assertEquals(await handleTokenRequest(req(), { secret: SECRET, apply: () => Promise.resolve(1), log: () => Promise.reject(new Error("log down")) }), { status: 200, body: { ok: true } });
++  assertEquals(await handleTokenRequest(req(), { secret: SECRET, apply: () => Promise.resolve(0), log: () => Promise.resolve() }), { status: 200, body: { ok: true } }); // zero rows: nothing to switch off, no account state revealed
++});
++Deno.test("a bad token is still rate limited by IP, a valid one is not", async () => {
++  const t = (await signUnsubToken(SECRET, U, "all"))!;
++  const mk = (tok: string) => new Request(`https://x.test/unsubscribe?t=${tok}`, { method: "POST", body: ONE_CLICK_BODY });
++  assertEquals(await needsRateLimit(mk("junk"), SECRET), true);
++  assertEquals(await needsRateLimit(mk(t), SECRET), false);
++});
++Deno.test("scope to column map never touches another toggle", () => {
++  assertEquals(SCOPE_COLUMN, { retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest" });
++});
++
++const rq = (method: string, q: string, body?: string) => new Request(`https://x.test/unsubscribe${q}`, { method, body });
++Deno.test("rate limit: a genuine one-click opt-out is NEVER refused, however many arrive from one IP", async () => {
++  let limited = 0;
++  for (let i = 0; i < 200; i++) {
++    const scope = (["retest", "protocol", "digest", "all"] as const)[i % 4];
++    const t = await signUnsubToken(SECRET, U, scope);
++    if (await needsRateLimit(rq("POST", `?t=${t}`, ONE_CLICK_BODY).clone(), SECRET)) limited++;
++  }
++  assertEquals(limited, 0);
++});
++Deno.test("rate limit: token GET (redirect only) is exempt; bad tokens, wrong body, v8 email path and odd methods stay limited", async () => {
++  const good = (await signUnsubToken(SECRET, U, "all"))!;
++  assertEquals(await needsRateLimit(rq("GET", `?t=${good}&b=bjj`), SECRET), false);
++  assertEquals(await needsRateLimit(rq("POST", "?t=garbage", ONE_CLICK_BODY), SECRET), true);
++  assertEquals(await needsRateLimit(rq("POST", `?t=${good}x`, ONE_CLICK_BODY), SECRET), true);
++  assertEquals(await needsRateLimit(rq("POST", `?t=${good}`, ONE_CLICK_BODY), "z".repeat(40)), true, "wrong secret");
++  assertEquals(await needsRateLimit(rq("POST", `?t=${good}`, ONE_CLICK_BODY), undefined), true, "no secret");
++  assertEquals(await needsRateLimit(rq("POST", `?t=${good}`, "nope"), SECRET), true, "valid token but not the one-click body is not exempt");
++  assertEquals(await needsRateLimit(rq("POST", "", JSON.stringify({ email: "a@b.co" })), SECRET), true, "v8 email path");
++  assertEquals(await needsRateLimit(rq("GET", "?email=a@b.co"), SECRET), true, "v8 email GET");
++  assertEquals(await needsRateLimit(rq("PUT", `?t=${good}`, ONE_CLICK_BODY), SECRET), true);
++});
++Deno.test("rate limit: the 20/hr limiter in index.ts is only reachable through needsRateLimit, and the body stays readable", async () => {
++  const src = await Deno.readTextFile(new URL("../source/index.ts", import.meta.url));
++  const i = src.indexOf("enforceRateLimit(req"), j = src.indexOf("needsRateLimit(req.clone()");
++  assert(j > 0 && i > j, "limiter must come after the needsRateLimit guard");
++  assertEquals(src.split("enforceRateLimit(req").length - 1, 1);
++  const r = rq("POST", `?t=${(await signUnsubToken(SECRET, U, "digest"))!}`, ONE_CLICK_BODY);
++  await needsRateLimit(r.clone(), SECRET);
++  assertEquals(await r.text(), ONE_CLICK_BODY);
++});
++Deno.test("confirm pages are the sites' real React routes (Jules): Base /app/unsubscribe, BJJ and BB /unsubscribe, never a static .html", () => {
++  assertEquals(CONFIRM_PAGES, { bjj: "https://romrxbjj.com/unsubscribe", bodybuilding: "https://romrxbodybuilding.com/unsubscribe", base: "https://romrx.io/app/unsubscribe" });
++  for (const u of Object.values(CONFIRM_PAGES)) { if (/\.html$/.test(u)) throw new Error("static html confirm page: " + u); }
++});
++Deno.test("GET redirect target for each brand (and an unknown brand falls back to Base)", async () => {
++  const t = (await signUnsubToken(SECRET, U, "all"))!;
++  for (const [b, base] of [["base", "https://romrx.io/app/unsubscribe"], ["bjj", "https://romrxbjj.com/unsubscribe"], ["bodybuilding", "https://romrxbodybuilding.com/unsubscribe"], ["evil", "https://romrx.io/app/unsubscribe"]] as const) {
++    const res = (await run("GET", `?t=${t}&b=${b}`, SECRET).p)!;
++    assertEquals(res.redirect, `${base}?t=${encodeURIComponent(t)}`);
++  }
++});

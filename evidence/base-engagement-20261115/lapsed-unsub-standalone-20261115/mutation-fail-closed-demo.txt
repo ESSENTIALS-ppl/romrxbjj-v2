@@ -1,0 +1,7 @@
+[0m[32mCheck[0m test/_fail_closed_demo.test.ts
+[0m[38;5;245mrunning 2 tests from ./test/_fail_closed_demo.test.ts[0m
+OLD token module: lapsed is not a scope; sign returns null; handler fails closed (failed:1, no send) ... [0m[32mok[0m [0m[38;5;245m(24ms)[0m
+OLD token module: an existing scope still signs and the handler still sends protocol ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+
+[0m[32mok[0m | 2 passed | 0 failed [0m[38;5;245m(32ms)[0m
+

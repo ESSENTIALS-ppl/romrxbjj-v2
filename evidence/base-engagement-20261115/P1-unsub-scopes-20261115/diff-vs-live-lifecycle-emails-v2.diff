@@ -1,0 +1,270 @@
+diff --git a/live/lifecycle-emails/_shared/unsub_token.ts b/branch/lifecycle-emails/_shared/unsub_token.ts
+index f0a0c8e..1c9d11f 100644
+--- a/live/lifecycle-emails/_shared/unsub_token.ts
++++ b/branch/lifecycle-emails/_shared/unsub_token.ts
+@@ -2,8 +2,16 @@
+ // A token names ONE user and ONE scope, signed with HMAC-SHA256. It cannot be used to read anything and cannot
+ // switch off any other setting. Fail closed: with no secret, nothing is signed and nothing verifies.
+ // Secret name (NOT set by this batch): UNSUBSCRIBE_HMAC_SECRET (at least 32 characters).
+-export type UnsubScope = "retest" | "protocol" | "digest" | "all";
+-export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all"];
++export type UnsubScope = "retest" | "protocol" | "digest" | "all" | "check7" | "check14" | "lapsed";
++export const SCOPES: readonly UnsubScope[] = ["retest", "protocol", "digest", "all", "check7", "check14", "lapsed"];
++/** The three settings toggles a scoped link can switch off (unsubscribe SCOPE_COLUMN maps each to its column). */
++export type SettingScope = "retest" | "protocol" | "digest";
++/** Which settings toggle each scope switches off. P1 scopes (L1031) follow the toggle their email already names, with no new words:
++ *  check7 and check14 say "Turn off check reminders" (Settings "Check reminders" = retest_reminders, which also gates the retest email);
++ *  lapsed says "Turn off plan day reminders" (Settings "Plan day reminders" = email_reminders, which also gates the protocol email). */
++export const SCOPE_SETTING: Readonly<Record<Exclude<UnsubScope, "all">, SettingScope>> = {
++  retest: "retest", protocol: "protocol", digest: "digest", check7: "retest", check14: "retest", lapsed: "protocol",
++};
+ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ 
+ const enc = new TextEncoder();
+diff --git a/live/lifecycle-emails/source/email.ts b/branch/lifecycle-emails/source/email.ts
+index 640e623..52bdb71 100644
+--- a/live/lifecycle-emails/source/email.ts
++++ b/branch/lifecycle-emails/source/email.ts
+@@ -55,14 +55,61 @@ export const ALL_OFF_TEXT = "Turn off all ROMRx emails except account and billin
+ 
+ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+ 
++export const QUICK_CHECK_PATH = "/dashboard/quick-check"; // must match Jules P1-06 route
+ 
+ export interface CopySpec {
+   subject: string; preheader: string; lines: string[]; button: string; path: string;
+   why: string; off: string; afterButton?: string[]; sentTo: boolean;
+ }
+ 
+-/** Stacy P1-16 final words, used exactly. Jim wording yes still required before any send. */
++/** Stacy P1-16 final words, used exactly. Jim wording yes still required before any send.
++ *  Stacy P1-08 day 7 / day 14 A+B words, used exactly. */
+ export function copyFor(d: Due, brand?: Brand): CopySpec {
++  if (d.kind === "check7") {
++    const retest = d.retest_date ? `Your full retest is still at 6 weeks, on ${d.retest_date}.` : "Your full retest is still at 6 weeks.";
++    return {
++      subject: "Your ROMRx quick check is ready",
++      preheader: "See your day 1 results next to today's.",
++      lines: [
++        "It has been a week since your ROMRx assessment. Your quick check is ready.",
++        "It re-measures 1 or 2 of your focus areas and shows them next to your day 1 results.",
++        retest,
++      ],
++      button: "Start my quick check", path: QUICK_CHECK_PATH,
++      why: "You're getting this because Check reminders is on in your ROMRx settings.",
++      off: "Turn off check reminders", sentTo: true,
++    };
++  }
++  if (d.kind === "check14" && d.quick_check_done) {
++    const next = d.next_check_date ? `Your next check: ${d.next_check_date}` : null;
++    return {
++      subject: "Two weeks of ROMRx",
++      preheader: "Your next check date is set.",
++      lines: [
++        "You did your quick check. Nice work.",
++        ...(next ? [next] : []),
++        "Until then, your plan is ready each day in the app.",
++      ],
++      button: "Open today's session", path: "/dashboard/my-protocol",
++      why: "You're getting this because Check reminders is on in your ROMRx settings.",
++      off: "Turn off check reminders", sentTo: true,
++    };
++  }
++  if (d.kind === "check14") {
++    const retest = d.retest_date ? `Your full retest is on ${d.retest_date}.` : "Your full retest is still at 6 weeks.";
++    return {
++      subject: "Your quick check is waiting",
++      preheader: "Two weeks in. See where you are now.",
++      lines: [
++        "It has been two weeks since your ROMRx assessment. Your quick check is ready when you are.",
++        "It shows your day 1 results next to today's for 1 or 2 of your focus areas.",
++        retest,
++      ],
++      button: "Start my quick check", path: QUICK_CHECK_PATH,
++      why: "You're getting this because Check reminders is on in your ROMRx settings.",
++      off: "Turn off check reminders", sentTo: true,
++    };
++  }
+   if (d.kind === "lapsed") {
+     const settings = brand ? `${brand.appBase}${brand.settingsPath}` : "/dashboard/settings";
+     return {
+diff --git a/live/lifecycle-emails/source/index.ts b/branch/lifecycle-emails/source/index.ts
+index 41e162c..cf2e196 100644
+--- a/live/lifecycle-emails/source/index.ts
++++ b/branch/lifecycle-emails/source/index.ts
+@@ -1,10 +1,10 @@
+-// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
++// lifecycle-emails (from live v1) + P1-15 digest lines + P1-16 lapsed + P1-08 day 7 / day 14. Base From left as live (Jim Scott <jim@romrxbjj.com>). No P1-02 audience/sender rewrite. BRANCH ONLY: not deployed.
+ // Cron-only (x-cron-secret via public.verify_webhook_secret, fail closed). Dry run unless LIFECYCLE_EMAILS_SEND === "on".
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ import { createClient } from "jsr:@supabase/supabase-js@2";
+ import { handle } from "./handler.ts";
+ import { explicitOn, type Candidate, type Kind } from "./logic.ts";
+-import { appScore, SCORE_COLUMNS } from "./score.ts";
++import { appScore, latestTwoFull } from "./score.ts";
+ import { deletionRequested } from "./deletion.ts";
+ 
+ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+@@ -45,9 +45,8 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
+   for (const p of keep) {
+     const { data: u } = await sb.from("users").select("id, email, full_name, active_sport, marketing_opt_out").eq("id", p.user_id).maybeSingle();
+     if (!u) continue;
+-    // Newest two assessments, ordered like My Body (assessed_at desc). Delta is newest vs the one immediately before it.
+-    const { data: as2 } = await sb.from("assessments").select(SCORE_COLUMNS.join(", ")).eq("user_id", p.user_id).order("assessed_at", { ascending: false }).limit(2);
+-    const rows = (as2 ?? []) as unknown as Record<string, unknown>[];
++    // Newest two FULL assessments (quick re-checks skipped), ordered like My Body (assessed_at desc). Delta is newest vs the one immediately before it.
++    const rows = await latestTwoFull(sb, p.user_id);
+     const a = rows[0] ? { id: String(rows[0].id), assessed_at: String(rows[0].assessed_at) } : null;
+     const latestScore = rows[0] ? appScore(rows[0], cutMs) : null;
+     const previousScore = rows[1] ? appScore(rows[1], cutMs) : null;
+@@ -57,17 +56,25 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
+     try {
+       const { data: sch, error: schErr } = await sb.from("user_mobility_schedule").select("last_assessment_id, last_assessed_at, next_retest_at, next_check_at").eq("user_id", p.user_id).maybeSingle();
+       if (!schErr && sch) schedule = sch as Candidate["schedule"];
+-    } catch { schedule = null; } // table may not exist yet; nextCheck omits the line in both emails
++    } catch { schedule = null; } // table may not exist until the P1-07 030000 migration is applied; nextCheck omits the line
+     let lastSignIn: string | null = null;
+     try {
+       const { data: au } = await sb.auth.admin.getUserById(p.user_id);
+       lastSignIn = au?.user?.last_sign_in_at ?? null;
+     } catch { lastSignIn = null; }
++    let hasQuick = false;
++    try {
++      const since = schedule?.last_assessed_at ?? a?.assessed_at; // quick rows after the last full assessment only
++      if (since) {
++        const { data: q, error: qErr } = await sb.from("assessments").select("id").eq("user_id", p.user_id).eq("check_kind", "quick").gt("assessed_at", since).limit(1);
++        if (!qErr && q && q.length) hasQuick = true;
++      }
++    } catch { hasQuick = false; } // column may not exist until the P1-06 check_kind migration is applied
+     out.push({
+       user_id: p.user_id, email: u.email, full_name: u.full_name, active_sport: u.active_sport, marketing_opt_out: u.marketing_opt_out,
+       deletion_requested: await deletionRequested(sb, p.user_id), pref: p as never, latest_assessment: a, latest_score: latestScore, previous_score: previousScore,
+       session_dates: (s ?? []).map((r) => String(r.session_date)), has_protocol: (count ?? 0) > 0,
+-      schedule, last_sign_in_at: lastSignIn,
++      schedule, last_sign_in_at: lastSignIn, has_quick_check: hasQuick,
+     });
+   }
+   return out;
+diff --git a/live/lifecycle-emails/source/logic.ts b/branch/lifecycle-emails/source/logic.ts
+index 549a45c..79edead 100644
+--- a/live/lifecycle-emails/source/logic.ts
++++ b/branch/lifecycle-emails/source/logic.ts
+@@ -8,8 +8,8 @@
+ //  - Nothing is sent to users with marketing_opt_out, with a pending deletion request, or with no email.
+ //  - No scores in reminders. The digest holds the overall score change and the streak count only.
+ 
+-export type Kind = "retest" | "protocol" | "digest" | "lapsed";
+-export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed"];
++export type Kind = "retest" | "protocol" | "digest" | "lapsed" | "check7" | "check14";
++export const KINDS: readonly Kind[] = ["retest", "protocol", "digest", "lapsed", "check7", "check14"];
+ 
+ /** Fail-safe flag rule: ON only when the value is exactly the lowercase string "on". */
+ export function flagOn(v: string | null | undefined): boolean { return v === "on"; }
+@@ -57,6 +57,8 @@ export interface Candidate {
+   schedule?: { last_assessment_id: string | null; last_assessed_at: string | null; next_retest_at: string | null; next_check_at: string | null } | null;
+   /** auth.users.last_sign_in_at, when loaded. */
+   last_sign_in_at?: string | null;
++  /** True when a check_kind=quick assessment exists after the last full one (loader; fail-soft if the column is missing). */
++  has_quick_check?: boolean;
+ }
+ export interface Due {
+   kind: Kind; user_id: string; email: string; first_name: string; active_sport: string | null;
+@@ -73,6 +75,7 @@ export interface Due {
+ const FIELD: Record<Kind, "retest_reminders" | "email_reminders" | "weekly_digest"> = {
+   retest: "retest_reminders", protocol: "email_reminders", digest: "weekly_digest",
+   lapsed: "email_reminders",
++  check7: "retest_reminders", check14: "retest_reminders",
+ };
+ 
+ export function validTz(tz: string | null | undefined): tz is string {
+@@ -102,6 +105,7 @@ export function reminderHour(t: string | null | undefined): number {
+ const MARKER: Record<Kind, "retest_opt_in_at" | "protocol_opt_in_at" | "digest_opt_in_at"> = {
+   retest: "retest_opt_in_at", protocol: "protocol_opt_in_at", digest: "digest_opt_in_at",
+   lapsed: "protocol_opt_in_at",
++  check7: "retest_opt_in_at", check14: "retest_opt_in_at",
+ };
+ /** True only for a toggle that is true AND carries an explicit opt-in marker (set only by set_reminder_opt_in when the user turned it on).
+  *  A default-on row, a plain save of the form, or an old "touched" row has no marker and gets nothing. */
+@@ -146,14 +150,14 @@ export function assessmentLocalDate(c: Candidate, tz: string | null | undefined)
+   if (!Number.isFinite(t)) return null;
+   return localParts(new Date(t), tz).date;
+ }
+-/** True when the user's local date is on the check due day or the one grace day after it. */
++export function assessmentIdOf(c: Candidate): string | null {
++  const id = c.schedule?.last_assessment_id || c.latest_assessment?.id;
++  return id ? String(id) : null;
++}
++/** True when the user's local date is on the check due day or the one grace day after it.
++ *  Both checks count from the last FULL assessment's local date (+7 / +14). Not from schedule.next_check_at: after the P1-07
++ *  roll (rule 3) or a quick check (rule 2) next_check_at equals the retest date, which would move check7 to ~day 42. */
+ export function checkDueOn(kind: "check7" | "check14", nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
+-  if (kind === "check7" && c.schedule?.next_check_at) {
+-    const dueAt = Date.parse(c.schedule.next_check_at);
+-    if (!Number.isFinite(dueAt)) return false;
+-    const due = localParts(new Date(dueAt), tz).date;
+-    return nowDate >= due && nowDate < ymdAdd(due, CHECK_GRACE_DAYS + 1);
+-  }
+   const start = assessmentLocalDate(c, tz);
+   if (!start) return false;
+   const due = ymdAdd(start, kind === "check7" ? CHECK7_DAYS : CHECK14_DAYS);
+@@ -243,6 +247,21 @@ export function lapsedNextLine(c: Candidate, tz: string | null | undefined, now:
+ }
+ 
+ 
++/** Day-14 email version B only when a real quick row exists after the last full assessment (loader sets has_quick_check).
++ *  No schedule fallback: after the P1-07 roll next_check_at = next_retest_at for everyone, so it no longer means "quick done". */
++export function quickCheckDone(c: Candidate): boolean {
++  return c.has_quick_check === true;
++}
++
++function retestIsoOf(c: Candidate): string | null {
++  if (c.schedule?.next_retest_at) return c.schedule.next_retest_at;
++  const a = c.schedule?.last_assessed_at || c.latest_assessment?.assessed_at;
++  if (!a) return null;
++  const t = Date.parse(a);
++  if (!Number.isFinite(t)) return null;
++  return new Date(t + RETEST_DAYS * 86400000).toISOString();
++}
++
+ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all: boolean; canary: ReadonlySet<string> }) {
+   const due: Due[] = [];
+   const skipped: Partial<Record<SkipReason, number>> = {};
+@@ -273,6 +292,18 @@ export function planKind(kind: Kind, now: Date, cands: Candidate[], opts: { all:
+       if (checkDueOn("check14", lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
+       const last = lastActivityLocalDate(c, c.pref.timezone) ?? lp.date;
+       due.push({ ...base, email_id: `lc-lapsed-${last}`, next_check_line: lapsedNextLine(c, c.pref.timezone, now, lp.date) });
++    } else if (kind === "check7" || kind === "check14") {
++      const id = assessmentIdOf(c);
++      if (!id || (!c.latest_assessment && !c.schedule?.last_assessed_at)) { skip("no_assessment"); continue; }
++      if (!checkDueOn(kind, lp.date, c, c.pref.timezone)) { skip("not_due"); continue; }
++      const done = quickCheckDone(c);
++      due.push({
++        ...base,
++        email_id: `lc-${kind}-${id}`,
++        retest_date: friendlyDate(retestIsoOf(c), c.pref.timezone, now),
++        next_check_date: friendlyDate(c.schedule?.next_retest_at ?? retestIsoOf(c), c.pref.timezone, now),
++        quick_check_done: done,
++      });
+     } else if (kind === "protocol") {
+       if (!PROTOCOL_DAYS.includes(lp.dow)) { skip("wrong_weekday"); continue; }
+       if (!c.has_protocol) { skip("no_protocol"); continue; }
+diff --git a/live/lifecycle-emails/source/score.ts b/branch/lifecycle-emails/source/score.ts
+index a863de3..9e22553 100644
+--- a/live/lifecycle-emails/source/score.ts
++++ b/branch/lifecycle-emails/source/score.ts
+@@ -26,3 +26,15 @@ export function appScore(a: Record<string, unknown>, hipFlexCutoverMs: number |
+ export const SCORE_LABEL: Record<"bjj" | "bodybuilding" | "base", string> = {
+   bjj: "Position Readiness Score", bodybuilding: "Position Readiness Score", base: "Body score",
+ };
++
++// P1-06 must-fix (b): the newest two FULL assessments. Quick re-checks (check_kind = 'quick') carry no full score and must not
++// become "latest" or "previous". Filter = check_kind IS DISTINCT FROM 'quick' (NULL counts as full). If the filtered read errors
++// (column not there yet, before 20261116031000 is applied) it falls back to the unfiltered read used before.
++// deno-lint-ignore no-explicit-any
++export async function latestTwoFull(sb: any, userId: string): Promise<Record<string, unknown>[]> {
++  const q = () => sb.from("assessments").select(SCORE_COLUMNS.join(", ")).eq("user_id", userId);
++  const f = await q().or("check_kind.is.null,check_kind.neq.quick").order("assessed_at", { ascending: false }).limit(2);
++  if (!f.error) return (f.data ?? []) as Record<string, unknown>[];
++  const u = await q().order("assessed_at", { ascending: false }).limit(2);
++  return (u.data ?? []) as Record<string, unknown>[];
++}

@@ -1,0 +1,4 @@
+[0m[32mCheck[0m source/index.ts
+[0m[32mCheck[0m source/logic.ts
+[0m[32mCheck[0m source/email.ts
+[0m[32mCheck[0m source/handler.ts

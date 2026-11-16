@@ -1,0 +1,45 @@
+[0m[32mCheck[0m test/p1-08-v4.test.ts
+[0m[38;5;245mrunning 2 tests from ./test/p1-08-v4.test.ts[0m
+P1-08 v4: check14 sends on day 14 late local evening and not on day 15 ... [0m[31mFAILED[0m [0m[38;5;245m(35ms)[0m
+P1-08 v4: check7 is skipped when a quick check exists in the current cycle, and sent when none exists or the quick is from a previous cycle ... [0m[31mFAILED[0m [0m[38;5;245m(2ms)[0m
+
+[0m[1m[37m[41m ERRORS [0m
+
+P1-08 v4: check14 sends on day 14 late local evening and not on day 15 [0m[38;5;245m=> ./test/p1-08-v4.test.ts:26:6[0m
+[0m[1m[31merror[0m: AssertionError: Values are not equal: day 15 00:20 local does not send
+
+
+    [90m[1m[Diff][22m[39m [31m[1mActual[22m[39m / [32m[1mExpected[22m[39m
+
+
+[31m[1m-   1[22m[39m
+[32m[1m+   0[22m[39m
+
+  throw new AssertionError(message);
+[0m[31m        ^[0m
+    at [0m[1m[3massertEquals[0m ([0m[36mhttps://jsr.io/@std/assert/1.0.19/equals.ts[0m:[0m[33m67[0m:[0m[33m9[0m)
+    at [0m[2m[38;5;245mfile:///tmp/p108v4-mut1/lifecycle-emails/[0m[0m[36mtest/p1-08-v4.test.ts[0m:[0m[33m40[0m:[0m[33m3[0m
+
+P1-08 v4: check7 is skipped when a quick check exists in the current cycle, and sent when none exists or the quick is from a previous cycle [0m[38;5;245m=> ./test/p1-08-v4.test.ts:53:6[0m
+[0m[1m[31merror[0m: AssertionError: Values are not equal: quick check after the last full assessment: skip
+
+
+    [90m[1m[Diff][22m[39m [31m[1mActual[22m[39m / [32m[1mExpected[22m[39m
+
+
+[31m[1m-   1[22m[39m
+[32m[1m+   0[22m[39m
+
+  throw new AssertionError(message);
+[0m[31m        ^[0m
+    at [0m[1m[3massertEquals[0m ([0m[36mhttps://jsr.io/@std/assert/1.0.19/equals.ts[0m:[0m[33m67[0m:[0m[33m9[0m)
+    at [0m[2m[38;5;245mfile:///tmp/p108v4-mut1/lifecycle-emails/[0m[0m[36mtest/p1-08-v4.test.ts[0m:[0m[33m64[0m:[0m[33m3[0m
+
+[0m[1m[37m[41m FAILURES [0m
+
+P1-08 v4: check14 sends on day 14 late local evening and not on day 15 [0m[38;5;245m=> ./test/p1-08-v4.test.ts:26:6[0m
+P1-08 v4: check7 is skipped when a quick check exists in the current cycle, and sent when none exists or the quick is from a previous cycle [0m[38;5;245m=> ./test/p1-08-v4.test.ts:53:6[0m
+
+[0m[31mFAILED[0m | 0 passed | 2 failed [0m[38;5;245m(42ms)[0m
+
+[0m[1m[31merror[0m: Test failed

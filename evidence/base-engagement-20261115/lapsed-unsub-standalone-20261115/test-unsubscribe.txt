@@ -1,0 +1,31 @@
+[0m[32mCheck[0m test/lapsed-scope.test.ts
+[0m[32mCheck[0m test/token_path.test.ts
+[0m[38;5;245mrunning 7 tests from ./test/lapsed-scope.test.ts[0m
+lapsed: a token signs, verifies, and a one-click POST applies exactly the lapsed scope ... [0m[32mok[0m [0m[38;5;245m(8ms)[0m
+lapsed: GET with a lapsed token only redirects to the brand confirm page and applies nothing ... [0m[32mok[0m [0m[38;5;245m(521µs)[0m
+lapsed: a genuine lapsed one-click is never rate limited ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+lapsed maps to email_reminders (plan day reminders); the four old scopes and SCOPE_COLUMN are unchanged ... [0m[32mok[0m [0m[38;5;245m(136µs)[0m
+tampered, unknown or re-scoped tokens are rejected (400 invalid_token, nothing applied) ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+old-scope tokens keep the exact v12 payload format and still verify ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+index.ts keeps the v12 'all' write and the v8 email path byte-stable; scoped writes go through SCOPE_SETTING ... [0m[32mok[0m [0m[38;5;245m(538µs)[0m
+[0m[38;5;245mrunning 17 tests from ./test/token_path.test.ts[0m
+no t param falls through to the v8 email path ... [0m[32mok[0m [0m[38;5;245m(6ms)[0m
+valid token: ONE-CLICK POST applies exactly its own scope ... [0m[32mok[0m [0m[38;5;245m(3ms)[0m
+GET applies NOTHING for a valid token: redirect to the confirm page only ... [0m[32mok[0m [0m[38;5;245m(607µs)[0m
+GET gives the same redirect for bad tokens and no secret (reveals nothing) and applies nothing ... [0m[32mok[0m [0m[38;5;245m(440µs)[0m
+GET redirect goes only to the fixed brand pages; unknown or hostile b falls back to base ... [0m[32mok[0m [0m[38;5;245m(545µs)[0m
+POST without the RFC 8058 body applies nothing (400) ... [0m[32mok[0m [0m[38;5;245m(544µs)[0m
+PUT, DELETE and others are 405 ... [0m[32mok[0m [0m[38;5;245m(312µs)[0m
+bad, tampered, wrong-secret or unsigned tokens: 400 invalid_token (never ok), nothing applied ... [0m[32mok[0m [0m[38;5;245m(552µs)[0m
+missing signing secret: 503 unavailable, not ok, nothing applied ... [0m[32mok[0m [0m[38;5;245m(144µs)[0m
+a valid token whose write fails is 503 unavailable (no false success); a log failure after a good write is still ok ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+a bad token is still rate limited by IP, a valid one is not ... [0m[32mok[0m [0m[38;5;245m(1ms)[0m
+scope to column map never touches another toggle ... [0m[32mok[0m [0m[38;5;245m(64µs)[0m
+rate limit: a genuine one-click opt-out is NEVER refused, however many arrive from one IP ... [0m[32mok[0m [0m[38;5;245m(25ms)[0m
+rate limit: token GET (redirect only) is exempt; bad tokens, wrong body, v8 email path and odd methods stay limited ... [0m[32mok[0m [0m[38;5;245m(390µs)[0m
+rate limit: the 20/hr limiter in index.ts is only reachable through needsRateLimit, and the body stays readable ... [0m[32mok[0m [0m[38;5;245m(544µs)[0m
+confirm pages are the sites' real React routes (Jules): Base /app/unsubscribe, BJJ and BB /unsubscribe, never a static .html ... [0m[32mok[0m [0m[38;5;245m(155µs)[0m
+GET redirect target for each brand (and an unknown brand falls back to Base) ... [0m[32mok[0m [0m[38;5;245m(269µs)[0m
+
+[0m[32mok[0m | 24 passed | 0 failed [0m[38;5;245m(138ms)[0m
+

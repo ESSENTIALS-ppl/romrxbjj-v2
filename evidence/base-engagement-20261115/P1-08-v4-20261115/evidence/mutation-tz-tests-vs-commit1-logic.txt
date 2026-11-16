@@ -1,0 +1,29 @@
+[0m[32mCheck[0m test/default-tz-ny.test.ts
+[0m[38;5;245mrunning 1 test from ./test/default-tz-ny.test.ts[0m
+P1-08 v4 tz: invalid or missing timezone falls back to America/New_York; a stored timezone stays first ... [0m[31mFAILED[0m [0m[38;5;245m(19ms)[0m
+
+[0m[1m[37m[41m ERRORS [0m
+
+P1-08 v4 tz: invalid or missing timezone falls back to America/New_York; a stored timezone stays first [0m[38;5;245m=> ./test/default-tz-ny.test.ts:26:6[0m
+[0m[1m[31merror[0m: AssertionError: Values are not equal.
+
+
+    [90m[1m[Diff][22m[39m [31m[1mActual[22m[39m / [32m[1mExpected[22m[39m
+
+
+[31m[1m-   America/[41m[37mChicago[31m[49m
+[22m[39m[32m[1m+   America/[42m[37mNew_York[32m[49m
+[22m[39m
+
+  throw new AssertionError(message);
+[0m[31m        ^[0m
+    at [0m[1m[3massertEquals[0m ([0m[36mhttps://jsr.io/@std/assert/1.0.19/equals.ts[0m:[0m[33m67[0m:[0m[33m9[0m)
+    at [0m[2m[38;5;245mfile:///tmp/p108v4-mut2/lifecycle-emails/[0m[0m[36mtest/default-tz-ny.test.ts[0m:[0m[33m27[0m:[0m[33m3[0m
+
+[0m[1m[37m[41m FAILURES [0m
+
+P1-08 v4 tz: invalid or missing timezone falls back to America/New_York; a stored timezone stays first [0m[38;5;245m=> ./test/default-tz-ny.test.ts:26:6[0m
+
+[0m[31mFAILED[0m | 0 passed | 1 failed [0m[38;5;245m(26ms)[0m
+
+[0m[1m[31merror[0m: Test failed
