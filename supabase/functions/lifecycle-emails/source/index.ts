@@ -4,7 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handle } from "./handler.ts";
 import { explicitOn, type Candidate, type Kind } from "./logic.ts";
-import { appScore, SCORE_COLUMNS } from "./score.ts";
+import { appScore, latestTwoFull } from "./score.ts";
 import { deletionRequested } from "./deletion.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -45,9 +45,8 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
   for (const p of keep) {
     const { data: u } = await sb.from("users").select("id, email, full_name, active_sport, marketing_opt_out").eq("id", p.user_id).maybeSingle();
     if (!u) continue;
-    // Newest two assessments, ordered like My Body (assessed_at desc). Delta is newest vs the one immediately before it.
-    const { data: as2 } = await sb.from("assessments").select(SCORE_COLUMNS.join(", ")).eq("user_id", p.user_id).order("assessed_at", { ascending: false }).limit(2);
-    const rows = (as2 ?? []) as unknown as Record<string, unknown>[];
+    // Newest two FULL assessments (quick re-checks skipped), ordered like My Body (assessed_at desc). Delta is newest vs the one immediately before it.
+    const rows = await latestTwoFull(sb, p.user_id);
     const a = rows[0] ? { id: String(rows[0].id), assessed_at: String(rows[0].assessed_at) } : null;
     const latestScore = rows[0] ? appScore(rows[0], cutMs) : null;
     const previousScore = rows[1] ? appScore(rows[1], cutMs) : null;

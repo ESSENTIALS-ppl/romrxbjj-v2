@@ -26,3 +26,15 @@ export function appScore(a: Record<string, unknown>, hipFlexCutoverMs: number | 
 export const SCORE_LABEL: Record<"bjj" | "bodybuilding" | "base", string> = {
   bjj: "Position Readiness Score", bodybuilding: "Position Readiness Score", base: "Body score",
 };
+
+// P1-06 must-fix (b): the newest two FULL assessments. Quick re-checks (check_kind = 'quick') carry no full score and must not
+// become "latest" or "previous". Filter = check_kind IS DISTINCT FROM 'quick' (NULL counts as full). If the filtered read errors
+// (column not there yet, before 20261116031000 is applied) it falls back to the unfiltered read used before.
+// deno-lint-ignore no-explicit-any
+export async function latestTwoFull(sb: any, userId: string): Promise<Record<string, unknown>[]> {
+  const q = () => sb.from("assessments").select(SCORE_COLUMNS.join(", ")).eq("user_id", userId);
+  const f = await q().or("check_kind.is.null,check_kind.neq.quick").order("assessed_at", { ascending: false }).limit(2);
+  if (!f.error) return (f.data ?? []) as Record<string, unknown>[];
+  const u = await q().order("assessed_at", { ascending: false }).limit(2);
+  return (u.data ?? []) as Record<string, unknown>[];
+}
