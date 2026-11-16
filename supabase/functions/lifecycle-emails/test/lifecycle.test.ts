@@ -1,0 +1,353 @@
+import { assert, assertEquals, assertFalse, assertMatch } from "jsr:@std/assert@1";
+import { audienceAll, type Candidate, explicitOn, flagOn, localParts, planKind, quickCheckDone, reminderHour, streakDays } from "../source/logic.ts";
+import { BRANDS, brandFor, buildEmail, COPY, copyFor } from "../source/email.ts";
+import { signUnsubToken, verifyUnsubToken } from "../_shared/unsub_token.ts";
+import { CONFIRM_PAGES, type Deps, handle, idList, UNSUB_BASE } from "../source/handler.ts";
+
+const U1 = "11111111-1111-4111-8111-111111111111";
+const U2 = "22222222-2222-4222-8222-222222222222";
+const SECRET = "s".repeat(40);
+const created = "2026-10-01T00:00:00Z";
+const saved = "2026-10-02T00:00:00Z";
+
+function cand(over: Partial<Omit<Candidate, "pref">> & { pref?: Partial<NonNullable<Candidate["pref"]>> | null } = {}): Candidate {
+  const { pref, ...rest } = over;
+  return {
+    user_id: U1, email: "alex@example.com", full_name: "Alex Rider", active_sport: "bjj", marketing_opt_out: false, deletion_requested: false,
+    pref: pref === null ? null : {
+      user_id: U1, reminder_time: "08:00", timezone: "America/Chicago", retest_reminders: true, email_reminders: true, weekly_digest: true,
+      created_at: created, updated_at: saved,
+      retest_opt_in_at: saved, protocol_opt_in_at: saved, digest_opt_in_at: saved, ...pref,
+    },
+    latest_assessment: { id: "a1", assessed_at: "2026-09-20T12:00:00Z" }, latest_score: 70, previous_score: 66,
+    session_dates: [], has_protocol: true, ...rest,
+  };
+}
+const canaryAll = { all: true, canary: new Set<string>() };
+// Mon 2026-11-02 14:00Z = 08:00 CST (DST ended Nov 1 2026).
+const MON_8_CST = new Date("2026-11-02T14:00:00Z");
+// Sun 2026-11-01 is the DST change day; use Sun 2026-11-08 15:00Z = 09:00 CST.
+const SUN_9_CST = new Date("2026-11-08T15:00:00Z");
+
+Deno.test("flag fail-safe: only exact lowercase 'on'", () => {
+  for (const v of [undefined, null, "", "ON", "On", "true", "1", "yes", " on", "on "]) assertFalse(flagOn(v as never), String(v));
+  assert(flagOn("on"));
+});
+Deno.test("audience: only exact 'all' opens everyone", () => {
+  for (const v of [undefined, "", "ALL", "All", "true", "on", " all"]) assertFalse(audienceAll(v as never), String(v));
+  assert(audienceAll("all"));
+});
+Deno.test("explicit opt-in: toggle true AND marker present; nothing else counts", () => {
+  const p = cand().pref!;
+  for (const k of ["retest", "protocol", "digest"] as const) assert(explicitOn(p, k), k);
+  // updated_at later than created_at (an old "touched" row) is NOT opt-in any more
+  assertFalse(explicitOn({ ...p, retest_opt_in_at: null }, "retest"));
+  assertFalse(explicitOn({ ...p, protocol_opt_in_at: undefined }, "protocol"));
+  assertFalse(explicitOn({ ...p, digest_opt_in_at: "not a date" }, "digest"));
+  assertFalse(explicitOn({ ...p, digest_opt_in_at: "" }, "digest"));
+  // a marker with the toggle off or null is not opt-in
+  assertFalse(explicitOn({ ...p, retest_reminders: false }, "retest"));
+  assertFalse(explicitOn({ ...p, weekly_digest: null }, "digest"));
+  // each kind needs ITS OWN marker
+  assertFalse(explicitOn({ ...p, retest_opt_in_at: null, protocol_opt_in_at: saved }, "retest"));
+  assertFalse(explicitOn(null, "digest"));
+});
+Deno.test("audience: default-on, touched-but-unmarked and plain-saved rows get nothing in any kind", () => {
+  const unmarked = { retest_opt_in_at: null, protocol_opt_in_at: null, digest_opt_in_at: null };
+  for (const pref of [{ updated_at: created, ...unmarked }, { updated_at: "2026-10-30T00:00:00Z", ...unmarked }]) {
+    const c = cand({ pref });
+    for (const k of ["retest", "protocol", "digest"] as const) assertEquals(planKind(k, SUN_9_CST, [c], canaryAll).due.length, 0, k);
+  }
+  // marker present on one kind only: only that kind is audience
+  const only = cand({ pref: { ...unmarked, digest_opt_in_at: saved } });
+  assertEquals(planKind("digest", SUN_9_CST, [only], canaryAll).due.length, 1);
+  assertEquals(planKind("retest", MON_8_CST, [only], canaryAll).due.length, 0);
+});
+Deno.test("send time follows reminder_time and timezone (two timezones)", () => {
+  const chi = cand({ user_id: U1 });
+  const tokyo = cand({ user_id: U2, pref: { user_id: U2, timezone: "Asia/Tokyo", reminder_time: "08:00" } });
+  // 14:00Z Mon = 08:00 Chicago, 23:00 Tokyo
+  let p = planKind("protocol", MON_8_CST, [chi, tokyo], canaryAll);
+  assertEquals(p.due.map((x) => x.user_id), [U1]);
+  // 23:00Z Sun = 08:00 Tokyo Mon
+  p = planKind("protocol", new Date("2026-11-01T23:00:00Z"), [chi, tokyo], canaryAll);
+  assertEquals(p.due.map((x) => x.user_id), [U2]);
+  assertEquals(p.due[0].local_date, "2026-11-02");
+});
+Deno.test("retry window: hour 0 to 2 after target, not 3 and not before", () => {
+  const c = cand();
+  const at = (z: string) => planKind("protocol", new Date(z), [c], canaryAll).due.length;
+  assertEquals(at("2026-11-02T13:00:00Z"), 0); // 07:00
+  assertEquals(at("2026-11-02T14:30:00Z"), 1); // 08:30
+  assertEquals(at("2026-11-02T16:00:00Z"), 1); // 10:00
+  assertEquals(at("2026-11-02T17:00:00Z"), 0); // 11:00
+});
+Deno.test("bad reminder_time or timezone fall back to 09:00 Chicago", () => {
+  assertEquals(reminderHour("garbage"), 9);
+  assertEquals(reminderHour(null), 9);
+  assertEquals(reminderHour("8:30 PM"), 20);
+  assertEquals(reminderHour("12:00 AM"), 0);
+  assertEquals(localParts(MON_8_CST, "Not/AZone").tz, "America/Chicago");
+});
+Deno.test("opt-outs: marketing_opt_out, deletion request, no/invalid email, not canary, no pref", () => {
+  const cs = [
+    cand({ marketing_opt_out: true }), cand({ deletion_requested: true }), cand({ email: null }), cand({ email: "nope" }), cand({ pref: null }),
+  ];
+  for (const c of cs) assertEquals(planKind("protocol", MON_8_CST, [c], canaryAll).due.length, 0);
+  assertEquals(planKind("protocol", MON_8_CST, [cand()], { all: false, canary: new Set() }).due.length, 0);
+  // Live test-stage is canary-listed user ids only (this branch does not include the P1-02 audience rewrite).
+  assertEquals(planKind("protocol", MON_8_CST, [cand()], { all: false, canary: new Set([U1]) }).due.length, 1);
+});
+Deno.test("retest: day 42 to 48 after the latest assessment, once per assessment id", () => {
+  const mk = (days: number) => cand({ latest_assessment: { id: "a9", assessed_at: new Date(MON_8_CST.getTime() - days * 86400000).toISOString() } });
+  assertEquals(planKind("retest", MON_8_CST, [mk(41)], canaryAll).due.length, 0);
+  assertEquals(planKind("retest", MON_8_CST, [mk(42)], canaryAll).due.length, 1);
+  assertEquals(planKind("retest", MON_8_CST, [mk(48)], canaryAll).due.length, 1);
+  assertEquals(planKind("retest", MON_8_CST, [mk(49)], canaryAll).due.length, 0);
+  assertEquals(planKind("retest", MON_8_CST, [mk(100)], canaryAll).due.length, 0); // no go-live sweep of old assessments
+  assertEquals(planKind("retest", MON_8_CST, [mk(43)], canaryAll).due[0].email_id, "lc-retest-a9");
+});
+Deno.test("protocol: skipped when a session is already logged that local date", () => {
+  assertEquals(planKind("protocol", MON_8_CST, [cand({ session_dates: ["2026-11-02"] })], canaryAll).due.length, 0);
+  assertEquals(planKind("protocol", MON_8_CST, [cand({ session_dates: ["2026-11-01"] })], canaryAll).due.length, 1);
+  assertEquals(planKind("protocol", MON_8_CST, [cand({ has_protocol: false })], canaryAll).due.length, 0);
+});
+Deno.test("digest delta is against the previous assessment, not last week; one assessment = no delta", () => {
+  const SUNS = [{ session_dates: [] as string[] }];
+  // previous assessment 2 days before the latest (nothing is a week old): still compared
+  const near = planKind("digest", SUN_9_CST, [cand({ latest_score: 80, previous_score: 77, ...SUNS[0] })], canaryAll).due[0];
+  assertEquals(near.digest!.delta, 3);
+  assertEquals(planKind("digest", SUN_9_CST, [cand({ latest_score: 60, previous_score: 71 })], canaryAll).due[0].digest!.delta, -11);
+  assertEquals(planKind("digest", SUN_9_CST, [cand({ latest_score: 60, previous_score: 60 })], canaryAll).due[0].digest!.delta, 0);
+  assertEquals(planKind("digest", SUN_9_CST, [cand({ latest_score: 60, previous_score: null })], canaryAll).due[0].digest!.delta, null);
+  assertEquals(planKind("digest", SUN_9_CST, [cand({ latest_score: null })], canaryAll).skipped.no_score, 1);
+});
+Deno.test("digest: Sunday 09:00 local only, score change and streak only", () => {
+  assertEquals(planKind("digest", MON_8_CST, [cand()], canaryAll).due.length, 0);
+  const d = planKind("digest", SUN_9_CST, [cand({ session_dates: ["2026-11-08", "2026-11-07", "2026-11-06"] })], canaryAll).due[0];
+  assertEquals(d.digest, { score: 70, delta: 4, streak: 3 }); // 70 now vs 66 on the PREVIOUS assessment, whatever the dates
+  assertEquals(planKind("digest", SUN_9_CST, [cand({ latest_assessment: null })], canaryAll).due.length, 0);
+  assertEquals(streakDays(["2026-11-07", "2026-11-06"], "2026-11-08"), 2); // yesterday counts
+  assertEquals(streakDays(["2026-11-05"], "2026-11-08"), 0);
+});
+Deno.test("email: no scores/health words in subject or preheader, no pixels, no em dash, headers and both opt-outs", () => {
+  const links = { offKind: "https://x.test/c?t=A", offAll: "https://x.test/c?t=B", oneClick: "https://x.test/u?t=A&b=bjj" };
+  for (const k of ["retest", "protocol", "digest"] as const) {
+    const due = { kind: k, user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "bjj", email_id: "x", local_date: "2026-11-08", digest: { score: 71.2, delta: 1.1, streak: 4 } };
+    const b = buildEmail(due, BRANDS.bjj, links, "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774");
+    const head = `${b.subject} ${COPY[k].preheader}`;
+    assertFalse(/\d/.test(head.replace(/\b6-week\b/, "")), `digits in subject/preheader: ${k}`); // the retest cadence "6-week" is a duration, not a score
+    assertFalse(/\b(score|pain|injur|mobility|degrees?|rom|mood|joint|hip|shoulder)\b/i.test(head), `health word: ${k}`);
+    assertFalse(/<img|pixel|track/i.test(b.html));
+    assertFalse(/\u2014|\u2013/.test(b.html + b.text + b.subject));
+    assertEquals(b.headers["List-Unsubscribe"], "<https://x.test/u?t=A&b=bjj>");
+    assertEquals(b.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+    assert(b.html.includes("t=B") && b.html.includes("t=A") && b.text.includes("t=B"));
+    assert(b.html.includes("6605 Longshore Street"));
+    assertFalse(/mood/i.test(b.html + b.text));
+    assertFalse(b.html.includes("alex@example.com") && b.headers["List-Unsubscribe"].includes("@"));
+  }
+});
+Deno.test("digest body holds score change and streak only", () => {
+  const due = { kind: "digest" as const, user_id: U1, email: "a@b.co", first_name: "Alex", active_sport: null, email_id: "x", local_date: "d", digest: { score: 71.2, delta: -2, streak: 1 } };
+  const lines = COPY.digest.lines(due).join(" ");
+  assertMatch(lines, /Body score: 71\.2, down 2 since your previous assessment/);
+  assertFalse(/last week/.test(lines));
+  assertMatch(lines, /Current streak: 1 day\./);
+});
+Deno.test("token: sign, verify, scope bound, tamper, no/short secret fail closed", async () => {
+  const t = (await signUnsubToken(SECRET, U1, "digest"))!;
+  assertEquals(await verifyUnsubToken(SECRET, t), { userId: U1, scope: "digest" });
+  assertEquals(await verifyUnsubToken("x".repeat(40), t), null);
+  const [p, s] = t.split(".");
+  const forged = btoa(JSON.stringify({ u: U1, s: "all" })).replace(/=+$/, "") + "." + s;
+  assertEquals(await verifyUnsubToken(SECRET, forged), null);
+  assertEquals(await verifyUnsubToken(SECRET, p), null);
+  assertEquals(await signUnsubToken(undefined, U1, "all"), null);
+  assertEquals(await signUnsubToken("short", U1, "all"), null);
+  assertEquals(await signUnsubToken(SECRET, "not-a-uuid", "all"), null);
+  assertEquals(await verifyUnsubToken(undefined, t), null);
+});
+
+// ---- handler ----
+function deps(env: Record<string, string>, cands: Candidate[], over: Partial<Deps> = {}) {
+  const log = { claims: [] as string[], releases: [] as string[], sends: [] as Record<string, unknown>[] };
+  const d: Deps = {
+    env: (k) => env[k], cronOk: () => Promise.resolve(true), now: () => MON_8_CST, load: () => Promise.resolve(cands),
+    claim: (u, e) => { log.claims.push(`${u}|${e}`); return Promise.resolve(true); },
+    release: (u, e) => { log.releases.push(`${u}|${e}`); return Promise.resolve(); },
+    send: (p) => { log.sends.push(p as never); return Promise.resolve(true); }, ...over,
+  };
+  return { d, log };
+}
+const req = (q = "") => new Request(`https://x.test/lifecycle-emails${q}`, { method: "POST" });
+
+Deno.test("handler: no cron secret = 403", async () => {
+  const { d } = deps({}, [], { cronOk: () => Promise.resolve(false) });
+  assertEquals((await handle(req(), d)).status, 403);
+});
+Deno.test("handler: default is dry run with masked emails, no claims, no sends", async () => {
+  const { d, log } = deps({ LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+  const body = await (await handle(req(), d)).json();
+  assertEquals(body.dry_run, true);
+  assertEquals(body.kinds.protocol.due[0].email, "a***@example.com");
+  assertEquals([log.claims.length, log.sends.length], [0, 0]);
+});
+Deno.test("handler: send flag values other than exact 'on' stay dry", async () => {
+  for (const v of ["ON", "true", "1", "", " on"]) {
+    const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: v, LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+    assertEquals((await (await handle(req(), d)).json()).dry_run, true, v);
+    assertEquals(log.sends.length, 0);
+  }
+});
+Deno.test("handler: ?dry_run=1 beats the send flag", async () => {
+  const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+  assertEquals((await (await handle(req("?dry_run=1"), d)).json()).dry_run, true);
+  assertEquals(log.sends.length, 0);
+});
+Deno.test("handler: live test-stage (no audience=all) mails only canary-listed users", async () => {
+  const env = { LIFECYCLE_EMAILS_SEND: "on", UNSUBSCRIBE_HMAC_SECRET: SECRET };
+  const listed = cand({ user_id: U1 });
+  const other = cand({ user_id: U2, email: "other@example.com", pref: { user_id: U2 } });
+  const { d, log } = deps(env, [listed, other]);
+  const body = await (await handle(req("?kind=protocol"), d)).json();
+  assertEquals(body.audience, "canary");
+  assertEquals(log.sends.length, 0);
+  const { d: d2, log: log2 } = deps({ ...env, LIFECYCLE_CANARY_USER_IDS: U1 }, [listed, other]);
+  const body2 = await (await handle(req("?kind=protocol"), d2)).json();
+  assertEquals(body2.results.protocol, { sent: 1, already: 0, failed: 0 });
+  assertEquals(log2.sends.length, 1);
+  assertEquals(log2.sends[0].to, "alex@example.com");
+  assertEquals(log2.sends[0].from, "Jim Scott <jim@romrxbjj.com>");
+});
+Deno.test("handler: flag on with no 'all' and no canary list sends nothing", async () => {
+  const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+  const body = await (await handle(req(), d)).json();
+  assertEquals(body.audience, "canary");
+  assertEquals(log.sends.length, 0);
+});
+Deno.test("handler: already claimed = no send; send failure releases the claim; missing signing secret sends nothing", async () => {
+  const env = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET };
+  let r = deps(env, [cand()], { claim: () => Promise.resolve(false) });
+  assertEquals((await (await handle(req("?kind=protocol"), r.d)).json()).results.protocol.already, 1);
+  assertEquals(r.log.sends.length, 0);
+  r = deps(env, [cand()], { send: () => Promise.resolve(false) });
+  assertEquals((await (await handle(req("?kind=protocol"), r.d)).json()).results.protocol.failed, 1);
+  assertEquals(r.log.releases.length, 1);
+  r = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all" }, [cand()]);
+  assertEquals((await (await handle(req("?kind=protocol"), r.d)).json()).results.protocol.failed, 1);
+  assertEquals([r.log.claims.length, r.log.sends.length], [0, 0]);
+});
+Deno.test("handler: LIFECYCLE_SUPPRESS_USER_IDS blocks a user even when everything else says send", async () => {
+  const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", LIFECYCLE_SUPPRESS_USER_IDS: U1, UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+  await handle(req(), d);
+  assertEquals(log.sends.length, 0);
+  assertEquals(idList(`${U1}, junk ,${U2.toUpperCase()}`).size, 2);
+});
+
+Deno.test("Base From stays the live sender Jim Scott <jim@romrxbjj.com>; sport-pack senders are unchanged", () => {
+  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(BRANDS.base.replyTo, "jim@romrxbjj.com");
+  assertEquals(brandFor(null).from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(brandFor(undefined).replyTo, "jim@romrxbjj.com");
+  assertEquals(BRANDS.bjj.from, "Jim Scott <jim@romrxbjj.com>");
+  assertEquals(BRANDS.bjj.replyTo, "jim@romrxbjj.com");
+  assertEquals(BRANDS.bodybuilding.from, "Jim Scott <jim@romrxbodybuilding.com>");
+  assertEquals(brandFor("bjj").from, BRANDS.bjj.from);
+  assertEquals(brandFor("bodybuilding").from, BRANDS.bodybuilding.from);
+});
+Deno.test("handler: footer links go to the brand confirm page, the one-click header goes to the POST endpoint with the brand", async () => {
+  const { d, log } = deps({ LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: SECRET }, [cand()]);
+  await handle(req("?kind=protocol"), d);
+  const sent = log.sends[0] as { html: string; text: string; headers: Record<string, string> };
+  const brand = brandFor(cand().active_sport);
+  assert(sent.headers["List-Unsubscribe"].startsWith(`<${UNSUB_BASE}?t=`));
+  assert(sent.headers["List-Unsubscribe"].includes(`&b=${brand.key}>`));
+  assertEquals(sent.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+  assert(sent.html.includes(CONFIRM_PAGES[brand.key] + "?t="), "footer link is the confirm page");
+  assert(!sent.html.includes(UNSUB_BASE), "no visible link to the function URL (a GET would apply nothing, but links stay on the confirm page)");
+});
+
+Deno.test("P1-08 check7 and check14: due on the local due date and one grace day, once per assessment", () => {
+  // Assessed local Chicago 2026-10-25. Day 7 = 2026-11-01, day 14 = 2026-11-08.
+  const c = cand({ latest_assessment: { id: "a-check", assessed_at: "2026-10-25T15:00:00Z" } });
+  const day7 = new Date("2026-11-01T14:00:00Z"); // 08:00 CST
+  const day8 = new Date("2026-11-02T14:00:00Z");
+  const day9 = new Date("2026-11-03T14:00:00Z");
+  const day14 = new Date("2026-11-08T15:00:00Z"); // 09:00 CST, inside the 08:00 3h window
+  const p7 = planKind("check7", day7, [c], canaryAll);
+  assertEquals(p7.due.length, 1);
+  assertEquals(p7.due[0].email_id, "lc-check7-a-check");
+  assertEquals(planKind("check7", day8, [c], canaryAll).due.length, 1);
+  assertEquals(planKind("check7", day9, [c], canaryAll).due.length, 0);
+  assertEquals(planKind("check14", day7, [c], canaryAll).due.length, 0);
+  assertEquals(planKind("check14", day14, [c], canaryAll).due[0]?.email_id, "lc-check14-a-check");
+  assert(explicitOn(c.pref!, "check7") && explicitOn(c.pref!, "check14"));
+  // default-on, no retest marker: nothing (live explicitOn; stands without the P1-02 audience rewrite)
+  const unmarked = cand({ pref: { retest_opt_in_at: null }, latest_assessment: { id: "a-check", assessed_at: "2026-10-25T15:00:00Z" } });
+  assertEquals(planKind("check7", day7, [unmarked], canaryAll).due.length, 0);
+});
+Deno.test("P1-08 check7 counts from the schedule's last full assessment when present", () => {
+  const c = cand({
+    latest_assessment: { id: "a-old", assessed_at: "2026-09-01T15:00:00Z" },
+    schedule: { last_assessment_id: "a-new", last_assessed_at: "2026-10-25T15:00:00Z", next_retest_at: "2026-12-06T15:00:00Z", next_check_at: "2026-11-01T15:00:00Z" },
+  });
+  const day7 = new Date("2026-11-01T14:00:00Z");
+  const p = planKind("check7", day7, [c], canaryAll);
+  assertEquals(p.due.length, 1);
+  assertEquals(p.due[0].email_id, "lc-check7-a-new");
+});
+Deno.test("P1-08 v2: P1-07 roll / quick check (next_check_at = next_retest_at) does not move check7 or flip day-14 to version B", () => {
+  // Assessed 2026-10-25 local Chicago; rolled schedule: next_check_at = next_retest_at = day 42 (2026-12-06).
+  const rolled = { last_assessment_id: "a-r", last_assessed_at: "2026-10-25T15:00:00Z", next_retest_at: "2026-12-06T15:00:00Z", next_check_at: "2026-12-06T15:00:00Z" };
+  const c = cand({ latest_assessment: { id: "a-r", assessed_at: "2026-10-25T15:00:00Z" }, schedule: rolled });
+  assertEquals(planKind("check7", new Date("2026-11-01T14:00:00Z"), [c], canaryAll).due.length, 1, "day 7 still due");
+  assertEquals(planKind("check7", new Date("2026-11-02T14:00:00Z"), [c], canaryAll).due.length, 1, "day 8 grace kept");
+  assertEquals(planKind("check7", new Date("2026-12-06T14:00:00Z"), [c], canaryAll).due.length, 0, "not on the retest day");
+  const d14 = new Date("2026-11-08T15:00:00Z");
+  assertEquals(quickCheckDone(c), false, "roll alone is not a quick check");
+  assertEquals(planKind("check14", d14, [c], canaryAll).due[0]?.quick_check_done, false);
+  const q = cand({ latest_assessment: { id: "a-r", assessed_at: "2026-10-25T15:00:00Z" }, schedule: rolled, has_quick_check: true });
+  assertEquals(quickCheckDone(q), true, "real quick row after the full assessment = version B");
+  assertEquals(planKind("check14", d14, [q], canaryAll).due[0]?.quick_check_done, true);
+});
+Deno.test("P1-08 Stacy final words: day 7, day 14 A and B, exact subjects and lines, no scores or em dash", () => {
+  const links = { offKind: "https://romrx.io/app/unsubscribe?t=k", offAll: "https://romrx.io/app/unsubscribe?t=a", oneClick: "https://example.com/unsub" };
+  const postal = "ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774";
+  const baseDue = { user_id: U1, email: "alex@example.com", first_name: "Alex", active_sport: "general", email_id: "lc-x", local_date: "2026-11-08" };
+  const d7 = buildEmail({ ...baseDue, kind: "check7", retest_date: "Sunday, December 27" }, BRANDS.base, links, postal);
+  assertEquals(d7.subject, "Your ROMRx quick check is ready");
+  assertEquals(copyFor({ ...baseDue, kind: "check7", retest_date: "Sunday, December 27" }).preheader, "See your day 1 results next to today's.");
+  assert(d7.text.includes("It has been a week since your ROMRx assessment. Your quick check is ready."));
+  assert(d7.text.includes("It re-measures 1 or 2 of your focus areas and shows them next to your day 1 results."));
+  assert(d7.text.includes("Your full retest is still at 6 weeks, on Sunday, December 27."));
+  assert(d7.text.includes("Start my quick check: https://romrx.io/app/dashboard/quick-check"));
+  assert(d7.text.includes("You're getting this because Check reminders is on in your ROMRx settings."));
+  assert(d7.text.includes("Turn off check reminders"));
+  assert(d7.text.includes("Turn off all ROMRx emails except account and billing notices"));
+  assert(d7.text.includes(postal));
+  assert(d7.text.includes("jim@romrxbjj.com"));
+  assert(d7.text.includes("This message was sent to alex@example.com."));
+
+  const d14a = buildEmail({ ...baseDue, kind: "check14", retest_date: "Sunday, December 27", quick_check_done: false }, BRANDS.base, links, postal);
+  assertEquals(d14a.subject, "Your quick check is waiting");
+  assertEquals(copyFor({ ...baseDue, kind: "check14", quick_check_done: false }).preheader, "Two weeks in. See where you are now.");
+  assert(d14a.text.includes("It has been two weeks since your ROMRx assessment. Your quick check is ready when you are."));
+  assert(d14a.text.includes("It shows your day 1 results next to today's for 1 or 2 of your focus areas."));
+  assert(d14a.text.includes("Your full retest is on Sunday, December 27."));
+  assert(d14a.text.includes("Start my quick check: https://romrx.io/app/dashboard/quick-check"));
+
+  const d14b = buildEmail({ ...baseDue, kind: "check14", next_check_date: "Sunday, December 27", quick_check_done: true }, BRANDS.base, links, postal);
+  assertEquals(d14b.subject, "Two weeks of ROMRx");
+  assertEquals(copyFor({ ...baseDue, kind: "check14", quick_check_done: true }).preheader, "Your next check date is set.");
+  assert(d14b.text.includes("You did your quick check. Nice work."));
+  assert(d14b.text.includes("Your next check: Sunday, December 27"));
+  assert(d14b.text.includes("Until then, your plan is ready each day in the app."));
+  assert(d14b.text.includes("Open today's session: https://romrx.io/app/dashboard/my-protocol"));
+
+  for (const s of [d7.subject, d7.text, d14a.subject, d14a.text, d14b.subject, d14b.text]) {
+    assertFalse(/score|PRS|hip|shoulder|\bjoint\b/i.test(s), s);
+    assertFalse(s.includes("\u2014"), "em dash");
+  }
+  assertEquals(BRANDS.base.from, "Jim Scott <jim@romrxbjj.com>");
+});
