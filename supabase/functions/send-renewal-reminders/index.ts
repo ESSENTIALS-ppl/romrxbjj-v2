@@ -1,9 +1,15 @@
-// ROMRx send-renewal-reminders v4 — sport-aware; v4 (2026-10-01 security audit): fail-closed x-cron-secret gate
+// ROMRx send-renewal-reminders v6 (2026-11-02, FG-35: explicit legacy skip, send gated by RENEWAL_BASE_SEND). Based on v5 (2026-10-26): targets Base subscribers. v4 read users.subscription_expiry, empty for every
+// active account, so the Jan 1, 2027 Base charge got no reminders. v5 reads Base billing state (users.base_*, billing_consents.trial_end),
+// claims each reminder row BEFORE sending (unique user_id+reminder_type+subscription_expiry) so retries never double send,
+// skips test fixtures and internal accounts, and supports ?dry_run=1 (cron secret still required; no sends, no writes).
+// v4 (2026-10-01 security audit): fail-closed x-cron-secret gate
 // (only pg_cron via public.cron_call_edge may trigger sends; was open to anonymous callers).
 // From + reply_to use the per-brand jim@ alias (send-as aliases on jim@romrx.io
 // so replies land in the unified inbox).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { POSTAL_LINE } from "../_shared/email_footer.ts";
+import { type CandidateRow, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -45,11 +51,6 @@ function brandFor(sport?: string | null): Brand {
   return sport === "bodybuilding" ? BRANDS.bodybuilding : BRANDS.bjj;
 }
 
-const REMINDER_WINDOWS = [
-  { type: "45_day" as const, days: 45, label: "45 days" },
-  { type: "30_day" as const, days: 30, label: "30 days" },
-  { type: "2_day"  as const, days: 2,  label: "2 days"  },
-];
 
 function buildEmail(brand: Brand, name: string, plan: string, price: string, daysUntil: number, expiryDateStr: string, reminderLabel: string, email: string): string {
   const urgency = daysUntil <= 2;
@@ -79,8 +80,8 @@ function buildEmail(brand: Brand, name: string, plan: string, price: string, day
     <a href="${dashboardUrl}" style="display:inline-block;background:#1a2e2e;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:600;">Manage Subscription</a>
     <p style="font-size:11px;color:#5a7070;margin-top:24px;line-height:1.6;">To cancel, go to Settings and click Manage Subscription before your renewal date. All sales are final per our <a href="${brand.domain}/legal" style="color:#008080;">Refund Policy</a>.</p>
   </div>
-  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">ROMRx LLC &mdash; Dublin, Ohio &mdash; <a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
-<p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}. If you don't want to receive these emails from ${brand.name} in the future, please <a href="${brand.domain}/unsubscribe?email=${encodeURIComponent(email)}" style="color:#5a7070;">unsubscribe</a>.</p></div></body></html>`;
+  <p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">${POSTAL_LINE}<br /><a href="mailto:${brand.replyTo}" style="color:#008080;">${brand.replyTo}</a></p>
+<p style="font-size:11px;color:#5a7070;text-align:center;margin-top:20px;">This message was sent to ${email}.</p></div></body></html>`;
 }
 
 async function sendEmail(brand: Brand, to: string, subject: string, html: string): Promise<boolean> {
@@ -94,58 +95,61 @@ async function sendEmail(brand: Brand, to: string, subject: string, html: string
   return true;
 }
 
-Deno.serve(async (_req: Request) => {
-  if (!(await cronCallerOk(_req))) return new Response("forbidden", { status: 403 });
+Deno.serve(async (req: Request) => {
+  if (!(await cronCallerOk(req))) return new Response("forbidden", { status: 403 });
+  const dryRun = new URL(req.url).searchParams.get("dry_run") === "1";
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const now = new Date();
+  const json = (b: unknown) => new Response(JSON.stringify(b), { headers: { "Content-Type": "application/json" } });
+
+  const { data: users, error } = await supabase.from("users")
+    .select("id, email, full_name, active_sport, base_status, base_stripe_subscription_id, base_expiry, base_cancel_at_period_end, base_canceled_at, grandfathered_at, subscription_tier, subscription_expiry, stripe_subscription_id")
+    .eq("base_status", "active").not("base_stripe_subscription_id", "is", null);
+  if (error) return json({ success: false, error: error.message });
+
+  const rows: CandidateRow[] = [];
+  for (const u of users ?? []) {
+    const { data: isTest } = await supabase.rpc("is_test_account", { p_email: u.email });
+    const { data: consents } = await supabase.from("billing_consents")
+      .select("stripe_subscription_id, trial_end, amounts, offer").eq("user_id", u.id);
+    rows.push({ ...u, is_test: isTest === true, consents: consents ?? [] } as CandidateRow);
+  }
+  const { due, skipped } = planReminders(rows, now);
   const results: Record<string, { sent: number; skipped: number; errors: string[] }> = {};
-  const today = new Date();
+  const bump = (t: string) => (results[t] ??= { sent: 0, skipped: 0, errors: [] });
 
-  for (const window of REMINDER_WINDOWS) {
-    results[window.type] = { sent: 0, skipped: 0, errors: [] };
-    const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() + window.days);
-    const targetDateStr = targetDate.toISOString().split("T")[0];
-
-    const { data: users, error: fetchErr } = await supabase
-      .from("users")
-      .select("id, email, full_name, subscription_tier, subscription_expiry, active_sport")
-      .eq("subscription_status", "active")
-      .gte("subscription_expiry", `${targetDateStr}T00:00:00Z`)
-      .lt("subscription_expiry", `${targetDateStr}T23:59:59Z`);
-
-    if (fetchErr) { results[window.type].errors.push(fetchErr.message); continue; }
-    if (!users || users.length === 0) continue;
-
-    for (const user of users) {
-      const { data: existing } = await supabase.from("renewal_reminders").select("id")
-        .eq("user_id", user.id).eq("reminder_type", window.type).eq("subscription_expiry", targetDateStr).maybeSingle();
-      if (existing) { results[window.type].skipped++; continue; }
-
-      const brand = brandFor(user.active_sport as string | undefined);
-      const planLabel = user.subscription_tier === "coach" ? "Coach Starter" : "Athlete";
-      const price = user.subscription_tier === "coach" ? "$349/yr" : "$149/yr";
-      const expiryFormatted = new Date(user.subscription_expiry).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-      const firstName = (user.full_name ?? user.email).split(" ")[0];
-      const subject = window.days <= 2
-        ? `Your ${brand.name} membership renews in ${window.label} - last chance to cancel`
-        : `Your ${brand.name} membership renews in ${window.label}`;
-
-      const { data: profile } = await supabase
-          .from('profiles')
-          .select('marketing_opt_out')
-          .eq('email', user.email)
-          .single();
-      if (profile?.marketing_opt_out) {
-        results[window.type].skipped++;
-        continue;
-      }
-      const sent = await sendEmail(brand, user.email, subject, buildEmail(brand, firstName, `${brand.name}+ ${planLabel}`, price, window.days, expiryFormatted, window.label, user.email));
-      if (sent) {
-        await supabase.from("renewal_reminders").insert({ user_id: user.id, reminder_type: window.type, subscription_expiry: targetDateStr });
-        results[window.type].sent++;
-      } else { results[window.type].errors.push(`Failed: ${user.email}`); }
-    }
+  // v6: real sends stay OFF until RENEWAL_BASE_SEND is exactly "on" (not a credential; unset = plan only, no claims, no sends).
+  // Reason: the Base reminder wording and brand (v5 reuses the BJJ brand and "All sales are final" line) need Jim and Stacy first.
+  const sendOn = sendEnabled(Deno.env.get("RENEWAL_BASE_SEND"));
+  if (dryRun || !sendOn) {
+    return json({ success: true, dry_run: true, send_enabled: sendOn, date: now.toISOString(), skipped,
+      due: due.map((d) => ({ email: maskEmail(d.email), type: d.type, days_until: d.days_until, charge_date: d.charge_date })) });
   }
 
-  return new Response(JSON.stringify({ success: true, date: today.toISOString().split("T")[0], results }), { headers: { "Content-Type": "application/json" } });
+  for (const d of due) {
+    const r = bump(d.type);
+    // Claim first: the unique key makes a second run (or a concurrent one) a no op.
+    const { data: claim, error: claimErr } = await supabase.from("renewal_reminders")
+      .insert({ user_id: d.user_id, reminder_type: d.type, subscription_expiry: d.charge_date }).select("id").maybeSingle();
+    if (claimErr || !claim) {
+      if (claimErr && claimErr.code !== "23505") r.errors.push(`claim failed: ${maskEmail(d.email)}`);
+      r.skipped++;
+      continue;
+    }
+    const brand = brandFor(d.active_sport);
+    const price = formatUsdYear(d.amount_cents);
+    const expiryFormatted = new Date(d.charge_at).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" });
+    const firstName = (d.full_name ?? d.email).split(" ")[0];
+    const subject = d.days_until <= 2
+      ? `Your ${brand.name} membership renews in ${d.label} - last chance to cancel`
+      : `Your ${brand.name} membership renews in ${d.label}`;
+    // Renewal reminders are required account notices: no unsubscribe link, and marketing_opt_out never blocks them (Grant, 2026-10-04).
+    const sent = await sendEmail(brand, d.email, subject, buildEmail(brand, firstName, "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email));
+    if (sent) r.sent++;
+    else {
+      await supabase.from("renewal_reminders").delete().eq("id", claim.id); // release so tomorrow retries
+      r.errors.push(`send failed: ${maskEmail(d.email)}`);
+    }
+  }
+  return json({ success: true, date: now.toISOString(), skipped, results });
 });
