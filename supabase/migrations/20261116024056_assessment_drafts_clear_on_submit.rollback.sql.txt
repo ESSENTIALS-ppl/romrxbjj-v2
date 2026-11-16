@@ -1,4 +1,4 @@
--- ROLLBACK for 20261116000100_assessment_drafts_clear_on_submit.sql. NOT APPLIED. Run FIRST if assessment submits fail (urgent case).
+-- ROLLBACK for 20261116024056_assessment_drafts_clear_on_submit.sql. NOT APPLIED. Run FIRST if assessment submits fail (urgent case).
 -- Puts the assessments insert path back to exactly what it was.
 drop trigger if exists assessments_clear_draft_ai on public.assessments;
 drop function if exists public.assessment_drafts_clear_on_submit();

@@ -1,6 +1,6 @@
 -- Clear a user's draft the moment a real assessment row lands. PROPOSED, NOT APPLIED. Needs the table migration first.
 -- Covers every client and the submit-assessment edge function (v40, not redeployed) without a code change.
--- The body deletes one row by primary key. Rollback: 20261116000100_assessment_drafts_clear_on_submit.rollback.sql.txt
+-- The body deletes one row by primary key. Rollback: 20261116024056_assessment_drafts_clear_on_submit.rollback.sql.txt
 create or replace function public.assessment_drafts_clear_on_submit()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin

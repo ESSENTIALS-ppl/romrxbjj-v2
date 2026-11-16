@@ -3,7 +3,7 @@
 -- which step is done, and the step the user was on. No name, email, mood, sport, consent or device data.
 -- Retention (Stacy ruling Oct 28): rolling 48 hours from the last save, hard cap 7 days from created_at.
 -- Both limits are enforced here: the BEFORE trigger sets expires_at, a CHECK pins the cap, the purge deletes both kinds.
--- Rollback: 20261116000000_assessment_drafts.rollback.sql.txt (safe on its own: it drops the clear-on-submit trigger first; cron rollback first is still the tidy order).
+-- Rollback: 20261116024051_assessment_drafts.rollback.sql.txt (safe on its own: it drops the clear-on-submit trigger first; cron rollback first is still the tidy order).
 
 create table if not exists public.assessment_drafts (
   user_id          uuid primary key references auth.users (id) on delete cascade,
