@@ -1,4 +1,4 @@
--- ROLLBACK for 20261029100000_assessment_drafts.sql. NOT APPLIED. Safe on its own (drops the trigger first). Tidy order: cron, clear-on-submit, then this.
+-- ROLLBACK for 20261116000000_assessment_drafts.sql. NOT APPLIED. Safe on its own (drops the trigger first). Tidy order: cron, clear-on-submit, then this.
 -- Drops the draft table (policies, grants, constraints and the touch trigger go with it) and its functions.
 -- Draft rows are disposable (unsubmitted copies, 48 hours at most, 7 days hard cap): dropping loses only in-progress values.
 -- Vera D2: the clear-on-submit trigger on public.assessments points at this table. Drop it first, so this file is safe
