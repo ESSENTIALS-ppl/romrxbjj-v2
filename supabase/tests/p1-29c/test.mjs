@@ -1,0 +1,325 @@
+// P1-29c: drop coaches_select_athletes, coach link via coach_linked_athlete_ids(). PGlite, synthetic
+// data only, no live reads or writes. Replays P1-29 (ae58b91f, b4861884...) then P1-29b (89b0be9c,
+// f0558b74...) from git, then P1-29c. Policies on athletes and the 5 dependent tables are created
+// from the live pg_policies read (live-pg_policies-20261116.json). Run: npm install && node test.mjs
+import { PGlite } from '@electric-sql/pglite';
+import { execFileSync } from 'child_process';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, '../../..');
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const gitShow = (c, p) => execFileSync('git', ['-C', repo, 'show', `${c}:${p}`], { encoding: 'utf8' });
+const P129 = { c: 'ae58b91f316ca757d130a612a30c05a620e6fee3', p: 'supabase/migrations/20261117020100_p1_29_coach_roster_security_invoker.sql', sha: 'b4861884e9b69c0fb06680a12801c50a91b10020204c1dd128221f42b19d16d9' };
+const P129B = { c: '89b0be9c37866e0ce227368c252a62b46d7dbfa8', p: 'supabase/migrations/20261117020300_p1_29b_coach_linked_athletes.sql', sha: 'f0558b7459d71dba8345fc88bed78258dc701be9378970b5617a6f58a259966b' };
+const SQL29 = gitShow(P129.c, P129.p);
+const SQL29B = gitShow(P129B.c, P129B.p);
+const MIG = fs.readFileSync(path.join(repo, 'supabase/migrations/20261117020400_p1_29c_coach_athletes_narrow.sql'), 'utf8');
+const ROLL = fs.readFileSync(path.join(repo, 'supabase/migrations/20261117020400_p1_29c_coach_athletes_narrow.rollback.sql.txt'), 'utf8');
+const LIVE = JSON.parse(fs.readFileSync(path.join(here, 'live-pg_policies-20261116.json'), 'utf8')).rows;
+
+const C = 'eeeeeeee-0000-4000-8000-0000000000c1'; // linked coach
+const F = 'eeeeeeee-0000-4000-8000-0000000000f1'; // coach, no athletes
+const D = 'eeeeeeee-0000-4000-8000-0000000000d1'; // athlete linked to C
+const E = 'eeeeeeee-0000-4000-8000-0000000000e1'; // athlete, no coach
+const SA = 'eeeeeeee-0000-4000-8000-0000000000a1'; // school admin
+const SU = 'eeeeeeee-0000-4000-8000-0000000000b1'; // school member
+const COACH_C = 'ffffffff-0000-4000-8000-0000000000c1';
+const COACH_F = 'ffffffff-0000-4000-8000-0000000000f1';
+const ATH_D = 'ffffffff-0000-4000-8000-0000000000d1';
+const ATH_E = 'ffffffff-0000-4000-8000-0000000000e1';
+const SCHOOL = 'ffffffff-0000-4000-8000-0000000000a1';
+const rid = (n) => `dddddddd-0000-4000-8000-0000000000${n}`;
+
+const PERSONAS = {
+  anon: { role: 'anon', claims: { role: 'anon' } },
+  coach_C: { role: 'authenticated', claims: { sub: C, role: 'authenticated' } },
+  coach_F_unlinked: { role: 'authenticated', claims: { sub: F, role: 'authenticated' } },
+  athlete_D: { role: 'authenticated', claims: { sub: D, role: 'authenticated' } },
+  athlete_E: { role: 'authenticated', claims: { sub: E, role: 'authenticated' } },
+  school_admin_SA: { role: 'authenticated', claims: { sub: SA, role: 'authenticated' } },
+  service_role: { role: 'service_role', claims: { role: 'service_role' } },
+};
+const DEP_TABLES = ['assessments', 'drill_sessions', 'game_plans', 'protocol_completions', 'protocol_sessions'];
+
+async function asP(db, name, fn) {
+  const p = PERSONAS[name];
+  await db.exec('begin');
+  try {
+    await db.query(
+      `select set_config('request.jwt.claims',$1,true), set_config('request.jwt.claim.sub',$2,true), set_config('request.jwt.claim.role',$3,true)`,
+      [JSON.stringify(p.claims), p.claims.sub || '', p.claims.role || ''],
+    );
+    await db.exec(`set local role ${p.role}`);
+    return await fn();
+  } catch (e) {
+    return { err: (e.code || '') + ':' + String(e.message || '').slice(0, 80) };
+  } finally {
+    await db.exec('rollback');
+  }
+}
+const q = (db, name, sql) => asP(db, name, async () => {
+  const r = await db.query(sql);
+  return { cols: r.fields.map((f) => f.name), rows: r.rows };
+});
+
+function policySql(r) {
+  const roles = r.roles.replace(/[{}]/g, '').split(',').join(', ');
+  let s = `create policy "${r.policyname}" on public.${r.tablename} as ${r.permissive.toLowerCase()} for ${r.cmd.toLowerCase()} to ${roles}`;
+  if (r.qual !== null) s += ` using (${r.qual})`;
+  if (r.with_check !== null) s += ` with check (${r.with_check})`;
+  return s + ';';
+}
+
+async function setup(db) {
+  await db.exec(`
+    set check_function_bodies=off;
+    create role anon nologin noinherit;
+    create role authenticated nologin noinherit;
+    create role service_role nologin noinherit bypassrls;
+    create schema auth;
+    grant usage on schema public, auth to anon, authenticated, service_role;
+    alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid; $$;
+    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb; $$;
+    grant execute on function auth.uid(), auth.jwt() to anon, authenticated, service_role;
+    create table public.schools (id uuid primary key, admin_id uuid);
+    create table public.users (id uuid primary key, email text not null, full_name text, belt text, school_id uuid,
+      stripe_customer_id text, gender text, age_bucket text);
+    create table public.coaches (id uuid primary key, user_id uuid not null unique, school_id uuid);
+    create table public.athletes (id uuid primary key, user_id uuid not null unique, email text not null, full_name text,
+      belt text not null default 'white', dominant_side text not null default 'right', age integer,
+      injury_flags jsonb not null default '[]', coach_id uuid, gym_name text, is_active boolean not null default true);
+    create table public.assessments (id uuid primary key, athlete_id uuid, user_id uuid);
+    create table public.drill_sessions (id uuid primary key, user_id uuid);
+    create table public.game_plans (id uuid primary key, user_id uuid, is_public boolean not null default false);
+    create table public.protocol_completions (id uuid primary key, user_id uuid);
+    create table public.protocol_sessions (id uuid primary key, user_id uuid);
+    alter table public.users enable row level security;
+    alter table public.coaches enable row level security;
+    alter table public.athletes enable row level security;
+    alter table public.schools enable row level security;
+    ${DEP_TABLES.map((t) => `alter table public.${t} enable row level security;`).join('\n')}
+    -- live table grants (information_schema.role_table_grants, read-only 2026-11-16)
+    grant select on public.users, public.coaches, public.schools to anon, authenticated, service_role;
+    grant select on public.athletes to anon;
+    grant select, insert, update, delete on public.athletes to authenticated;
+    grant all on public.athletes to service_role;
+    grant select on public.assessments to anon;
+    grant select, insert, update, delete on public.assessments to authenticated;
+    grant all on public.assessments, public.drill_sessions, public.game_plans, public.protocol_completions, public.protocol_sessions to service_role;
+    grant select, insert, update, delete on public.drill_sessions, public.game_plans, public.protocol_completions, public.protocol_sessions to anon, authenticated;
+    -- live coach_linked_to_user (pg_get_functiondef, read-only 2026-11-16), live ACL postgres/authenticated/service_role
+    create function public.coach_linked_to_user(p_user uuid) returns boolean language sql stable security definer
+      set search_path to 'public', 'pg_temp' as $function$
+      SELECT p_user IS NOT NULL AND auth.uid() IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.athletes a JOIN public.coaches c ON c.id = a.coach_id
+        WHERE a.user_id = p_user AND c.user_id = auth.uid());
+    $function$;
+    revoke all on function public.coach_linked_to_user(uuid) from public, anon;
+    grant execute on function public.coach_linked_to_user(uuid) to authenticated, service_role;
+    -- users / coaches / schools policies (live)
+    create policy "coaches: service role" on public.coaches for all to public using (current_setting('role') = 'service_role');
+    create policy "coaches_own" on public.coaches for all to public using (user_id = auth.uid());
+    create policy "schools: admin owns" on public.schools for all to public using ((select auth.uid()) = admin_id);
+    create policy "users: service role full access" on public.users for all to public using (current_setting('role') = 'service_role');
+    create policy "users: school admin reads school users" on public.users for select to public using (exists (select 1 from public.schools s where s.admin_id = (select auth.uid()) and s.id = users.school_id));
+    create policy "users: self read" on public.users for select to public using ((select auth.uid()) = id);
+    -- live view before P1-29
+    create view public.coach_roster with (security_barrier=true) as
+      select a.id as athlete_id, a.user_id, u.full_name, u.belt
+      from public.athletes a join public.coaches c on c.id = a.coach_id join public.users u on u.id = a.user_id
+      where c.user_id = auth.uid();
+    grant select on public.coach_roster to authenticated, service_role;
+  `);
+  // athletes + dependent table policies: verbatim from live pg_policies
+  for (const r of LIVE) await db.exec(policySql(r));
+  await db.exec(`
+    insert into public.schools(id, admin_id) values ('${SCHOOL}', '${SA}');
+    insert into public.users(id, email, full_name, belt, school_id, stripe_customer_id, gender, age_bucket) values
+      ('${C}', 'user@example.com', 'Coach C', 'black', null, null, null, null),
+      ('${F}', 'user@example.com', 'Coach F', 'brown', null, null, null, null),
+      ('${D}', 'user@example.com', 'Athlete D', 'blue', null, 'cus_TESTD', 'x', '25-34'),
+      ('${E}', 'user@example.com', 'Athlete E', 'white', null, 'cus_TESTE', 'y', '35-44'),
+      ('${SA}', 'user@example.com', 'Admin SA', 'black', null, null, null, null),
+      ('${SU}', 'user@example.com', 'Member SU', 'white', '${SCHOOL}', null, null, null);
+    insert into public.coaches(id, user_id) values ('${COACH_C}', '${C}'), ('${COACH_F}', '${F}');
+    insert into public.athletes(id, user_id, email, full_name, belt, age, injury_flags, coach_id, gym_name) values
+      ('${ATH_D}', '${D}', 'user@example.com', 'Athlete D', 'blue', 29, '["knee"]', '${COACH_C}', 'Gym D'),
+      ('${ATH_E}', '${E}', 'user@example.com', 'Athlete E', 'white', 41, '[]', null, 'Gym E');
+    insert into public.assessments(id, athlete_id, user_id) values ('${rid('a1')}', '${ATH_D}', '${D}'), ('${rid('a2')}', '${ATH_E}', '${E}');
+    insert into public.drill_sessions(id, user_id) values ('${rid('b1')}', '${D}'), ('${rid('b2')}', '${E}');
+    insert into public.game_plans(id, user_id, is_public) values ('${rid('c1')}', '${D}', false), ('${rid('c2')}', '${E}', false), ('${rid('c3')}', '${SU}', true);
+    insert into public.protocol_completions(id, user_id) values ('${rid('d1')}', '${D}'), ('${rid('d2')}', '${E}');
+    insert into public.protocol_sessions(id, user_id) values ('${rid('e1')}', '${D}'), ('${rid('e2')}', '${E}');
+  `);
+}
+
+const results = [];
+const J = (x) => JSON.stringify(x);
+function rec(name, ok, detail) {
+  results.push({ name, ok: !!ok });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail !== undefined ? '  ' + (typeof detail === 'string' ? detail : J(detail)) : ''}`);
+}
+const isDenied = (r) => !!(r && r.err && /42501/.test(r.err));
+const short = (r) => (r.err ? r.err : r.rows.map((x) => (x.id || x.athlete_id || '').slice(-2)).join(' ') || '(none)');
+
+async function snap(db) {
+  const s = { personas: {} };
+  for (const p of Object.keys(PERSONAS)) {
+    const o = {};
+    o.athletes = await q(db, p, 'select * from public.athletes order by id');
+    o.users = await q(db, p, 'select * from public.users order by id');
+    o.roster = await q(db, p, 'select * from public.coach_roster order by athlete_id');
+    for (const t of DEP_TABLES) o[t] = await q(db, p, `select * from public.${t} order by id`);
+    s.personas[p] = o;
+  }
+  s.viewdef = (await db.query(`select pg_get_viewdef('public.coach_roster'::regclass, true) d`)).rows[0].d;
+  s.reloptions = (await db.query(`select reloptions from pg_class where oid='public.coach_roster'::regclass`)).rows[0].reloptions;
+  s.policies = (await db.query(`select tablename::text, policyname::text, permissive, roles::text, cmd, qual, with_check from pg_policies where schemaname='public' and tablename in ('athletes','assessments','drill_sessions','game_plans','protocol_completions','protocol_sessions') order by tablename, policyname`)).rows;
+  return s;
+}
+async function coachInsert(db, athleteId, userId, n) {
+  return asP(db, 'coach_C', async () => { await db.query(`insert into public.assessments(id, athlete_id, user_id) values ('${rid(n)}', '${athleteId}', '${userId}')`); return { ok: true }; });
+}
+async function fresh(upto) {
+  const db = new PGlite();
+  await setup(db);
+  await db.exec(SQL29);
+  await db.exec(SQL29B);
+  if (upto) await db.exec(upto);
+  return db;
+}
+const coachDirectZero = async (db) => {
+  const a = await q(db, 'coach_C', `select id, email, age, injury_flags from public.athletes where id = '${ATH_D}'`);
+  const b = await q(db, 'coach_C', `select * from public.athletes`);
+  return { ok: !a.err && a.rows.length === 0 && !b.err && b.rows.length === 0, detail: { cols_email_age_injury: a.err || a.rows.length, star: b.err || b.rows.length } };
+};
+
+// ---------- inputs ----------
+rec('input: P1-29 SQL replayed from ae58b91f, sha256 b4861884...', sha(SQL29) === P129.sha, sha(SQL29));
+rec('input: P1-29b SQL replayed from 89b0be9c, sha256 f0558b74...', sha(SQL29B) === P129B.sha, sha(SQL29B));
+rec('input: neither P1-29 nor P1-29b migration file is on this branch', !fs.existsSync(path.join(repo, P129.p)) && !fs.existsSync(path.join(repo, P129B.p)));
+rec('input: P1-29c sql sha256', true, sha(MIG));
+rec('input: P1-29c rollback sha256', true, sha(ROLL));
+rec('input: live pg_policies rows (athletes + 5 dependent tables)', LIVE.length === 26, LIVE.length);
+
+// ---------- baseline: live + P1-29 + P1-29b ----------
+const db = await fresh(null);
+const sB = await snap(db);
+rec('baseline policies == live pg_policies text (setup is exact)', J(sB.policies.map((r) => [r.tablename, r.policyname, r.permissive, r.roles, r.cmd, r.qual, r.with_check])) === J(LIVE.map((r) => [r.tablename, r.policyname, r.permissive, r.roles, r.cmd, r.qual, r.with_check])));
+const leakB = await q(db, 'coach_C', `select email, age, injury_flags from public.athletes where id = '${ATH_D}'`);
+rec('baseline (the gap): coach_C reads athlete D email/age/injury_flags directly', !leakB.err && leakB.rows.length === 1 && leakB.rows[0].age === 29, leakB.err || leakB.rows.length);
+const insB_ok = await coachInsert(db, ATH_D, D, 'f1');
+const insB_bad = await coachInsert(db, ATH_E, E, 'f2');
+rec('baseline: coach_C may insert an assessment for linked D, not for E', insB_ok.ok === true && isDenied(insB_bad), { ok: insB_ok, bad: insB_bad });
+
+// ---------- apply P1-29c ----------
+await db.exec(MIG);
+rec('apply: P1-29c applies cleanly after P1-29 and P1-29b', true);
+const sC = await snap(db);
+const fn = (await db.query(`select p.prosecdef, p.provolatile, p.proconfig, pg_get_function_result(p.oid) res, p.proacl::text acl from pg_proc p where p.proname='coach_linked_athlete_ids'`)).rows;
+rec('helper: one function, SECURITY DEFINER, STABLE, search_path ""', fn.length === 1 && fn[0].prosecdef && fn[0].provolatile === 's' && J(fn[0].proconfig) === J(['search_path=""']), fn);
+rec('helper: returns TABLE(athlete_id uuid, user_id uuid) only', fn[0] && fn[0].res === 'TABLE(athlete_id uuid, user_id uuid)', fn[0] && fn[0].res);
+const priv = (await db.query(`select r, has_function_privilege(r, 'public.coach_linked_athlete_ids()', 'EXECUTE') x from unnest(array['anon','authenticated','service_role']) r`)).rows;
+rec('helper grants: EXECUTE authenticated only (anon, service_role, PUBLIC revoked)', J(priv) === J([{ r: 'anon', x: false }, { r: 'authenticated', x: true }, { r: 'service_role', x: false }]) && fn[0].acl === '{postgres=X/postgres,authenticated=X/postgres}', { priv, acl: fn[0] && fn[0].acl });
+const pol = Object.fromEntries(sC.policies.map((r) => [r.policyname, r]));
+rec('policy: coaches_select_athletes dropped', !pol.coaches_select_athletes);
+const rewritten = ['coaches_select_assessments', 'coaches_insert_assessments', 'drill_sessions_coach', 'game_plans_coach', 'completions_coach_read', 'ps_coach'];
+rec('policy: six dependent coach policies rewritten, TO authenticated, via coach_linked_athlete_ids(), no athletes subquery', rewritten.every((n) => pol[n] && pol[n].roles === '{authenticated}' && /coach_linked_athlete_ids\(\)/.test((pol[n].qual || '') + (pol[n].with_check || '')) && !/athletes a/.test((pol[n].qual || '') + (pol[n].with_check || ''))), rewritten.map((n) => pol[n] && pol[n].roles));
+const untouchedLive = LIVE.filter((r) => r.policyname !== 'coaches_select_athletes' && !rewritten.includes(r.policyname));
+rec(`policy: the other ${untouchedLive.length} policies on these tables are byte-identical to live`, untouchedLive.every((r) => pol[r.policyname] && pol[r.policyname].qual === r.qual && pol[r.policyname].with_check === r.with_check && pol[r.policyname].roles === r.roles && pol[r.policyname].cmd === r.cmd));
+rec('view: security_barrier + security_invoker kept', J(sC.reloptions) === J(sB.reloptions) && sC.reloptions.includes('security_invoker=true'), sC.reloptions);
+rec('view: no direct athletes/coaches/users read in coach_roster', !/\bathletes\b|\bcoaches\b|\busers\b/.test(sC.viewdef.replace(/coach_linked_athlete_ids|coach_linked_athletes/g, '')), sC.viewdef.replace(/\s+/g, ' '));
+
+// linked coach
+const hC = await q(db, 'coach_C', 'select * from public.coach_linked_athlete_ids()');
+rec('linked coach: helper returns only athlete_id, user_id for linked D', !hC.err && J(hC.cols) === J(['athlete_id', 'user_id']) && J(hC.rows) === J([{ athlete_id: ATH_D, user_id: D }]), hC.err || hC.rows);
+const z = await coachDirectZero(db);
+rec('linked coach: SELECT email, age, injury_flags (or *) from athletes = 0 rows', z.ok, z.detail);
+rec('linked coach: roster identical to P1-29b (same 4 columns, D only)', J(sC.personas.coach_C.roster) === J(sB.personas.coach_C.roster) && sC.personas.coach_C.roster.rows.length === 1, short(sC.personas.coach_C.roster));
+for (const t of DEP_TABLES) {
+  rec(`linked coach: ${t} rows identical to P1-29b`, J(sC.personas.coach_C[t]) === J(sB.personas.coach_C[t]), `${short(sB.personas.coach_C[t])} -> ${short(sC.personas.coach_C[t])}`);
+}
+rec('linked coach: users rows identical to P1-29b (self only)', J(sC.personas.coach_C.users) === J(sB.personas.coach_C.users));
+const insC_ok = await coachInsert(db, ATH_D, D, 'f3');
+const insC_bad = await coachInsert(db, ATH_E, E, 'f4');
+rec('linked coach: assessment insert for D still allowed, for E still denied', insC_ok.ok === true && isDenied(insC_bad), { ok: insC_ok, bad: insC_bad });
+
+// unlinked coach
+const f = sC.personas.coach_F_unlinked;
+const hF = await q(db, 'coach_F_unlinked', 'select * from public.coach_linked_athlete_ids()');
+rec('unlinked coach: helper, roster, athletes and all dependent tables = 0 rows', !hF.err && hF.rows.length === 0 && f.roster.rows.length === 0 && f.athletes.rows.length === 0 && DEP_TABLES.every((t) => f[t].rows && f[t].rows.length === (t === 'game_plans' ? 1 : 0)), { helper: hF.rows && hF.rows.length, roster: short(f.roster), gp_public_only: short(f.game_plans) });
+
+// every other persona unchanged
+for (const p of ['athlete_D', 'athlete_E', 'school_admin_SA', 'anon', 'coach_F_unlinked']) {
+  rec(`${p}: athletes, users, roster and all 5 dependent tables identical to P1-29b`, J(sC.personas[p]) === J(sB.personas[p]), `athletes=${short(sC.personas[p].athletes)}`);
+}
+{
+  const { roster: rB, ...restB } = sB.personas.service_role;
+  const { roster: rC, ...restC } = sC.personas.service_role;
+  rec('service_role: athletes, users and all 5 dependent tables identical to P1-29b', J(restC) === J(restB), `athletes=${short(restC.athletes)}`);
+  // Already true after P1-29b (coach_linked_athletes is authenticated-only): service_role SELECT on coach_roster is 42501.
+  rec('service_role: coach_roster SELECT denied (42501) after P1-29b and still after P1-29c (helpers are authenticated-only)', isDenied(rB) && isDenied(rC), { b: rB.err, c: rC.err });
+}
+rec('athlete_D: own athletes row (all columns incl. email/age/injury_flags) still visible', sC.personas.athlete_D.athletes.rows.length === 1 && sC.personas.athlete_D.athletes.rows[0].age === 29);
+rec('athletes: roster 0 rows', sC.personas.athlete_D.roster.rows.length === 0 && sC.personas.athlete_E.roster.rows.length === 0);
+rec('anon: athletes 0 rows, roster denied, helper denied', sC.personas.anon.athletes.rows.length === 0 && isDenied(sC.personas.anon.roster) && isDenied(await q(db, 'anon', 'select * from public.coach_linked_athlete_ids()')));
+rec('anon: public game plan still readable (rewritten policies are TO authenticated)', !sC.personas.anon.game_plans.err && sC.personas.anon.game_plans.rows.length === 1, short(sC.personas.anon.game_plans));
+const srv = await q(db, 'service_role', `select id, user_id, email, full_name, belt, is_active, gym_name from public.athletes where coach_id = '${COACH_C}' and is_active = true`);
+rec('service_role: get-coach-roster athletes select (id,user_id,email,full_name,belt,is_active,gym_name) unaffected', !srv.err && srv.rows.length === 1 && srv.rows[0].gym_name === 'Gym D', srv.err || srv.rows.length);
+rec('service_role: reads all athletes rows (BYPASSRLS), identical to P1-29b', sC.personas.service_role.athletes.rows.length === 2);
+rec('service_role: helper EXECUTE denied', isDenied(await q(db, 'service_role', 'select * from public.coach_linked_athlete_ids()')));
+
+// ---------- rollback ----------
+await db.exec(ROLL);
+const sR = await snap(db);
+rec('rollback: helper dropped', (await db.query(`select count(*)::int n from pg_proc where proname='coach_linked_athlete_ids'`)).rows[0].n === 0);
+rec('rollback: all 26 policies on athletes + 5 dependent tables == live pg_policies text exactly', J(sR.policies.map((r) => [r.tablename, r.policyname, r.permissive, r.roles, r.cmd, r.qual, r.with_check])) === J(LIVE.map((r) => [r.tablename, r.policyname, r.permissive, r.roles, r.cmd, r.qual, r.with_check])));
+rec('rollback: coaches_select_athletes restored verbatim', (() => { const a = sR.policies.find((r) => r.policyname === 'coaches_select_athletes'); const l = LIVE.find((r) => r.policyname === 'coaches_select_athletes'); return a && a.qual === l.qual && a.roles === l.roles && a.cmd === l.cmd; })());
+rec('rollback: coach_roster definition and options == P1-29b', sR.viewdef === sB.viewdef && J(sR.reloptions) === J(sB.reloptions));
+rec('rollback: every persona x every table identical to P1-29b', J(sR.personas) === J(sB.personas));
+await db.exec(MIG);
+rec('re-apply after rollback: narrowed again', (await coachDirectZero(db)).ok);
+await db.close();
+
+// ---------- planted mutants ----------
+async function mutant(label, mutated, check) {
+  let caught;
+  try {
+    rec(`mutant setup differs from MIG: ${label}`, mutated !== MIG);
+    const m = await fresh(mutated);
+    caught = !(await check(m));
+    await m.close();
+  } catch (e) {
+    caught = true;
+  }
+  rec(`mutant caught: ${label}`, caught);
+}
+const sBcoach = sB.personas.coach_C;
+await mutant('coaches_select_athletes left in place', MIG.replace('DROP POLICY IF EXISTS coaches_select_athletes ON public.athletes;\n', ''), async (m) => (await coachDirectZero(m)).ok);
+const noRewrite = MIG.replace(/DROP POLICY IF EXISTS coaches_select_assessments[\s\S]*?(?=CREATE OR REPLACE VIEW)/, '');
+await mutant('dependent coach policies not rewritten (coach loses assessments etc.)', noRewrite, async (m) => {
+  for (const t of DEP_TABLES) if (J(await q(m, 'coach_C', `select * from public.${t} order by id`)) !== J(sBcoach[t])) return false;
+  return true;
+});
+await mutant('rewritten policies left TO public (anon breaks on game_plans)', MIG.replace(/FOR SELECT TO authenticated\n  USING \(game_plans/, 'FOR SELECT TO public\n  USING (game_plans'), async (m) => {
+  const g = await q(m, 'anon', 'select * from public.game_plans order by id');
+  return !g.err && g.rows.length === 1;
+});
+await mutant('helper EXECUTE left to anon', MIG.replace('FROM PUBLIC, anon, service_role;', 'FROM PUBLIC;'), async (m) => isDenied(await q(m, 'anon', 'select * from public.coach_linked_athlete_ids()')));
+await mutant('helper returns an extra column (email)', MIG.replace('RETURNS TABLE (athlete_id uuid, user_id uuid)', 'RETURNS TABLE (athlete_id uuid, user_id uuid, email text)').replace('SELECT a.id, a.user_id\n', 'SELECT a.id, a.user_id, a.email\n').replace(/SELECT l\.athlete_id,\n         l\.user_id,/, 'SELECT l.athlete_id,\n         l.user_id,'), async (m) => {
+  const h = await q(m, 'coach_C', 'select * from public.coach_linked_athlete_ids()');
+  return !h.err && J(h.cols) === J(['athlete_id', 'user_id']);
+});
+await mutant('helper not SECURITY DEFINER (invoker cannot see athletes)', MIG.replace('STABLE\nSECURITY DEFINER\nSET search_path', 'STABLE\nSET search_path'), async (m) => {
+  const r = await q(m, 'coach_C', 'select * from public.coach_roster');
+  return J(r) === J(sBcoach.roster);
+});
+
+const failed = results.filter((r) => !r.ok);
+console.log(J({ passed: results.length - failed.length, failed: failed.length, total: results.length, failed_names: failed.map((r) => r.name) }));
+if (failed.length) process.exit(1);

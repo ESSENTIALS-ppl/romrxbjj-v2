@@ -1,0 +1,239 @@
+{
+ "source": "live pg_policies, project cqzvqzwwevnflinxgnpp, read-only, read_at 2026-11-16 20:45:19 America/New_York",
+ "rows": [
+  {
+   "tablename": "assessments",
+   "policyname": "assessments: linked coach reads",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "coach_linked_to_user(user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments: self read/write",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments: service role",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(current_setting('role'::text) = 'service_role'::text)",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments_insert_own",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "INSERT",
+   "qual": null,
+   "with_check": "(EXISTS ( SELECT 1\n   FROM athletes a\n  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = auth.uid()))))"
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments_select_own",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM athletes a\n  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = auth.uid()))))",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments_service_role_all",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "((auth.jwt() ->> 'role'::text) = 'service_role'::text)",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "assessments_user_select",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(user_id = auth.uid())",
+   "with_check": null
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "coaches_insert_assessments",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "INSERT",
+   "qual": null,
+   "with_check": "(EXISTS ( SELECT 1\n   FROM (athletes a\n     JOIN coaches c ON ((c.id = a.coach_id)))\n  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = auth.uid()))))"
+  },
+  {
+   "tablename": "assessments",
+   "policyname": "coaches_select_assessments",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM (athletes a\n     JOIN coaches c ON ((c.id = a.coach_id)))\n  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = auth.uid()))))",
+   "with_check": null
+  },
+  {
+   "tablename": "athletes",
+   "policyname": "athletes_select_own",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(auth.uid() = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "athletes",
+   "policyname": "athletes_service_role_all",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "((auth.jwt() ->> 'role'::text) = 'service_role'::text)",
+   "with_check": null
+  },
+  {
+   "tablename": "athletes",
+   "policyname": "athletes_update_own",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "UPDATE",
+   "qual": "(auth.uid() = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "athletes",
+   "policyname": "coaches_select_athletes",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM coaches c\n  WHERE ((c.user_id = auth.uid()) AND (c.id = athletes.coach_id))))",
+   "with_check": null
+  },
+  {
+   "tablename": "drill_sessions",
+   "policyname": "drill_sessions_coach",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM (athletes a\n     JOIN coaches c ON ((c.id = a.coach_id)))\n  WHERE ((a.user_id = drill_sessions.user_id) AND (c.user_id = auth.uid()))))",
+   "with_check": null
+  },
+  {
+   "tablename": "drill_sessions",
+   "policyname": "drill_sessions_self",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(auth.uid() = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "drill_sessions",
+   "policyname": "drill_sessions_service",
+   "permissive": "PERMISSIVE",
+   "roles": "{service_role}",
+   "cmd": "ALL",
+   "qual": "true",
+   "with_check": null
+  },
+  {
+   "tablename": "game_plans",
+   "policyname": "game_plans_coach",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM (athletes a\n     JOIN coaches c ON ((c.id = a.coach_id)))\n  WHERE ((a.user_id = game_plans.user_id) AND (c.user_id = auth.uid()))))",
+   "with_check": null
+  },
+  {
+   "tablename": "game_plans",
+   "policyname": "game_plans_public_select",
+   "permissive": "PERMISSIVE",
+   "roles": "{anon,authenticated}",
+   "cmd": "SELECT",
+   "qual": "(is_public = true)",
+   "with_check": null
+  },
+  {
+   "tablename": "game_plans",
+   "policyname": "game_plans_self",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(auth.uid() = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "game_plans",
+   "policyname": "game_plans_service",
+   "permissive": "PERMISSIVE",
+   "roles": "{service_role}",
+   "cmd": "ALL",
+   "qual": "true",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_completions",
+   "policyname": "completions_coach_read",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM athletes a\n  WHERE ((a.user_id = protocol_completions.user_id) AND (a.coach_id IN ( SELECT coaches.id\n           FROM coaches\n          WHERE (coaches.user_id = auth.uid()))))))",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_completions",
+   "policyname": "completions_own",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(user_id = auth.uid())",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_completions",
+   "policyname": "completions_service_role",
+   "permissive": "PERMISSIVE",
+   "roles": "{service_role}",
+   "cmd": "ALL",
+   "qual": "true",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_sessions",
+   "policyname": "ps_coach",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "(EXISTS ( SELECT 1\n   FROM (athletes a\n     JOIN coaches c ON ((c.id = a.coach_id)))\n  WHERE ((a.user_id = protocol_sessions.user_id) AND (c.user_id = auth.uid()))))",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_sessions",
+   "policyname": "ps_self",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "(auth.uid() = user_id)",
+   "with_check": null
+  },
+  {
+   "tablename": "protocol_sessions",
+   "policyname": "ps_service",
+   "permissive": "PERMISSIVE",
+   "roles": "{service_role}",
+   "cmd": "ALL",
+   "qual": "true",
+   "with_check": null
+  }
+ ]
+}

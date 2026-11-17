@@ -1,0 +1,80 @@
+-- Rollback for 20261117020400_p1_29c_coach_athletes_narrow (UNAPPLIED).
+-- Restores the state after P1-29b (20261117020300):
+--   * coach_roster: the P1-29b definition (athletes + coaches + coach_linked_athletes()).
+--   * coaches_select_athletes on public.athletes and the six dependent coach policies,
+--     recreated from the live pg_policies text read 2026-11-16 8:45 PM ET (roles public).
+--   * public.coach_linked_athlete_ids() dropped.
+-- The view and the policies are restored before the helper is dropped (they depend on it).
+
+BEGIN;
+
+CREATE OR REPLACE VIEW public.coach_roster
+  WITH (security_barrier = true, security_invoker = true) AS
+  SELECT a.id AS athlete_id,
+         a.user_id,
+         h.full_name,
+         h.belt
+  FROM public.athletes a
+  JOIN public.coaches c ON c.id = a.coach_id
+  JOIN public.coach_linked_athletes() h ON h.id = a.user_id
+  WHERE c.user_id = (SELECT auth.uid());
+
+DROP POLICY IF EXISTS coaches_select_athletes ON public.athletes;
+CREATE POLICY coaches_select_athletes ON public.athletes
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.user_id = auth.uid()) AND (c.id = athletes.coach_id)))));
+
+DROP POLICY IF EXISTS coaches_select_assessments ON public.assessments;
+CREATE POLICY coaches_select_assessments ON public.assessments
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM (athletes a
+     JOIN coaches c ON ((c.id = a.coach_id)))
+  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = auth.uid())))));
+
+DROP POLICY IF EXISTS coaches_insert_assessments ON public.assessments;
+CREATE POLICY coaches_insert_assessments ON public.assessments
+  AS PERMISSIVE FOR INSERT TO public
+  WITH CHECK ((EXISTS ( SELECT 1
+   FROM (athletes a
+     JOIN coaches c ON ((c.id = a.coach_id)))
+  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = auth.uid())))));
+
+DROP POLICY IF EXISTS drill_sessions_coach ON public.drill_sessions;
+CREATE POLICY drill_sessions_coach ON public.drill_sessions
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM (athletes a
+     JOIN coaches c ON ((c.id = a.coach_id)))
+  WHERE ((a.user_id = drill_sessions.user_id) AND (c.user_id = auth.uid())))));
+
+DROP POLICY IF EXISTS game_plans_coach ON public.game_plans;
+CREATE POLICY game_plans_coach ON public.game_plans
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM (athletes a
+     JOIN coaches c ON ((c.id = a.coach_id)))
+  WHERE ((a.user_id = game_plans.user_id) AND (c.user_id = auth.uid())))));
+
+DROP POLICY IF EXISTS completions_coach_read ON public.protocol_completions;
+CREATE POLICY completions_coach_read ON public.protocol_completions
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM athletes a
+  WHERE ((a.user_id = protocol_completions.user_id) AND (a.coach_id IN ( SELECT coaches.id
+           FROM coaches
+          WHERE (coaches.user_id = auth.uid())))))));
+
+DROP POLICY IF EXISTS ps_coach ON public.protocol_sessions;
+CREATE POLICY ps_coach ON public.protocol_sessions
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM (athletes a
+     JOIN coaches c ON ((c.id = a.coach_id)))
+  WHERE ((a.user_id = protocol_sessions.user_id) AND (c.user_id = auth.uid())))));
+
+DROP FUNCTION IF EXISTS public.coach_linked_athlete_ids();
+
+COMMIT;
