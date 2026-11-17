@@ -1,0 +1,14 @@
+{
+  "read_at": "2026-11-16 7:28 PM ET (America/New_York)",
+  "project": "cqzvqzwwevnflinxgnpp",
+  "query": "counts only; no emails, names, or row contents selected",
+  "rules": "v3: completed account_deletion_requests.completed_at older than 90 days; path 2 unused",
+  "qualifying_total": 0,
+  "candidates_before_exclusions": 0,
+  "adr_completed_any_age": 0,
+  "adr_completed_under_90d": 0,
+  "adr_open_over_90d_not_completed": 0,
+  "auth_soft_deleted_any_age": 0,
+  "path2_over_90d_not_used_in_v3": 0,
+  "has_is_test_account": true
+}
