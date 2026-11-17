@@ -2,6 +2,7 @@
 // Uses SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (names; presence UNVERIFIED).
 // r3: touch matches only the caller's own rows and never writes user_id. A cross-user endpoint
 // is deleted from the previous owner and inserted as a new row for the caller.
+// W2: clearOtherBackups nulls this exact endpoint from other users' legacy backups (service role).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handle, type Subscription } from "./handler.ts";
@@ -47,6 +48,11 @@ Deno.serve((req) => handle(req, {
   legacy: async (user_id, s) => {
     const { error } = await admin.from("notification_preferences").upsert({ user_id, push_subscription: s, push_reminders: true }, { onConflict: "user_id" });
     if (error) throw new Error("legacy failed");
+  },
+  clearOtherBackups: async (user_id, endpoint) => {
+    // W2: service role, scoped to this exact endpoint and to users other than the caller.
+    const { error } = await admin.from("notification_preferences").update({ push_subscription: null }).eq("push_subscription->>endpoint", endpoint).neq("user_id", user_id);
+    if (error) throw new Error("backup clear failed");
   },
   origins: (o) => ({ "Access-Control-Allow-Origin": o && ALLOWED.has(o) ? o : "https://romrx.io", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" }),
 }));

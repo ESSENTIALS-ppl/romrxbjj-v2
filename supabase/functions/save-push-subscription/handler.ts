@@ -5,6 +5,9 @@
 // jsonb column. r3 fix: an endpoint match updates only the caller's own rows. A cross-user
 // endpoint is deleted from the previous owner and inserted fresh for the caller — never a silent
 // reassign of user_id on the existing row.
+// W2 (fix/p1-14-w2-device-move-backup-20261116): after a successful save, clear this exact endpoint
+// from every OTHER user's legacy notification_preferences.push_subscription backup, so a device that
+// moved from user A to user B can no longer be reached through A's backup.
 
 export interface Subscription { endpoint: string; keys: { p256dh: string; auth: string } }
 export type Takeover = "taken" | "none" | "limit";
@@ -19,6 +22,8 @@ export interface Deps {
   insert: (userId: string, s: Subscription) => Promise<"ok" | "limit">;
   remove: (userId: string, endpoint: string) => Promise<void>;
   legacy: (userId: string, s: Subscription) => Promise<void>;
+  /** W2: null the legacy backup on every OTHER user whose backup holds this exact endpoint. Never touches the caller's own backup. Throws on error. */
+  clearOtherBackups: (userId: string, endpoint: string) => Promise<void>;
   origins: (o: string | null) => Record<string, string>;
 }
 
@@ -58,6 +63,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
   if (!s) return json({ error: "Missing or invalid subscription object" }, 400);
   try {
     if ((await saveDevice(uid, s, d)) === "limit") return json({ error: "device_limit_reached" }, 409);
+    await d.clearOtherBackups(uid, s.endpoint);
     await d.legacy(uid, s);
   } catch { return json({ error: "save_failed" }, 500); } // never echo database text
   return json({ success: true });

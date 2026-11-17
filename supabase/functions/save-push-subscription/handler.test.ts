@@ -15,6 +15,7 @@ function mk(o: { uid?: string | null; touch?: boolean; ins?: "ok" | "limit" | "t
     insert: async () => { log.insert++; if (o.ins === "throw") throw new Error("db: secret detail"); return o.ins ?? "ok"; },
     remove: async (u, e) => { log.remove.push(`${u}|${e}`); },
     legacy: async () => { log.legacy++; if (o.legacyThrow) throw new Error("x"); },
+    clearOtherBackups: async () => {}, // W2 dep; covered in handler.w2.test.ts
     origins: () => ({ "Access-Control-Allow-Origin": "https://romrx.io" }),
   };
   return { d, log };

@@ -8,6 +8,9 @@
 // reminder time is exempt and sends even inside 21:00-08:00 local. On 404/410, clear that user's
 // dead subscription (table row and/or matching legacy jsonb) and release the day's claim so it is
 // not counted as the day's send. Dry-run reports would_clear and writes nothing.
+// W2 (fix/p1-14-w2-device-move-backup-20261116): the legacy notification_preferences fallback is used
+// only when no push_subscriptions row for that endpoint belongs to a different user. Otherwise the
+// fallback is skipped with a reason code. If the owner lookup fails, every fallback is skipped.
 
 export const PUSH_COPY = {
   protocol: { title: "ROMRx Base", body: "Time for today's session. Open ROMRx Base to see your plan." },
@@ -17,6 +20,33 @@ export const PUSH_COPY = {
 } as const;
 
 export type Kind = keyof typeof PUSH_COPY;
+
+// ---------- W2: legacy fallback ownership guard ----------
+export const FALLBACK_OWNED_BY_OTHER_USER = "fallback_endpoint_owned_by_other_user";
+export const FALLBACK_OWNER_LOOKUP_FAILED = "fallback_owner_lookup_failed";
+export type FallbackSkipReason = typeof FALLBACK_OWNED_BY_OTHER_USER | typeof FALLBACK_OWNER_LOOKUP_FAILED;
+export interface OwnerRow { user_id: string; endpoint: string }
+
+/** owners = every push_subscriptions row (any disabled_at) whose endpoint is a fallback endpoint, or null if the lookup failed. */
+export function fallbackAllowed(userId: string, endpoint: string, owners: OwnerRow[] | null): { ok: true } | { ok: false; reason: FallbackSkipReason } {
+  if (!owners) return { ok: false, reason: FALLBACK_OWNER_LOOKUP_FAILED };
+  for (const o of owners) {
+    if (o.endpoint === endpoint && o.user_id !== userId) return { ok: false, reason: FALLBACK_OWNED_BY_OTHER_USER };
+  }
+  return { ok: true };
+}
+
+/** Splits fallback candidates into allowed ones and per-reason skip counts (counts only, no ids or endpoints). */
+export function filterFallbacks<T extends { userId: string; sub: PushSub }>(fallbacks: T[], owners: OwnerRow[] | null): { allowed: T[]; skipped: Record<FallbackSkipReason, number> } {
+  const allowed: T[] = [];
+  const skipped: Record<FallbackSkipReason, number> = { [FALLBACK_OWNED_BY_OTHER_USER]: 0, [FALLBACK_OWNER_LOOKUP_FAILED]: 0 } as Record<FallbackSkipReason, number>;
+  for (const f of fallbacks) {
+    const v = fallbackAllowed(f.userId, f.sub.endpoint, owners);
+    if (v.ok) allowed.push(f);
+    else skipped[v.reason] += 1;
+  }
+  return { allowed, skipped };
+}
 
 export interface PushSub {
   endpoint: string;

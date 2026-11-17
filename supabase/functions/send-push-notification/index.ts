@@ -4,9 +4,11 @@
 // Sends only when WEB_PUSH_SEND is exactly "on". Never logs VAPID values, endpoints, or emails.
 // r3: 404/410 clears that user's dead push_subscriptions row and any matching legacy
 // notification_preferences.push_subscription jsonb, and releases the push_sends claim.
+// W2: the legacy jsonb fallback is skipped when that endpoint has a push_subscriptions row owned by a
+// different user (reason codes logged as counts only; no ids or endpoints).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { handle, type Candidate, type Deps, type Kind, type PushSub, dedupeKey, vapidSubjectOk } from "./handler.ts";
+import { handle, type Candidate, type Deps, type Kind, type OwnerRow, type PushSub, dedupeKey, filterFallbacks, FALLBACK_OWNED_BY_OTHER_USER, FALLBACK_OWNER_LOOKUP_FAILED, vapidSubjectOk } from "./handler.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -113,11 +115,26 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
       list.push({ id: row.id, sub });
       subsByUser.set(row.user_id, list);
     }
+    // W2: collect legacy fallbacks, then refuse any whose endpoint has a push_subscriptions row
+    // (any disabled_at) owned by a different user. Owner lookup error -> skip all (fail closed).
+    const fallbacks: { userId: string; sub: PushSub }[] = [];
     for (const p of prefs as { user_id: string; timezone: string | null; reminder_time: string | null; push_subscription: unknown }[]) {
       if (!subsByUser.has(p.user_id)) {
         const fallback = subFromJson(p.push_subscription);
-        if (fallback) subsByUser.set(p.user_id, [{ id: null, sub: fallback }]);
+        if (fallback) fallbacks.push({ userId: p.user_id, sub: fallback });
       }
+    }
+    if (fallbacks.length) {
+      const endpoints = [...new Set(fallbacks.map((f) => f.sub.endpoint))];
+      let owners: OwnerRow[] | null = [];
+      for (let i = 0; i < endpoints.length && owners; i += 50) {
+        const { data: ownerRows, error: ownerErr } = await sb.from("push_subscriptions").select("user_id, endpoint").in("endpoint", endpoints.slice(i, i + 50));
+        owners = ownerErr || !ownerRows ? null : owners.concat(ownerRows as OwnerRow[]);
+      }
+      const { allowed, skipped } = filterFallbacks(fallbacks, owners);
+      for (const f of allowed) subsByUser.set(f.userId, [{ id: null, sub: f.sub }]);
+      const refused = skipped[FALLBACK_OWNED_BY_OTHER_USER] + skipped[FALLBACK_OWNER_LOOKUP_FAILED];
+      if (refused) console.log(JSON.stringify({ fn: "send-push-notification", event: "legacy_fallback_skipped", reasons: skipped }));
     }
 
     const flags = await testFlags(sb, [...subsByUser.keys()]);
