@@ -1,0 +1,9 @@
+22d1cf98a9285dd17a0f2cf8c8b74df46d7e617ae6026c623a40f6397ec5450a  ./6bde1ac8.patch
+cb5e97cdcc00c7cacdfbb0de5c4de3ecb5f9cc6204169afdc9fd0de03f32a9a0  ./BUILD-NOTES.md
+429593b1213114f6857ac341a698af0c6174da2fc8526f4d73695fe1894f62e4  ./RECEIPT-P1-14-r3-20261116.md
+db53c39e679db04c7632532a3ee7ca9c83a6525ce55f139e3ff95a294a9b111e  ./SIDE-FINDING-save-push-subscription-20261116.md
+4ba4653aa2eaa52525252b7b99b0fcc1bfaa9e05ef196ea9a4194428563b00dd  ./logs/deno-test-r3-20261116.log
+7d10b5a570d5507916eb4c040f6543f2dbfcb2417dc2150177f24c0e85e2c3b1  ./logs/deno-test-save-push.log
+b2c9160f107cace530c0dda0149cba81c776e7323da0dfa1c1cc6ec8dfa01882  ./logs/deno-test-send-push.log
+d209096e015030e2667c7d6395fa61e6472363c5b0793969bb57ba7847f14c06  ./side-finding/live-save-push-subscription-v21/handler.ts
+b3686a4e3f1d948872de42d07eafdc5465c964a7c735e76e24fdb3ff377bf42a  ./side-finding/live-save-push-subscription-v21/index.ts

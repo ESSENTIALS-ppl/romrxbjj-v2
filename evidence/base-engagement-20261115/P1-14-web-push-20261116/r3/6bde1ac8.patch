@@ -1,0 +1,877 @@
+diff --git a/supabase/functions/save-push-subscription/handler.test.ts b/supabase/functions/save-push-subscription/handler.test.ts
+new file mode 100644
+index 0000000..0232555
+--- /dev/null
++++ b/supabase/functions/save-push-subscription/handler.test.ts
+@@ -0,0 +1,231 @@
++// P1-14 r3 tests for save-push-subscription: own-row touch, cross-user delete+insert (never silent reassign),
++// device limit, legacy jsonb still written. Run:
++// deno test --no-lock --node-modules-dir=none --allow-read --allow-write handler.test.ts
++import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
++import { type Deps, handle, parseSubscription, saveDevice, type Subscription, type Takeover } from "./handler.ts";
++
++const good: Subscription = { endpoint: "https://push.example/abc", keys: { p256dh: "P".repeat(87), auth: "A".repeat(22) } };
++
++function mk(o: { uid?: string | null; touch?: boolean; ins?: "ok" | "limit" | "throw"; takeover?: Takeover | "throw"; legacyThrow?: boolean } = {}) {
++  const log = { touch: 0, insert: 0, takeover: 0, remove: [] as string[], legacy: 0, touchUser: "" as string, takeoverUser: "" as string };
++  const d: Deps = {
++    userId: async () => o.uid === undefined ? "u1" : o.uid,
++    touch: async (u) => { log.touch++; log.touchUser = u; return o.touch ?? false; },
++    takeover: async (u) => { log.takeover++; log.takeoverUser = u; if (o.takeover === "throw") throw new Error("db: secret detail"); return o.takeover ?? "none"; },
++    insert: async () => { log.insert++; if (o.ins === "throw") throw new Error("db: secret detail"); return o.ins ?? "ok"; },
++    remove: async (u, e) => { log.remove.push(`${u}|${e}`); },
++    legacy: async () => { log.legacy++; if (o.legacyThrow) throw new Error("x"); },
++    origins: () => ({ "Access-Control-Allow-Origin": "https://romrx.io" }),
++  };
++  return { d, log };
++}
++const post = (b: unknown, auth = true) => new Request("https://x.test/f", { method: "POST", body: JSON.stringify(b), headers: auth ? { Authorization: "Bearer t" } : {} });
++
++Deno.test("401 without Authorization or with a bad JWT, nothing written", async () => {
++  const a = mk(); assertEquals((await handle(post({ subscription: good }, false), a.d)).status, 401);
++  const b = mk({ uid: null }); assertEquals((await handle(post({ subscription: good }), b.d)).status, 401);
++  assertEquals(a.log.insert + b.log.insert + b.log.touch + b.log.legacy + b.log.takeover, 0);
++});
++Deno.test("GET 405, OPTIONS 204 with CORS", async () => {
++  const m = mk(); assertEquals((await handle(new Request("https://x.test/f", { method: "GET" }), m.d)).status, 405);
++  const o = await handle(new Request("https://x.test/f", { method: "OPTIONS" }), m.d); assertEquals(o.status, 204); assert(o.headers.get("Access-Control-Allow-Origin"));
++});
++Deno.test("invalid subscriptions are 400 and write nothing", async () => {
++  const m = mk();
++  for (const bad of [undefined, null, {}, { endpoint: "http://insecure/x", keys: good.keys }, { endpoint: good.endpoint }, { endpoint: good.endpoint, keys: { p256dh: "short", auth: good.keys.auth } }, { endpoint: good.endpoint, keys: { p256dh: good.keys.p256dh, auth: "x" } }, { endpoint: "https://" + "a".repeat(3000), keys: good.keys }, { endpoint: 5, keys: good.keys }])
++    assertEquals((await handle(post({ subscription: bad }), m.d)).status, 400);
++  assertEquals(m.log.insert + m.log.touch + m.log.legacy + m.log.takeover, 0);
++});
++Deno.test("invalid JSON is 400", async () => { const m = mk(); assertEquals((await handle(new Request("https://x.test/f", { method: "POST", body: "{", headers: { Authorization: "b" } }), m.d)).status, 400); });
++Deno.test("new device is inserted, legacy column still written", async () => {
++  const m = mk(); const r = await handle(post({ subscription: good }), m.d); assertEquals(r.status, 200);
++  assertEquals([m.log.touch, m.log.takeover, m.log.insert, m.log.legacy], [1, 1, 1, 1]);
++});
++Deno.test("caller's own endpoint is touched, not inserted or taken over", async () => {
++  const m = mk({ touch: true }); assertEquals((await handle(post({ subscription: good }), m.d)).status, 200);
++  assertEquals([m.log.touch, m.log.takeover, m.log.insert, m.log.legacy], [1, 0, 0, 1]);
++});
++Deno.test("cross-user endpoint is taken over (delete+insert), not silently touched, legacy still written", async () => {
++  const m = mk({ takeover: "taken" }); assertEquals((await handle(post({ subscription: good }), m.d)).status, 200);
++  assertEquals([m.log.touch, m.log.takeover, m.log.insert, m.log.legacy], [1, 1, 0, 1]);
++});
++Deno.test("device limit on insert gives 409 and does not touch the legacy column", async () => {
++  const m = mk({ ins: "limit" }); const r = await handle(post({ subscription: good }), m.d); assertEquals(r.status, 409); assertEquals(m.log.legacy, 0);
++});
++Deno.test("device limit on cross-user takeover gives 409, does not insert, does not write legacy", async () => {
++  const m = mk({ takeover: "limit" }); const r = await handle(post({ subscription: good }), m.d);
++  assertEquals(r.status, 409);
++  assertEquals(await r.json(), { error: "device_limit_reached" });
++  assertEquals([m.log.insert, m.log.legacy], [0, 0]);
++});
++Deno.test("database errors give a generic 500 with no database text", async () => {
++  for (const o of [{ ins: "throw" as const }, { takeover: "throw" as const }, { legacyThrow: true }]) {
++    const m = mk(o); const r = await handle(post({ subscription: good }), m.d);
++    assertEquals(r.status, 500); assertEquals(await r.json(), { error: "save_failed" });
++  }
++});
++Deno.test("unsubscribe removes only the caller's own endpoint (user id comes from the JWT, not the body)", async () => {
++  const m = mk(); const r = await handle(post({ unsubscribe: true, endpoint: good.endpoint, user_id: "victim" }), m.d);
++  assertEquals(r.status, 200); assertEquals(m.log.remove, [`u1|${good.endpoint}`]);
++  assertEquals((await handle(post({ unsubscribe: true }), m.d)).status, 400);
++});
++Deno.test("parseSubscription accepts a real-shaped subscription", () => { assert(parseSubscription(good)); });
++Deno.test("source: user id never read from the body, no console logging", async () => {
++  const s = await Deno.readTextFile(new URL("./handler.ts", import.meta.url));
++  assert(!/body\.user_id|body\.userId/.test(s)); assert(!/console\./.test(s));
++});
++
++// ---------- in-memory store: prove no silent reassign ----------
++interface Row { id: string; userId: string; endpoint: string; p256dh: string; auth: string }
++function mem() {
++  const rows: Row[] = [];
++  let seq = 1;
++  const ops: Pick<Deps, "touch" | "takeover" | "insert"> = {
++    touch: async (userId, s) => {
++      const r = rows.find((x) => x.endpoint === s.endpoint && x.userId === userId);
++      if (!r) return false;
++      r.p256dh = s.keys.p256dh;
++      r.auth = s.keys.auth;
++      return true;
++    },
++    takeover: async (userId, s) => {
++      const r = rows.find((x) => x.endpoint === s.endpoint && x.userId !== userId);
++      if (!r) return "none";
++      if (rows.filter((x) => x.userId === userId).length >= 10) return "limit";
++      rows.splice(rows.indexOf(r), 1);
++      rows.push({ id: `new-${seq++}`, userId, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++      return "taken";
++    },
++    insert: async (userId, s) => {
++      if (rows.filter((x) => x.userId === userId).length >= 10) return "limit";
++      if (rows.some((x) => x.endpoint === s.endpoint)) throw new Error("unique_endpoint");
++      rows.push({ id: `new-${seq++}`, userId, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++      return "ok";
++    },
++  };
++  return { rows, ops };
++}
++
++Deno.test("r3 store: own endpoint updates keys on the same row id and does not change user_id", async () => {
++  const st = mem();
++  st.rows.push({ id: "row-1", userId: "user-b", endpoint: good.endpoint, p256dh: "P".repeat(87), auth: "A".repeat(22) });
++  const rotated: Subscription = { endpoint: good.endpoint, keys: { p256dh: "Q".repeat(87), auth: "B".repeat(22) } };
++  assertEquals(await saveDevice("user-b", rotated, st.ops), "ok");
++  assertEquals(st.rows.length, 1);
++  assertEquals(st.rows[0].id, "row-1");
++  assertEquals(st.rows[0].userId, "user-b");
++  assertEquals(st.rows[0].p256dh, "Q".repeat(87));
++});
++
++Deno.test("r3 store: cross-user endpoint deletes the old row and inserts a fresh row for the caller (new id, never a silent reassign)", async () => {
++  const st = mem();
++  st.rows.push({ id: "old-1", userId: "user-a", endpoint: good.endpoint, p256dh: "P".repeat(87), auth: "A".repeat(22) });
++  const rotated: Subscription = { endpoint: good.endpoint, keys: { p256dh: "Q".repeat(87), auth: "B".repeat(22) } };
++  assertEquals(await saveDevice("user-b", rotated, st.ops), "ok");
++  assertEquals(st.rows.length, 1);
++  assertEquals(st.rows[0].userId, "user-b");
++  assertEquals(st.rows[0].id, "new-1");
++  assertFalse(st.rows[0].id === "old-1");
++  assertEquals(st.rows[0].p256dh, "Q".repeat(87));
++  assertEquals(st.rows.filter((r) => r.userId === "user-a").length, 0);
++});
++
++Deno.test("r3 store: cross-user takeover at the 10-device cap leaves the other user's row untouched", async () => {
++  const st = mem();
++  st.rows.push({ id: "old-1", userId: "user-a", endpoint: good.endpoint, p256dh: "P".repeat(87), auth: "A".repeat(22) });
++  for (let i = 0; i < 10; i++) {
++    st.rows.push({ id: `b-${i}`, userId: "user-b", endpoint: `https://push.example/b-${i}`, p256dh: "P".repeat(87), auth: "A".repeat(22) });
++  }
++  assertEquals(await saveDevice("user-b", good, st.ops), "limit");
++  const other = st.rows.find((r) => r.id === "old-1");
++  assert(other);
++  assertEquals(other!.userId, "user-a");
++  assertEquals(other!.endpoint, good.endpoint);
++});
++
++Deno.test("r3 store: a new endpoint is inserted for the caller", async () => {
++  const st = mem();
++  assertEquals(await saveDevice("user-b", good, st.ops), "ok");
++  assertEquals(st.rows.length, 1);
++  assertEquals(st.rows[0].userId, "user-b");
++  assertEquals(st.rows[0].endpoint, good.endpoint);
++});
++
++// ---------- index.ts source: the live bug must not be present ----------
++Deno.test("r3 source: live silent-reassign pattern is gone; touch is scoped to the caller; takeover is delete+insert", async () => {
++  const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
++  // The live v21 (ezbr 5d123c2b) line reassigned by updating user_id on any endpoint match.
++  assertFalse(/\.update\(\{\s*user_id\s*,/.test(src), "touch must not write user_id");
++  assertFalse(/update\(\{\s*user_id:/.test(src), "no update of user_id");
++  assert(src.includes('.eq("endpoint", s.endpoint).eq("user_id", user_id)'), "touch must match caller rows only");
++  assert(src.includes('.update({ p256dh: s.keys.p256dh, auth: s.keys.auth, failure_count: 0, disabled_at: null })'), "touch updates keys only");
++  assert(src.includes('.delete().eq("id", (other as { id: string }).id).eq("endpoint", s.endpoint).neq("user_id", user_id)'), "takeover deletes the other user's row");
++  assert(src.includes('.insert({ user_id, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth })'), "takeover/insert creates a fresh row");
++  assert(src.includes("if ((count ?? 0) >= 10) return \"limit\""), "takeover respects the 10-device cap before delete");
++  assert(src.includes("push_subscription: s"), "legacy jsonb write kept");
++  assertFalse(/console\./.test(src));
++});
++
++// ---------- planted mutants on handler.ts saveDevice / handle path ----------
++const SRC = await Deno.readTextFile(new URL("./handler.ts", import.meta.url));
++async function load(src: string) {
++  const dir = await Deno.makeTempDir({ prefix: "p1-14-r3-save-mutant-" });
++  const f = `${dir}/handler.ts`;
++  await Deno.writeTextFile(f, src);
++  return await import(`file://${f}`) as typeof import("./handler.ts");
++}
++
++async function saveOk(m: typeof import("./handler.ts")): Promise<boolean> {
++  const stRows: Row[] = [{ id: "old-1", userId: "user-a", endpoint: good.endpoint, p256dh: "P".repeat(87), auth: "A".repeat(22) }];
++  let seq = 1;
++  const ops: Pick<Deps, "touch" | "takeover" | "insert"> = {
++    touch: async (userId, s) => {
++      // Mutant-resistant expected behaviour is encoded in saveDevice's call pattern;
++      // this fake still only updates own rows.
++      const r = stRows.find((x) => x.endpoint === s.endpoint && x.userId === userId);
++      if (!r) return false;
++      r.p256dh = s.keys.p256dh;
++      r.auth = s.keys.auth;
++      return true;
++    },
++    takeover: async (userId, s) => {
++      const r = stRows.find((x) => x.endpoint === s.endpoint && x.userId !== userId);
++      if (!r) return "none";
++      stRows.splice(stRows.indexOf(r), 1);
++      stRows.push({ id: `new-${seq++}`, userId, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++      return "taken";
++    },
++    insert: async (userId, s) => {
++      const r = stRows.find((x) => x.endpoint === s.endpoint);
++      if (r) {
++        // silent reassign (the live bug) — if saveDevice ever did this, the test must fail
++        r.userId = userId;
++        return "ok";
++      }
++      stRows.push({ id: `new-${seq++}`, userId, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++      return "ok";
++    },
++  };
++  const result = await m.saveDevice("user-b", good, ops);
++  if (result !== "ok") return false;
++  if (stRows.length !== 1) return false;
++  if (stRows[0].userId !== "user-b") return false;
++  if (stRows[0].id === "old-1") return false; // reassigned in place
++  return true;
++}
++
++const MUTANTS: [string, string, string][] = [
++  ["saveDevice skips takeover and inserts (would hit a unique endpoint / silent path)", "  const t = await d.takeover(userId, s);\n  if (t === \"taken\") return \"ok\";\n  if (t === \"limit\") return \"limit\";\n  return await d.insert(userId, s);", "  return await d.insert(userId, s);"],
++  ["saveDevice treats any touch miss as insert only (takeover dropped)", "  if (await d.touch(userId, s)) return \"ok\";\n  const t = await d.takeover(userId, s);", "  if (await d.touch(userId, s)) return \"ok\";\n  const t = \"none\" as const; void d.takeover;"],
++];
++
++Deno.test("r3 save mutants: unmutated source uses delete+insert, not an in-place reassign", async () => {
++  assert(await saveOk(await load(SRC)));
++});
++for (const [name, from, to] of MUTANTS) {
++  Deno.test(`r3 save mutant caught: ${name}`, async () => {
++    assertEquals(SRC.split(from).length - 1, 1, `mutation anchor not unique: ${name}`);
++    const m = await load(SRC.replace(from, to));
++    assertFalse(await saveOk(m), `mutant survived: ${name}`);
++  });
++}
+diff --git a/supabase/functions/save-push-subscription/handler.ts b/supabase/functions/save-push-subscription/handler.ts
+new file mode 100644
+index 0000000..e2773ae
+--- /dev/null
++++ b/supabase/functions/save-push-subscription/handler.ts
+@@ -0,0 +1,64 @@
++// save-push-subscription r3 (P1-14). BUILD ONLY, not deployed.
++// Built from live source (list/get this turn: version 21, ezbr 5d123c2b; r2 receipt called the same
++// hash v20; comments in that source still say v19). Same contract as live: {subscription} plus
++// {unsubscribe:true, endpoint}. Still writes the legacy notification_preferences.push_subscription
++// jsonb column. r3 fix: an endpoint match updates only the caller's own rows. A cross-user
++// endpoint is deleted from the previous owner and inserted fresh for the caller — never a silent
++// reassign of user_id on the existing row.
++
++export interface Subscription { endpoint: string; keys: { p256dh: string; auth: string } }
++export type Takeover = "taken" | "none" | "limit";
++export interface Deps {
++  /** Verified user id from the caller's JWT, or null. */
++  userId: (req: Request) => Promise<string | null>;
++  /** Update keys on the caller's own row for this endpoint. Never changes user_id. Returns true if a row matched. */
++  touch: (userId: string, s: Subscription) => Promise<boolean>;
++  /** If another user owns this endpoint, delete that row and insert a fresh row for the caller. Never updates user_id in place. */
++  takeover: (userId: string, s: Subscription) => Promise<Takeover>;
++  /** Inserts a new device. Returns "ok" | "limit" (10 live devices) | throws. */
++  insert: (userId: string, s: Subscription) => Promise<"ok" | "limit">;
++  remove: (userId: string, endpoint: string) => Promise<void>;
++  legacy: (userId: string, s: Subscription) => Promise<void>;
++  origins: (o: string | null) => Record<string, string>;
++}
++
++export function parseSubscription(v: unknown): Subscription | null {
++  const s = v as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } } | null;
++  if (!s || typeof s.endpoint !== "string" || !/^https:\/\//.test(s.endpoint) || s.endpoint.length > 2048) return null;
++  const p = s.keys?.p256dh, a = s.keys?.auth;
++  if (typeof p !== "string" || p.length < 20 || p.length > 200 || typeof a !== "string" || a.length < 8 || a.length > 100) return null;
++  return { endpoint: s.endpoint, keys: { p256dh: p, auth: a } };
++}
++
++/** Own-row update, or delete+insert for a cross-user endpoint, or a plain insert. Never reassigns user_id. */
++export async function saveDevice(userId: string, s: Subscription, d: Pick<Deps, "touch" | "takeover" | "insert">): Promise<"ok" | "limit"> {
++  if (await d.touch(userId, s)) return "ok";
++  const t = await d.takeover(userId, s);
++  if (t === "taken") return "ok";
++  if (t === "limit") return "limit";
++  return await d.insert(userId, s);
++}
++
++export async function handle(req: Request, d: Deps): Promise<Response> {
++  const cors = d.origins(req.headers.get("Origin"));
++  const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors } });
++  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
++  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
++  if (!req.headers.get("Authorization")) return json({ error: "Missing Authorization header" }, 401);
++  const uid = await d.userId(req);
++  if (!uid) return json({ error: "Unauthorized" }, 401);
++  let body: { subscription?: unknown; unsubscribe?: unknown; endpoint?: unknown };
++  try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
++  if (body.unsubscribe === true) {
++    if (typeof body.endpoint !== "string" || body.endpoint.length > 2048) return json({ error: "Missing endpoint" }, 400);
++    try { await d.remove(uid, body.endpoint); } catch { return json({ error: "save_failed" }, 500); }
++    return json({ success: true });
++  }
++  const s = parseSubscription(body.subscription);
++  if (!s) return json({ error: "Missing or invalid subscription object" }, 400);
++  try {
++    if ((await saveDevice(uid, s, d)) === "limit") return json({ error: "device_limit_reached" }, 409);
++    await d.legacy(uid, s);
++  } catch { return json({ error: "save_failed" }, 500); } // never echo database text
++  return json({ success: true });
++}
+diff --git a/supabase/functions/save-push-subscription/index.ts b/supabase/functions/save-push-subscription/index.ts
+new file mode 100644
+index 0000000..356707a
+--- /dev/null
++++ b/supabase/functions/save-push-subscription/index.ts
+@@ -0,0 +1,52 @@
++// save-push-subscription r3 entrypoint. BUILD ONLY, not deployed.
++// Uses SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (names; presence UNVERIFIED).
++// r3: touch matches only the caller's own rows and never writes user_id. A cross-user endpoint
++// is deleted from the previous owner and inserted as a new row for the caller.
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { handle, type Subscription } from "./handler.ts";
++
++const URL_ = Deno.env.get("SUPABASE_URL") ?? "";
++const admin = createClient(URL_, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
++const ALLOWED = new Set(["https://romrx.io", "https://www.romrx.io", "https://app.romrx.io", "https://romrxbjj.com", "https://www.romrxbjj.com", "https://romrxbodybuilding.com", "https://www.romrxbodybuilding.com"]); // same seven hostnames as FG-38
++
++Deno.serve((req) => handle(req, {
++  userId: async (r) => {
++    const c = createClient(URL_, Deno.env.get("SUPABASE_ANON_KEY") ?? "", { global: { headers: { Authorization: r.headers.get("Authorization") ?? "" } } });
++    const { data: { user }, error } = await c.auth.getUser();
++    return error || !user ? null : user.id;
++  },
++  touch: async (user_id, s: Subscription) => {
++    // Match only this caller's rows. Do not set user_id (that would silently reassign a cross-user row).
++    const { data, error } = await admin.from("push_subscriptions").update({ p256dh: s.keys.p256dh, auth: s.keys.auth, failure_count: 0, disabled_at: null }).eq("endpoint", s.endpoint).eq("user_id", user_id).select("id");
++    if (error) throw new Error("touch failed");
++    return (data ?? []).length > 0;
++  },
++  takeover: async (user_id, s: Subscription) => {
++    const { data: other, error: findErr } = await admin.from("push_subscriptions").select("id, user_id").eq("endpoint", s.endpoint).neq("user_id", user_id).maybeSingle();
++    if (findErr) throw new Error("takeover lookup failed");
++    if (!other) return "none";
++    // Do not delete the other user's row if the caller is already at the 10-device cap.
++    const { count, error: countErr } = await admin.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", user_id).is("disabled_at", null);
++    if (countErr) throw new Error("takeover count failed");
++    if ((count ?? 0) >= 10) return "limit";
++    const { error: delErr } = await admin.from("push_subscriptions").delete().eq("id", (other as { id: string }).id).eq("endpoint", s.endpoint).neq("user_id", user_id);
++    if (delErr) throw new Error("takeover delete failed");
++    const { error: insErr } = await admin.from("push_subscriptions").insert({ user_id, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++    if (!insErr) return "taken";
++    if (insErr.code === "23514") return "limit";
++    throw new Error("takeover insert failed");
++  },
++  insert: async (user_id, s) => {
++    const { error } = await admin.from("push_subscriptions").insert({ user_id, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth });
++    if (!error) return "ok";
++    if (error.code === "23514") return "limit";
++    throw new Error("insert failed");
++  },
++  remove: async (user_id, endpoint) => { const { error } = await admin.from("push_subscriptions").delete().eq("user_id", user_id).eq("endpoint", endpoint); if (error) throw new Error("remove failed"); },
++  legacy: async (user_id, s) => {
++    const { error } = await admin.from("notification_preferences").upsert({ user_id, push_subscription: s, push_reminders: true }, { onConflict: "user_id" });
++    if (error) throw new Error("legacy failed");
++  },
++  origins: (o) => ({ "Access-Control-Allow-Origin": o && ALLOWED.has(o) ? o : "https://romrx.io", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin" }),
++}));
+diff --git a/supabase/functions/send-push-notification/handler.r2.test.ts b/supabase/functions/send-push-notification/handler.r2.test.ts
+index 8c039bf..586fad4 100644
+--- a/supabase/functions/send-push-notification/handler.r2.test.ts
++++ b/supabase/functions/send-push-notification/handler.r2.test.ts
+@@ -36,6 +36,8 @@ function deps(mod: typeof H, over: Partial<Deps> = {}): Spy {
+     send: async (_s, payload) => { sends.push(payload); return { ok: true }; },
+     markSuccess: async () => {},
+     markFailure: async () => {},
++    clearDead: async () => {},
++    releaseClaim: async () => {},
+     ...over,
+     sends,
+     claims,
+@@ -157,8 +159,8 @@ Deno.test("r2 quiet: user timezone is used; null or invalid falls back to Americ
+   const day = at("2026-11-17T20:00:00Z"); // 15:00 New York, 12:00 Los Angeles
+   assertFalse(inQuietHours(day, "America/Los_Angeles"));
+ });
+-Deno.test("r2 quiet: in-window candidate is skipped, not claimed, not sent; reported as skipped_quiet", async () => {
+-  const r = await run(H, { now: () => at("2026-11-17T03:00:00Z") }); // 22:00 EST
++Deno.test("r2 quiet: in-window system nudge is skipped, not claimed, not sent; reported as skipped_quiet", async () => {
++  const r = await run(H, { now: () => at("2026-11-17T03:00:00Z"), listDue: async () => [cand({ kind: "retest" })] }); // 22:00 EST
+   assertEquals([r.d.sends.length, r.d.claims.length, r.body.skipped_quiet, r.body.sent], [0, 0, 1, 0]);
+ });
+ 
+@@ -170,7 +172,7 @@ Deno.test("r2 dry-run: no network push, no claim, and it reports skip counts", a
+   try {
+     const due = [
+       cand({ userId: "u-test", isTest: true }),
+-      cand({ userId: "u-quiet", timezone: "Asia/Tokyo" }), // 04:45 Tokyo at 19:45Z
++      cand({ userId: "u-quiet", kind: "retest", timezone: "Asia/Tokyo" }), // 04:45 Tokyo at 19:45Z
+       cand({ userId: "u-ok-1" }),
+       cand({ userId: "u-ok-2", timezone: "America/Los_Angeles" }), // 11:45 LA
+     ];
+@@ -213,8 +215,10 @@ async function filtersOk(m: typeof H) {
+   if (t.d.sends.length !== 0 || t.body.skipped_test !== 1) return false;
+   const u = await run(m, { listDue: async () => [cand({ isTest: undefined as unknown as boolean })] });
+   if (u.d.sends.length !== 0) return false;
+-  const q = await run(m, { now: () => at("2026-11-17T02:00:00Z") }); // 21:00 EST
+-  if (q.d.sends.length !== 0) return false;
++  const q = await run(m, { now: () => at("2026-11-17T02:00:00Z"), listDue: async () => [cand({ kind: "retest" })] }); // 21:00 EST
++  if (q.d.sends.length !== 0 || q.body.skipped_quiet !== 1) return false;
++  const proto = await run(m, { now: () => at("2026-11-17T02:00:00Z"), listDue: async () => [cand({ kind: "protocol" })] });
++  if (proto.d.sends.length !== 1 || proto.body.skipped_quiet !== 0) return false;
+   const ok = await run(m);
+   return ok.d.sends.length === 1;
+ }
+@@ -237,7 +241,8 @@ const MUTANTS: [string, string, string][] = [
+   ["Kai's uncleared protocol line", "Time for today's session. Open ROMRx Base to see your plan.", "Today's plan is ready. It's built from your own assessment."],
+   ["is_test filter removed", "    if (c.isTest !== false) { skippedTest += 1; continue; }\n", ""],
+   ["is_test fail-open (only explicit true skipped)", "if (c.isTest !== false)", "if (c.isTest === true)"],
+-  ["quiet filter removed", "    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }\n", ""],
++  ["quiet filter removed", "    if (c.kind !== \"protocol\" && inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }\n", ""],
++  ["quiet applied to protocol (exemption removed)", "c.kind !== \"protocol\" && inQuietHours(now, c.timezone)", "inQuietHours(now, c.timezone)"],
+   ["quiet start off by one (>)", "hour >= QUIET_START_HOUR", "hour > QUIET_START_HOUR"],
+   ["quiet end off by one (<=)", "hour < QUIET_END_HOUR", "hour <= QUIET_END_HOUR"],
+   ["no midnight wrap (&&)", "hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR", "hour >= QUIET_START_HOUR && hour < QUIET_END_HOUR"],
+diff --git a/supabase/functions/send-push-notification/handler.r3.test.ts b/supabase/functions/send-push-notification/handler.r3.test.ts
+new file mode 100644
+index 0000000..daf8622
+--- /dev/null
++++ b/supabase/functions/send-push-notification/handler.r3.test.ts
+@@ -0,0 +1,227 @@
++// P1-14 r3 tests: protocol reminder exempt from quiet hours; 404/410 cleanup; dry-run would_clear; planted mutants.
++// Run: deno test --no-lock --node-modules-dir=none --allow-read --allow-write handler.r3.test.ts
++import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
++import * as H from "./handler.ts";
++import { handle, inQuietHours, isUserChosenProtocol, skippedByQuietHours, type Candidate, type Deps, type PushSub } from "./handler.ts";
++
++const SUB: PushSub = { endpoint: "https://example.com/push/device-1", p256dh: "B" + "x".repeat(40), auth: "a".repeat(16) };
++const SUB2: PushSub = { endpoint: "https://example.com/push/device-2", p256dh: "B" + "y".repeat(40), auth: "b".repeat(16) };
++const NY = "America/New_York";
++const at = (iso: string) => new Date(iso);
++
++function cand(over: Partial<Candidate> = {}): Candidate {
++  return { userId: "00000000-0000-4000-8000-0000000000aa", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: SUB, timezone: NY, isTest: false, ...over };
++}
++
++type Spy = Deps & { sends: string[]; claims: string[]; clears: string[]; releases: string[]; failures: number };
++function deps(mod: typeof H, over: Partial<Deps> = {}): Spy {
++  const sends: string[] = [];
++  const claims: string[] = [];
++  const clears: string[] = [];
++  const releases: string[] = [];
++  const held = new Set<string>();
++  let failures = 0;
++  return {
++    cronCallerOk: async () => true,
++    webPushSend: "on",
++    vapidPublicKey: "pub-not-a-real-key",
++    vapidPrivateKey: "priv-not-a-real-key",
++    vapidSubject: "mailto:hello@romrx.io",
++    now: () => new Date("2026-11-16T19:45:00Z"), // 2:45 PM ET
++    listDue: async () => [cand()],
++    claim: async (u, k) => {
++      const key = `${u}:${k}`;
++      claims.push(key);
++      if (held.has(key)) return false;
++      held.add(key);
++      return true;
++    },
++    send: async (_s, payload) => { sends.push(payload); return { ok: true }; },
++    markSuccess: async () => {},
++    markFailure: async () => { failures += 1; },
++    clearDead: async (u, id, ep) => { clears.push(`${u}|${id}|${ep}`); },
++    releaseClaim: async (u, k) => { const key = `${u}:${k}`; releases.push(key); held.delete(key); },
++    ...over,
++    sends,
++    claims,
++    clears,
++    releases,
++    get failures() { return failures; },
++  } as Spy;
++}
++const post = () => new Request("https://x/send-push-notification", { method: "POST", headers: { "x-cron-secret": "s".repeat(40) }, body: "{}" });
++async function run(mod: typeof H, over: Partial<Deps> = {}) {
++  const d = deps(mod, over);
++  const r = await mod.handle(post(), d);
++  return { d, status: r.status, body: await r.json() as Record<string, number | boolean | string> };
++}
++
++Deno.test("r3 quiet helpers: protocol is the user-chosen kind and is never skipped by quiet hours", () => {
++  assertEquals(isUserChosenProtocol("protocol"), true);
++  assertEquals(isUserChosenProtocol("retest"), false);
++  assertEquals(isUserChosenProtocol("digest"), false);
++  assertEquals(isUserChosenProtocol("test"), false);
++  const quiet = at("2026-11-17T02:30:00Z"); // 21:30 EST
++  assert(inQuietHours(quiet, NY));
++  assertFalse(skippedByQuietHours("protocol", quiet, NY));
++  assert(skippedByQuietHours("retest", quiet, NY));
++  assert(skippedByQuietHours("digest", quiet, NY));
++  assert(skippedByQuietHours("test", quiet, NY));
++  const day = at("2026-11-16T19:45:00Z"); // 14:45 EST
++  assertFalse(skippedByQuietHours("retest", day, NY));
++});
++
++Deno.test("r3 quiet: a 9:30 PM protocol reminder is sent (user-chosen time is exempt)", async () => {
++  // 2026-11-17 02:30Z = 21:30 EST
++  const r = await run(H, { now: () => at("2026-11-17T02:30:00Z"), listDue: async () => [cand({ kind: "protocol" })] });
++  assertEquals([r.d.sends.length, r.d.claims.length, r.body.skipped_quiet, r.body.sent, r.body.claimed], [1, 1, 0, 1, 1]);
++});
++
++Deno.test("r3 quiet: protocol is sent at 21:00, 00:30, and 07:59 local; system nudges at those times are skipped", async () => {
++  const times = [
++    at("2026-11-17T02:00:00Z"), // 21:00 EST
++    at("2026-11-17T05:30:00Z"), // 00:30 EST
++    at("2026-11-17T12:59:00Z"), // 07:59 EST
++  ];
++  for (const now of times) {
++    const proto = await run(H, { now: () => now, listDue: async () => [cand({ kind: "protocol" })] });
++    assertEquals([proto.body.sent, proto.body.skipped_quiet], [1, 0], `protocol should send at ${now.toISOString()}`);
++    for (const kind of ["retest", "digest", "test"] as const) {
++      const s = await run(H, { now: () => now, listDue: async () => [cand({ kind, dedupeKey: `${kind}:2026-11-16` })] });
++      assertEquals([s.body.sent, s.body.skipped_quiet, s.d.sends.length, s.d.claims.length], [0, 1, 0, 0], `${kind} should skip at ${now.toISOString()}`);
++    }
++  }
++});
++
++Deno.test("r3 quiet: system nudge at 08:00 local is sent", async () => {
++  const r = await run(H, { now: () => at("2026-11-17T13:00:00Z"), listDue: async () => [cand({ kind: "retest", dedupeKey: "retest:2026-11-16" })] });
++  assertEquals([r.body.sent, r.body.skipped_quiet], [1, 0]);
++});
++
++Deno.test("r3 gone: 404 clears only that user's subscription, releases the claim, and is not counted as the day's send or as failed", async () => {
++  const r = await run(H, {
++    send: async () => ({ ok: false, gone: true }),
++  });
++  assertEquals(r.body.sent, 0);
++  assertEquals(r.body.failed, 0);
++  assertEquals(r.body.cleared, 1);
++  assertEquals(r.body.claimed, 0);
++  assertEquals(r.body.would_clear, 0);
++  assertEquals(r.d.clears, ["00000000-0000-4000-8000-0000000000aa|sub-1|https://example.com/push/device-1"]);
++  assertEquals(r.d.releases.length, 1);
++  assertEquals(r.d.failures, 0);
++});
++
++Deno.test("r3 gone: 410 on a legacy jsonb candidate (no table row id) still clears and does not count as the day's send", async () => {
++  const r = await run(H, {
++    listDue: async () => [cand({ subscriptionId: null })],
++    send: async () => ({ ok: false, gone: true }),
++  });
++  assertEquals([r.body.cleared, r.body.failed, r.body.sent, r.body.claimed], [1, 0, 0, 0]);
++  assertEquals(r.d.clears, ["00000000-0000-4000-8000-0000000000aa|null|https://example.com/push/device-1"]);
++  assertEquals(r.d.releases.length, 1);
++});
++
++Deno.test("r3 gone: a dead first device does not burn the day for a second live device of the same user", async () => {
++  const r = await run(H, {
++    listDue: async () => [
++      cand({ subscriptionId: "dead-sub", sub: SUB, dedupeKey: "protocol:2026-11-16" }),
++      cand({ subscriptionId: "live-sub", sub: SUB2, dedupeKey: "protocol:2026-11-16" }),
++    ],
++    send: async (sub) => sub.endpoint === SUB.endpoint ? { ok: false, gone: true } : { ok: true },
++  });
++  assertEquals(r.body.cleared, 1);
++  assertEquals(r.body.sent, 1);
++  assertEquals(r.body.failed, 0);
++  assertEquals(r.body.claimed, 1);
++  assertEquals(r.body.skipped, 0);
++  assertEquals(r.d.clears, ["00000000-0000-4000-8000-0000000000aa|dead-sub|https://example.com/push/device-1"]);
++  assertEquals(r.d.releases.length, 1);
++});
++
++Deno.test("r3 gone: a non-gone failure still counts as failed, keeps the claim, and does not clear", async () => {
++  const r = await run(H, { send: async () => ({ ok: false }) });
++  assertEquals([r.body.failed, r.body.cleared, r.body.claimed, r.body.sent, r.d.clears.length, r.d.releases.length, r.d.failures], [1, 0, 1, 0, 0, 0, 1]);
++});
++
++Deno.test("r3 dry-run: would_clear is reported, no clear write, no claim, no send, no network", async () => {
++  const realFetch = globalThis.fetch;
++  let fetches = 0;
++  globalThis.fetch = (() => { fetches += 1; throw new Error("network in dry-run"); }) as typeof fetch;
++  try {
++    for (const flag of [undefined, "", "ON", "true", "1"]) {
++      const r = await run(H, { webPushSend: flag });
++      assertEquals(r.body.dry_run, true);
++      assertEquals(r.body.would_clear, 0); // dry-run does not call send, so it cannot see a 404/410
++      assertEquals(r.body.cleared, 0);
++      assertEquals(r.body.sent, 0);
++      assertEquals(r.body.claimed, 0);
++      assertEquals([r.d.sends.length, r.d.claims.length, r.d.clears.length, r.d.releases.length], [0, 0, 0, 0]);
++    }
++    assertEquals(fetches, 0);
++  } finally {
++    globalThis.fetch = realFetch;
++  }
++});
++
++Deno.test("r3 response: counts only, no endpoints or user ids", async () => {
++  const r = await run(H, { send: async () => ({ ok: false, gone: true }) });
++  const text = JSON.stringify(r.body);
++  assertFalse(text.includes("example.com"));
++  assertFalse(text.includes("00000000"));
++  assertFalse(text.includes("sub-1"));
++  assertEquals("cleared" in r.body, true);
++  assertEquals("would_clear" in r.body, true);
++});
++
++// ---------- planted mutants ----------
++const SRC = await Deno.readTextFile(new URL("handler.ts", import.meta.url));
++async function load(src: string): Promise<typeof H> {
++  const dir = await Deno.makeTempDir({ prefix: "p1-14-r3-mutant-" });
++  const f = `${dir}/handler.ts`;
++  await Deno.writeTextFile(f, src);
++  return await import(`file://${f}`) as typeof H;
++}
++
++async function r3Ok(m: typeof H): Promise<boolean> {
++  const quiet = at("2026-11-17T02:30:00Z"); // 21:30 EST
++  const proto = await run(m, { now: () => quiet, listDue: async () => [cand({ kind: "protocol" })] });
++  if (proto.d.sends.length !== 1 || proto.body.skipped_quiet !== 0) return false;
++  const retest = await run(m, { now: () => quiet, listDue: async () => [cand({ kind: "retest", dedupeKey: "retest:2026-11-16" })] });
++  if (retest.d.sends.length !== 0 || retest.body.skipped_quiet !== 1) return false;
++  const gone = await run(m, { send: async () => ({ ok: false, gone: true }) });
++  if (gone.body.cleared !== 1 || gone.body.failed !== 0 || gone.body.sent !== 0 || gone.body.claimed !== 0) return false;
++  if (gone.d.clears.length !== 1 || gone.d.releases.length !== 1 || gone.d.failures !== 0) return false;
++  // second device after a 410 still sends
++  const two = await run(m, {
++    listDue: async () => [
++      cand({ subscriptionId: "dead-sub", sub: SUB }),
++      cand({ subscriptionId: "live-sub", sub: SUB2 }),
++    ],
++    send: async (sub) => sub.endpoint === SUB.endpoint ? { ok: false, gone: true } : { ok: true },
++  });
++  if (two.body.sent !== 1 || two.body.cleared !== 1 || two.body.claimed !== 1) return false;
++  const dry = await run(m, { webPushSend: undefined, send: async () => ({ ok: false, gone: true }) });
++  if (dry.d.clears.length !== 0 || dry.d.claims.length !== 0 || dry.body.would_clear !== 0 || dry.body.dry_run !== true) return false;
++  return true;
++}
++
++const MUTANTS: [string, string, string][] = [
++  ["quiet applied to protocol (exemption removed)", 'c.kind !== "protocol" && inQuietHours(now, c.timezone)', "inQuietHours(now, c.timezone)"],
++  ["404/410 falls through to failed (gone branch dropped)", "} else if (result.gone) {", "} else if (false && result.gone) {"],
++  ["404/410 counted as sent", "} else if (result.gone) {", "} else if (result.gone) {\n        sent += 1;"],
++  ["no releaseClaim on 404/410", "          await d.releaseClaim(c.userId, key);\n          claimed -= 1;\n          cleared += 1;", "          claimed -= 1;\n          cleared += 1;"],
++  ["no clearDead on 404/410", "          await d.clearDead(c.userId, c.subscriptionId, c.sub.endpoint);\n", ""],
++  ["dry-run writes clear", "    if (live) {\n      const okClaim", "    if (true) {\n      const okClaim"],
++];
++
++Deno.test("r3 mutants: unmutated source passes the r3 checks", async () => {
++  assert(await r3Ok(await load(SRC)));
++});
++for (const [name, from, to] of MUTANTS) {
++  Deno.test(`r3 mutant caught: ${name}`, async () => {
++    assertEquals(SRC.split(from).length - 1, 1, `mutation anchor not unique: ${name}`);
++    const m = await load(SRC.replace(from, to));
++    assertFalse(await r3Ok(m), `mutant survived: ${name}`);
++  });
++}
+diff --git a/supabase/functions/send-push-notification/handler.test.ts b/supabase/functions/send-push-notification/handler.test.ts
+index f63fe4f..3429db4 100644
+--- a/supabase/functions/send-push-notification/handler.test.ts
++++ b/supabase/functions/send-push-notification/handler.test.ts
+@@ -30,6 +30,8 @@ function base(over: Partial<Deps> = {}): Deps {
+     },
+     markSuccess: async () => {},
+     markFailure: async () => {},
++    clearDead: async () => {},
++    releaseClaim: async () => {},
+     ...over,
+     // expose for assertions
+     _sends: sends,
+@@ -196,17 +198,45 @@ Deno.test("duplicate claim is skipped, second call does not send", async () => {
+   assertEquals(sent, 1);
+ });
+ 
+-Deno.test("send failure marks failure and increments failed, 410 is gone", async () => {
+-  let goneMarked = false;
++Deno.test("non-gone send failure marks failure and increments failed, claim stands", async () => {
++  let marked = 0;
++  let cleared = 0;
++  let released = 0;
+   const r = await handle(req(), base({
+     webPushSend: "on",
+-    send: async () => ({ ok: false, gone: true }),
+-    markFailure: async (_id, gone) => { goneMarked = gone; },
++    send: async () => ({ ok: false }),
++    markFailure: async () => { marked += 1; },
++    clearDead: async () => { cleared += 1; },
++    releaseClaim: async () => { released += 1; },
+   }));
+   const body = await json(r);
+   assertEquals(body.sent, 0);
+   assertEquals(body.failed, 1);
+-  assertEquals(goneMarked, true);
++  assertEquals(body.cleared, 0);
++  assertEquals(body.claimed, 1);
++  assertEquals([marked, cleared, released], [1, 0, 0]);
++});
++
++Deno.test("410/404 clears the dead subscription, is not the day's send, and does not increment failed", async () => {
++  let cleared = 0;
++  let released = 0;
++  let marked = 0;
++  let clearArgs: unknown[] = [];
++  const r = await handle(req(), base({
++    webPushSend: "on",
++    send: async () => ({ ok: false, gone: true }),
++    markFailure: async () => { marked += 1; },
++    clearDead: async (userId, subscriptionId, endpoint) => { cleared += 1; clearArgs = [userId, subscriptionId, endpoint]; },
++    releaseClaim: async () => { released += 1; },
++  }));
++  const body = await json(r);
++  assertEquals(body.sent, 0);
++  assertEquals(body.failed, 0);
++  assertEquals(body.cleared, 1);
++  assertEquals(body.claimed, 0);
++  assertEquals(body.would_clear, 0);
++  assertEquals([cleared, released, marked], [1, 1, 0]);
++  assertEquals(clearArgs, ["00000000-0000-4000-8000-000000000001", "sub-1", FAKE_SUB.endpoint]);
+ });
+ 
+ Deno.test("dedupeKey is kind:localDate, no mailbox form", () => {
+diff --git a/supabase/functions/send-push-notification/handler.ts b/supabase/functions/send-push-notification/handler.ts
+index d40b242..4ef9235 100644
+--- a/supabase/functions/send-push-notification/handler.ts
++++ b/supabase/functions/send-push-notification/handler.ts
+@@ -4,6 +4,10 @@
+ // No mailbox addresses, no VAPID values, and no subscription endpoints are logged or returned.
+ // r2: lock-screen copy is Stacy 219378b5 section A (with Kai 481a2e9d for the CLEAR digest line), extracted by
+ // script; see push_copy.cleared.json. Jim's wording yes is still needed before WEB_PUSH_SEND is flipped.
++// r3: quiet hours apply to system nudges only (retest, digest, test). A user's own chosen protocol
++// reminder time is exempt and sends even inside 21:00-08:00 local. On 404/410, clear that user's
++// dead subscription (table row and/or matching legacy jsonb) and release the day's claim so it is
++// not counted as the day's send. Dry-run reports would_clear and writes nothing.
+ 
+ export const PUSH_COPY = {
+   protocol: { title: "ROMRx Base", body: "Time for today's session. Open ROMRx Base to see your plan." },
+@@ -34,8 +38,10 @@ export interface Candidate {
+ }
+ 
+ // r2 quiet hours (Vera 7420bcd9 WARN: "no separate quiet-hours window"). Her note gives no hours, so the
+-// window is a constant here: local 21:00 up to 08:00 the next morning, in the user's timezone. Sends inside
+-// the window are skipped and not claimed, so a retest due that day goes out on the first run at or after 08:00.
++// window is a constant here: local 21:00 up to 08:00 the next morning, in the user's timezone.
++// r3: the window applies only to system nudges (retest due, test notice, digest). A protocol reminder
++// the user chose themselves is exempt, so a 21:30 pick still sends. Skipped system nudges are not
++// claimed; a retest due that day goes out on the first run at or after 08:00.
+ export const QUIET_START_HOUR = 21;
+ export const QUIET_END_HOUR = 8;
+ export const DEFAULT_TZ = "America/New_York";
+@@ -63,6 +69,16 @@ export function inQuietHours(now: Date, tz: string | null | undefined): boolean
+   return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+ }
+ 
++// r3: protocol is the user's own chosen reminder time and is exempt from quiet hours.
++export function isUserChosenProtocol(kind: Kind): boolean {
++  return kind === "protocol";
++}
++
++export function skippedByQuietHours(kind: Kind, now: Date, tz: string | null | undefined): boolean {
++  if (kind === "protocol") return false;
++  return inQuietHours(now, tz);
++}
++
+ export interface Deps {
+   cronCallerOk: (req: Request) => Promise<boolean>;
+   webPushSend: string | undefined;
+@@ -75,6 +91,10 @@ export interface Deps {
+   send: (sub: PushSub, payload: string) => Promise<{ ok: boolean; gone?: boolean }>;
+   markSuccess: (subscriptionId: string | null) => Promise<void>;
+   markFailure: (subscriptionId: string | null, gone: boolean) => Promise<void>;
++  // r3: delete that user's dead table row and/or matching legacy jsonb. No-op in dry-run (not called).
++  clearDead: (userId: string, subscriptionId: string | null, endpoint: string) => Promise<void>;
++  // r3: drop the day's claim so a 404/410 is not counted as the day's send.
++  releaseClaim: (userId: string, dedupeKey: string) => Promise<void>;
+ }
+ 
+ export function sendEnabled(value: string | undefined): boolean {
+@@ -122,11 +142,12 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+   let skipped = 0;
+   let skippedTest = 0;
+   let skippedQuiet = 0;
++  let cleared = 0;
+   const now = d.now();
+   for (const c of due) {
+     // r2 filters run before claim and before any send, in dry-run and live alike.
+     if (c.isTest !== false) { skippedTest += 1; continue; }
+-    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }
++    if (c.kind !== "protocol" && inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }
+     const key = c.dedupeKey || dedupeKey(c.kind, c.localDate);
+     if (live) {
+       const okClaim = await d.claim(c.userId, key);
+@@ -137,9 +158,18 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+       if (result.ok) {
+         sent += 1;
+         await d.markSuccess(c.subscriptionId);
++      } else if (result.gone) {
++        // 404/410: clear this user's dead subscription only; release the claim so it is not the day's send.
++        try {
++          await d.clearDead(c.userId, c.subscriptionId, c.sub.endpoint);
++        } finally {
++          await d.releaseClaim(c.userId, key);
++          claimed -= 1;
++          cleared += 1;
++        }
+       } else {
+         failed += 1;
+-        await d.markFailure(c.subscriptionId, !!result.gone);
++        await d.markFailure(c.subscriptionId, false);
+       }
+     } else {
+       skipped += 1; // counted as dry-run candidates, not claimed
+@@ -147,6 +177,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+   }
+ 
+   // Response counts only. No user ids, emails, endpoints, or keys.
++  // would_clear is 0 in dry-run because dry-run does not call send and cannot see a 404/410.
+   return new Response(JSON.stringify({
+     ok: true,
+     dry_run: !live,
+@@ -158,5 +189,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+     would_send: live ? 0 : skipped,
+     skipped_test: skippedTest,
+     skipped_quiet: skippedQuiet,
++    cleared: live ? cleared : 0,
++    would_clear: live ? 0 : 0,
+   }), { status: 200, headers: { "Content-Type": "application/json" } });
+ }
+diff --git a/supabase/functions/send-push-notification/index.ts b/supabase/functions/send-push-notification/index.ts
+index d69598f..b3dd02a 100644
+--- a/supabase/functions/send-push-notification/index.ts
++++ b/supabase/functions/send-push-notification/index.ts
+@@ -2,6 +2,8 @@
+ // BRANCH ONLY, not deployed. verify_jwt must be false (pg_cron, no user JWT).
+ // Fail-closed x-cron-secret via public.verify_webhook_secret (cron_webhook_secret), same as other cron senders.
+ // Sends only when WEB_PUSH_SEND is exactly "on". Never logs VAPID values, endpoints, or emails.
++// r3: 404/410 clears that user's dead push_subscriptions row and any matching legacy
++// notification_preferences.push_subscription jsonb, and releases the push_sends claim.
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ import { createClient } from "jsr:@supabase/supabase-js@2";
+ import { handle, type Candidate, type Deps, type Kind, type PushSub, dedupeKey, vapidSubjectOk } from "./handler.ts";
+@@ -167,10 +169,31 @@ async function markSuccess(subscriptionId: string | null): Promise<void> {
+ async function markFailure(subscriptionId: string | null, gone: boolean): Promise<void> {
+   if (!subscriptionId) return;
+   const patch: Record<string, unknown> = { last_failure_at: new Date().toISOString() };
++  // r3: 404/410 is handled by clearDead (row delete / jsonb null), not disabled_at.
+   if (gone) patch.disabled_at = new Date().toISOString();
+   await admin().from("push_subscriptions").update(patch).eq("id", subscriptionId);
+ }
+ 
++// r3: clear only this user's dead subscription. Table row is deleted by id+user_id.
++// The legacy jsonb column is nulled only when its stored endpoint matches, for this user only.
++// When a table row is cleared, a matching jsonb fallback is also nulled so listDue cannot
++// resurrect the same dead endpoint on the next run.
++async function clearDead(userId: string, subscriptionId: string | null, endpoint: string): Promise<void> {
++  const sb = admin();
++  if (subscriptionId) {
++    await sb.from("push_subscriptions").delete().eq("id", subscriptionId).eq("user_id", userId);
++  }
++  const { data } = await sb.from("notification_preferences").select("push_subscription").eq("user_id", userId).maybeSingle();
++  const stored = subFromJson((data as { push_subscription?: unknown } | null)?.push_subscription);
++  if (stored && stored.endpoint === endpoint) {
++    await sb.from("notification_preferences").update({ push_subscription: null }).eq("user_id", userId);
++  }
++}
++
++async function releaseClaim(userId: string, dedupeKeyValue: string): Promise<void> {
++  await admin().from("push_sends").delete().eq("user_id", userId).eq("dedupe_key", dedupeKeyValue);
++}
++
+ async function liveSend(sub: PushSub, payload: string): Promise<{ ok: boolean; gone?: boolean }> {
+   const pub = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
+   const priv = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
+@@ -200,5 +223,7 @@ Deno.serve((req) =>
+     send: liveSend,
+     markSuccess,
+     markFailure,
++    clearDead,
++    releaseClaim,
+   } satisfies Deps),
+ );
