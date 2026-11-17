@@ -1,0 +1,37 @@
+{
+  "read_at": "2026-11-16 7:40-7:50 PM ET (America/New_York)",
+  "project": "cqzvqzwwevnflinxgnpp",
+  "method": "MCP list_edge_functions, get_edge_function, execute_sql (read-only catalog and counts; no row contents)",
+  "conclusion": "Completion is MANUAL SQL per the privacy runbook; nothing live sets status='completed' or deletes auth.users/public.users",
+  "edge_functions": {
+    "total_live": 40,
+    "deletion_related_slugs": ["request-account-deletion"],
+    "no_slug_named": ["delete-account", "account-deletion"],
+    "request-account-deletion": {
+      "version": 11, "verify_jwt": true,
+      "ezbr_sha256": "d662e9b8c50da51f4d7b9793d7589dabc08aa883ce61ab8cc6a0cc3e0989a4fc",
+      "files": ["index.ts", "record.ts"],
+      "writes": ["account_deletion_requests insert {user_id} (record.ts)", "client_feedback insert", "rpc erase_backup_copies_for_user", "rpc rate_limit_hit"],
+      "string_completed": 0, "deleteUser": 0, "auth.admin": 0, "update_calls": 0, "delete_calls": 0
+    },
+    "lifecycle-emails source/deletion.ts": "reads account_deletion_requests status in (requested, in_progress) only (line 10); never writes it"
+  },
+  "pg_proc_referencing_adr_or_deleting_users": [
+    {"fn": "public.account_deletion_requests_touch", "role": "BEFORE UPDATE trigger; stamps completed_at when status becomes completed; deletes nothing", "def_md5": "10740bac5dfcb77b90e92be3ef585294"},
+    {"fn": "public.purge_account_deletion_requests", "role": "deletes completed REQUEST LOG rows only; unscheduled", "def_md5": "681bf4178318c1b65d35b6943f405247"}
+  ],
+  "pg_proc_delete_from_auth_users": 0,
+  "pg_proc_delete_from_public_users": 0,
+  "auth_schema_functions_referencing_adr": 0,
+  "adr_triggers": ["account_deletion_requests_touch (UPDATE only)"],
+  "cron_jobs": {"count": 13, "any_command_mentions_deletion_or_purge": false},
+  "adr_rows": {"total": 0, "completed": 0, "open": 0},
+  "runbook": "/workspace/process/batches/staged/docs/PRIVACY-DELETION-EXPORT-RUNBOOK.md lines 21-27 (A.1-A.2 erase copies), 91 (A.3 verify), 110 (A.4 'ONLY now remove the live data or the account'), 118 ('status goes in_progress when step 2 starts and completed after step 4')",
+  "contract": "process/batches/base-engagement-20261115/P1-23/CLIENT-API-CONTRACT-FOR-JULES.md line 87: 'The privacy team completes the request within 30 days.'",
+  "fks_from_users": {
+    "auth.users ON DELETE CASCADE": "assessment_drafts, athletes, auth.identities, auth.mfa_factors, auth.mfa_recovery_code_sets, auth.oauth_authorizations, auth.oauth_consents, auth.one_time_tokens, auth.sessions, auth.webauthn_challenges, auth.webauthn_credentials, body_metrics, clients, coach_assignments, coach_video_feedback, consents, drill_sessions, email_sends, fuel_logs, game_plans, mesocycles, mood_entries, mood_settings, notification_preferences, pr_records, progress_photos, protocol_sessions, renewal_reminders, surveys, user_ads_consent, user_technique_competency, users, workout_sets",
+    "auth.users ON DELETE SET NULL": "auth.scim_users, client_feedback, consent_events, product_events",
+    "public.users ON DELETE CASCADE": "ai_conversations, ai_messages, alert_dismissals, assessments, coach_notes, coaches, protocol_completions, protocols, push_sends, push_subscriptions, sport_entitlements, technique_eligibility, user_ai_preferences, user_mobility_schedule, workouts",
+    "public.users ON DELETE SET NULL": "leads, schools"
+  }
+}
