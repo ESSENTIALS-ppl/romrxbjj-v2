@@ -1,0 +1,58 @@
+--- live-def-purge_deleted_accounts-20261117.sql	2026-11-17 06:50:30.120122266 -0500
++++ /tmp/pfix/new-def.sql	2026-11-17 06:49:07.724203147 -0500
+@@ -28,6 +28,7 @@
+   v_comment text;
+   v_has_uid boolean;
+   v_has_email boolean;
++  v_storage_queued bigint := 0;
+ BEGIN
+   v_mode := lower(btrim(coalesce(p_mode, '')));
+   IF v_mode = 'count_only' THEN v_mode := 'count'; END IF;
+@@ -776,10 +777,14 @@
+     EXECUTE v_sql;
+   END LOOP;
+ 
+-  IF to_regclass('storage.objects') IS NOT NULL THEN
++  -- Storage files are never deleted with SQL (storage.protect_delete blocks it; files go through the Storage API).
++  -- Only when the run found matching objects, queue each object's bucket and path in
++  -- public.p1_25_storage_delete_queue for deletion through the Storage API (runbook). Otherwise nothing runs here.
++  IF to_regclass('storage.objects') IS NOT NULL AND coalesce((v_counts ->> 'storage.objects')::bigint, 0) > 0 THEN
+     IF to_regclass('public.progress_photos') IS NOT NULL THEN
+       v_sql := $q$
+-        DELETE FROM storage.objects o
++        INSERT INTO public.p1_25_storage_delete_queue (bucket_id, name)
++        SELECT o.bucket_id, o.name FROM storage.objects o
+         WHERE o.owner IN (SELECT user_id FROM _classed WHERE class = 'qualifying')
+            OR o.owner_id IN (SELECT user_id::text FROM _classed WHERE class = 'qualifying')
+            OR o.name IN (
+@@ -787,15 +792,19 @@
+              WHERE p.user_id IN (SELECT user_id FROM _classed WHERE class = 'qualifying')
+                AND p.storage_path IS NOT NULL
+            )
++        ON CONFLICT (bucket_id, name) DO NOTHING
+       $q$;
+     ELSE
+       v_sql := $q$
+-        DELETE FROM storage.objects o
++        INSERT INTO public.p1_25_storage_delete_queue (bucket_id, name)
++        SELECT o.bucket_id, o.name FROM storage.objects o
+         WHERE o.owner IN (SELECT user_id FROM _classed WHERE class = 'qualifying')
+            OR o.owner_id IN (SELECT user_id::text FROM _classed WHERE class = 'qualifying')
++        ON CONFLICT (bucket_id, name) DO NOTHING
+       $q$;
+     END IF;
+     EXECUTE v_sql;
++    GET DIAGNOSTICS v_storage_queued = ROW_COUNT;
+   END IF;
+ 
+   -- Final: remove the auth row when it is still present. Cascades public.users and ON DELETE CASCADE children
+@@ -825,7 +834,8 @@
+     'backup_schema', v_bak_schema,
+     'backup_created_at', v_bak_created,
+     'backup_keep_for', '7 days',
+-    'dropped_backup_schemas', v_dropped
++    'dropped_backup_schemas', v_dropped,
++    'storage_objects_queued', v_storage_queued
+   );
+ END;
+ $function$

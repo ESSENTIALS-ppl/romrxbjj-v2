@@ -1,0 +1,157 @@
+{
+ "results": [
+  {
+   "n": "MAIN T1 live body, 0 objects, 0 qualifying: apply FAILS on protect_delete (reproduces runid 22334)",
+   "pass": true,
+   "info": {
+    "err": "Direct deletion from storage tables is not allowed. Use the Storage API instead."
+   }
+  },
+  {
+   "n": "MAIN T2 new body, 0 objects, 0 qualifying: apply ok, queued 0",
+   "pass": true,
+   "info": {
+    "q": 0
+   }
+  },
+  {
+   "n": "MAIN T3 new body, 1 qualifying (0 objects): purged, queued 0, 7c71e421 excluded",
+   "pass": true,
+   "info": {
+    "s": {
+     "objects": 0,
+     "queue": [],
+     "auth_q": 0,
+     "auth_hard": 1,
+     "auth_other": 1,
+     "leads_q": 0,
+     "leads_hard": 1
+    },
+    "ids": [
+     "00000000-0000-4000-8000-000000000201"
+    ]
+   }
+  },
+  {
+   "n": "MAIN T4a new body, 1 qualifying with exactly 1 object: queued (bucket+path), NOT deleted",
+   "pass": true,
+   "info": {
+    "s1": {
+     "objects": 1,
+     "queue": [
+      {
+       "bucket_id": "progress-photos",
+       "name": "00000000-0000-4000-8000-000000000201/front.jpg"
+      }
+     ],
+     "auth_q": 0,
+     "auth_hard": 1,
+     "auth_other": 1,
+     "leads_q": 0,
+     "leads_hard": 1
+    }
+   }
+  },
+  {
+   "n": "MAIN T4b new body, 1 qualifying with 3 objects (owner+owner_id+photo / owner only / owner_id only) all queued (bucket+path), NOT deleted; 7c71e421 object not queued",
+   "pass": true,
+   "info": {
+    "s": {
+     "objects": 4,
+     "queue": [
+      {
+       "bucket_id": "progress-photos",
+       "name": "00000000-0000-4000-8000-000000000201/back.jpg"
+      },
+      {
+       "bucket_id": "progress-photos",
+       "name": "00000000-0000-4000-8000-000000000201/front.jpg"
+      },
+      {
+       "bucket_id": "progress-photos",
+       "name": "00000000-0000-4000-8000-000000000201/legacy.jpg"
+      }
+     ],
+     "auth_q": 0,
+     "auth_hard": 1,
+     "auth_other": 1,
+     "leads_q": 0,
+     "leads_hard": 1
+    },
+    "queued": 3
+   }
+  },
+  {
+   "n": "MAIN T5 rerun after T4: ok, 0 qualifying, queue unchanged",
+   "pass": true,
+   "info": {}
+  },
+  {
+   "n": "MAIN T6 backup schema still written by the fixed body",
+   "pass": true,
+   "info": {
+    "bak": 2
+   }
+  },
+  {
+   "n": "MAIN T7 dry_run and count outputs identical to the live body",
+   "pass": true,
+   "info": {
+    "qd": 1
+   }
+  },
+  {
+   "n": "MAIN T8 7c71e421 with a 100-day completed request: excluded, kept, object not queued",
+   "pass": true,
+   "info": {}
+  },
+  {
+   "n": "R1 rollback: prosrc md5 = live 83a038673c6f8ffbef7fddabb2b2cc9e, empty queue table dropped",
+   "pass": true,
+   "info": {
+    "src": "83a038673c6f8ffbef7fddabb2b2cc9e",
+    "t": null
+   }
+  },
+  {
+   "n": "R2 rollback with queued rows: queue table kept (3 rows), body restored",
+   "pass": true,
+   "info": {
+    "t2": 3
+   }
+  }
+ ],
+ "mutants": [
+  {
+   "name": "M1 queue INSERT reverted to DELETE FROM storage.objects",
+   "killed": true,
+   "applied": true
+  },
+  {
+   "name": "M2 guard > 0 changed to > 1",
+   "killed": true,
+   "applied": true
+  },
+  {
+   "name": "M3 hardcoded 7c71e421 id changed",
+   "killed": true,
+   "applied": true
+  },
+  {
+   "name": "M4 owner predicate dropped from the queue insert",
+   "killed": true,
+   "applied": true
+  },
+  {
+   "name": "M6 owner_id predicate dropped from the queue insert",
+   "killed": true,
+   "applied": true
+  },
+  {
+   "name": "M5 queued count not reported",
+   "killed": true,
+   "applied": true
+  }
+ ],
+ "fails": 0
+}
