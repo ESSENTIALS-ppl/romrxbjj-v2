@@ -1,0 +1,62 @@
+PASS  input: P1-29 SQL replayed from ae58b91f, sha256 b4861884...  b4861884e9b69c0fb06680a12801c50a91b10020204c1dd128221f42b19d16d9
+PASS  input: P1-29b SQL replayed from 89b0be9c, sha256 f0558b74...  f0558b7459d71dba8345fc88bed78258dc701be9378970b5617a6f58a259966b
+PASS  input: neither P1-29 nor P1-29b migration file is on this branch
+PASS  input: P1-29c sql sha256  eb9f11751ff2712dbdbb6467676ece28e8f728142975ec36c4a6d527fe66bcf2
+PASS  input: P1-29c rollback sha256  6ac6e970bf6db28d3a1b3410cec7791e29beb2bf63c7c49abbb17e398322b670
+PASS  input: live pg_policies rows (athletes + 5 dependent tables)  26
+PASS  baseline policies == live pg_policies text (setup is exact)
+PASS  baseline (the gap): coach_C reads athlete D email/age/injury_flags directly  1
+PASS  baseline: coach_C may insert an assessment for linked D, not for E  {"ok":{"ok":true},"bad":{"err":"42501:new row violates row-level security policy for table \"assessments\""}}
+PASS  apply: P1-29c applies cleanly after P1-29 and P1-29b
+PASS  helper: one function, SECURITY DEFINER, STABLE, search_path ""  [{"prosecdef":true,"provolatile":"s","proconfig":["search_path=\"\""],"res":"TABLE(athlete_id uuid, user_id uuid)","acl":"{postgres=X/postgres,authenticated=X/postgres}"}]
+PASS  helper: returns TABLE(athlete_id uuid, user_id uuid) only  TABLE(athlete_id uuid, user_id uuid)
+PASS  helper grants: EXECUTE authenticated only (anon, service_role, PUBLIC revoked)  {"priv":[{"r":"anon","x":false},{"r":"authenticated","x":true},{"r":"service_role","x":false}],"acl":"{postgres=X/postgres,authenticated=X/postgres}"}
+PASS  policy: coaches_select_athletes dropped
+PASS  policy: six dependent coach policies rewritten, TO authenticated, via coach_linked_athlete_ids(), no athletes subquery  ["{authenticated}","{authenticated}","{authenticated}","{authenticated}","{authenticated}","{authenticated}"]
+PASS  policy: the other 19 policies on these tables are byte-identical to live
+PASS  view: security_barrier + security_invoker kept  ["security_barrier=true","security_invoker=true"]
+PASS  view: no direct athletes/coaches/users read in coach_roster   SELECT l.athlete_id, l.user_id, h.full_name, h.belt FROM coach_linked_athlete_ids() l(athlete_id, user_id) JOIN coach_linked_athletes() h(id, full_name, belt) ON h.id = l.user_id;
+PASS  linked coach: helper returns only athlete_id, user_id for linked D  [{"athlete_id":"ffffffff-0000-4000-8000-0000000000d1","user_id":"eeeeeeee-0000-4000-8000-0000000000d1"}]
+PASS  linked coach: SELECT email, age, injury_flags (or *) from athletes = 0 rows  {"cols_email_age_injury":0,"star":0}
+PASS  linked coach: roster identical to P1-29b (same 4 columns, D only)  d1
+PASS  linked coach: assessments rows identical to P1-29b  a1 -> a1
+PASS  linked coach: drill_sessions rows identical to P1-29b  b1 -> b1
+PASS  linked coach: game_plans rows identical to P1-29b  c1 c3 -> c1 c3
+PASS  linked coach: protocol_completions rows identical to P1-29b  d1 -> d1
+PASS  linked coach: protocol_sessions rows identical to P1-29b  e1 -> e1
+PASS  linked coach: users rows identical to P1-29b (self only)
+PASS  linked coach: assessment insert for D still allowed, for E still denied  {"ok":{"ok":true},"bad":{"err":"42501:new row violates row-level security policy for table \"assessments\""}}
+PASS  unlinked coach: helper, roster, athletes and all dependent tables = 0 rows  {"helper":0,"roster":"(none)","gp_public_only":"c3"}
+PASS  athlete_D: athletes, users, roster and all 5 dependent tables identical to P1-29b  athletes=d1
+PASS  athlete_E: athletes, users, roster and all 5 dependent tables identical to P1-29b  athletes=e1
+PASS  school_admin_SA: athletes, users, roster and all 5 dependent tables identical to P1-29b  athletes=(none)
+PASS  anon: athletes, users, roster and all 5 dependent tables identical to P1-29b  athletes=(none)
+PASS  coach_F_unlinked: athletes, users, roster and all 5 dependent tables identical to P1-29b  athletes=(none)
+PASS  service_role: athletes, users and all 5 dependent tables identical to P1-29b  athletes=d1 e1
+PASS  service_role: coach_roster SELECT denied (42501) after P1-29b and still after P1-29c (helpers are authenticated-only)  {"b":"42501:permission denied for function coach_linked_athletes","c":"42501:permission denied for function coach_linked_athlete_ids"}
+PASS  athlete_D: own athletes row (all columns incl. email/age/injury_flags) still visible
+PASS  athletes: roster 0 rows
+PASS  anon: athletes 0 rows, roster denied, helper denied
+PASS  anon: public game plan still readable (rewritten policies are TO authenticated)  c3
+PASS  service_role: get-coach-roster athletes select (id,user_id,email,full_name,belt,is_active,gym_name) unaffected  1
+PASS  service_role: reads all athletes rows (BYPASSRLS), identical to P1-29b
+PASS  service_role: helper EXECUTE denied
+PASS  rollback: helper dropped
+PASS  rollback: all 26 policies on athletes + 5 dependent tables == live pg_policies text exactly
+PASS  rollback: coaches_select_athletes restored verbatim
+PASS  rollback: coach_roster definition and options == P1-29b
+PASS  rollback: every persona x every table identical to P1-29b
+PASS  re-apply after rollback: narrowed again
+PASS  mutant setup differs from MIG: coaches_select_athletes left in place
+PASS  mutant caught: coaches_select_athletes left in place
+PASS  mutant setup differs from MIG: dependent coach policies not rewritten (coach loses assessments etc.)
+PASS  mutant caught: dependent coach policies not rewritten (coach loses assessments etc.)
+PASS  mutant setup differs from MIG: rewritten policies left TO public (anon breaks on game_plans)
+PASS  mutant caught: rewritten policies left TO public (anon breaks on game_plans)
+PASS  mutant setup differs from MIG: helper EXECUTE left to anon
+PASS  mutant caught: helper EXECUTE left to anon
+PASS  mutant setup differs from MIG: helper returns an extra column (email)
+PASS  mutant caught: helper returns an extra column (email)
+PASS  mutant setup differs from MIG: helper not SECURITY DEFINER (invoker cannot see athletes)
+PASS  mutant caught: helper not SECURITY DEFINER (invoker cannot see athletes)
+{"passed":61,"failed":0,"total":61,"failed_names":[]}
