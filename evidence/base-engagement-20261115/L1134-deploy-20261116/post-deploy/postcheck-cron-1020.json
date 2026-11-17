@@ -1,0 +1,176 @@
+{
+ "read_at_et": "Mon Nov 16, 2026 6:57:58 PM ET",
+ "read_at_utc": "2026-11-16T23:57:58+00:00",
+ "job": {
+  "jobid": 13,
+  "jobname": "roll-next-check-at-hourly",
+  "schedule": "20 * * * *",
+  "active": true,
+  "command": "select public.roll_next_check_at();",
+  "cmd_md5": "01daf01196ef85d698253ef29f32122e",
+  "created_by_migration": "20261116143732"
+ },
+ "runs_from": "2026-11-16 10:20:00 America/New_York",
+ "run_count": 9,
+ "failed_runs": 0,
+ "runs": [
+  {
+   "runid": 22279,
+   "start_et": "10:20:00.096 AM",
+   "end_et": "10:20:00.940 AM",
+   "start_utc": "2026-11-16T15:20:00.096907+00:00",
+   "end_utc": "2026-11-16T15:20:00.940245+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.843338,
+   "log_start_et": "10:20:00.026 AM",
+   "log_end_et": "10:20:00.942 AM"
+  },
+  {
+   "runid": 22283,
+   "start_et": "11:20:00.096 AM",
+   "end_et": "11:20:00.981 AM",
+   "start_utc": "2026-11-16T16:20:00.096618+00:00",
+   "end_utc": "2026-11-16T16:20:00.981772+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.885154,
+   "log_start_et": "11:20:00.019 AM",
+   "log_end_et": "11:20:00.984 AM"
+  },
+  {
+   "runid": 22287,
+   "start_et": "12:20:00.084 PM",
+   "end_et": "12:20:00.952 PM",
+   "start_utc": "2026-11-16T17:20:00.084683+00:00",
+   "end_utc": "2026-11-16T17:20:00.952571+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.867888,
+   "log_start_et": "12:20:00.021 PM",
+   "log_end_et": "12:20:00.953 PM"
+  },
+  {
+   "runid": 22291,
+   "start_et": "1:20:00.083 PM",
+   "end_et": "1:20:00.954 PM",
+   "start_utc": "2026-11-16T18:20:00.083264+00:00",
+   "end_utc": "2026-11-16T18:20:00.954314+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.87105,
+   "log_start_et": "1:20:00.023 PM",
+   "log_end_et": "1:20:00.955 PM"
+  },
+  {
+   "runid": 22295,
+   "start_et": "2:20:00.077 PM",
+   "end_et": "2:20:00.945 PM",
+   "start_utc": "2026-11-16T19:20:00.077985+00:00",
+   "end_utc": "2026-11-16T19:20:00.945862+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.867877,
+   "log_start_et": "2:20:00.017 PM",
+   "log_end_et": "2:20:00.946 PM"
+  },
+  {
+   "runid": 22299,
+   "start_et": "3:20:00.087 PM",
+   "end_et": "3:20:00.966 PM",
+   "start_utc": "2026-11-16T20:20:00.087160+00:00",
+   "end_utc": "2026-11-16T20:20:00.966148+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.878988,
+   "log_start_et": "3:20:00.020 PM",
+   "log_end_et": "3:20:00.968 PM"
+  },
+  {
+   "runid": 22303,
+   "start_et": "4:20:00.092 PM",
+   "end_et": "4:20:00.950 PM",
+   "start_utc": "2026-11-16T21:20:00.092487+00:00",
+   "end_utc": "2026-11-16T21:20:00.950506+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.858019,
+   "log_start_et": "4:20:00.016 PM",
+   "log_end_et": "4:20:00.952 PM"
+  },
+  {
+   "runid": 22307,
+   "start_et": "5:20:00.079 PM",
+   "end_et": "5:20:00.947 PM",
+   "start_utc": "2026-11-16T22:20:00.079184+00:00",
+   "end_utc": "2026-11-16T22:20:00.947789+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.868605,
+   "log_start_et": "5:20:00.017 PM",
+   "log_end_et": "5:20:00.948 PM"
+  },
+  {
+   "runid": 22311,
+   "start_et": "6:20:00.069 PM",
+   "end_et": "6:20:00.944 PM",
+   "start_utc": "2026-11-16T23:20:00.069070+00:00",
+   "end_utc": "2026-11-16T23:20:00.944949+00:00",
+   "status": "succeeded",
+   "return_message": "1 row",
+   "dur_s": 0.875879,
+   "log_start_et": "6:20:00.016 PM",
+   "log_end_et": "6:20:00.945 PM"
+  }
+ ],
+ "schedule_counts_now": {
+  "rows": 19,
+  "next_check_at_eq_next_retest_at": 19,
+  "open_plus7": 0,
+  "next_check_null": 0,
+  "min_updated_et": "2026-11-16 09:37:32.659",
+  "max_updated_et": "2026-11-16 09:37:32.659",
+  "updated_et_minute_buckets": [
+   {
+    "updated_et_minute": "2026-11-16 09:37",
+    "n": 19
+   }
+  ],
+  "note": "return_message is '1 row' (the SELECT returns the integer); moved counts are derived from updated_at. All 19 rows still have updated_at from the in-migration roll, so each cron run moved 0."
+ },
+ "assessments": {
+  "total": 22,
+  "full": 22,
+  "last_assessed_et": "2026-10-28 12:53:27"
+ },
+ "postgres_logs": {
+  "window_start_utc": "2026-11-16T15:15:00Z",
+  "window_end_utc": "2026-11-16T23:55:00Z",
+  "job13_start_complete_pairs": 9,
+  "error_fatal_panic_warning_count": 0,
+  "all_job13_lines_severity": "LOG",
+  "all_job13_sql_state": "00000"
+ },
+ "cron_md5": {
+  "method_jobs": "md5(string_agg(jobid::text||schedule||command||active::text, '|' order by jobid))",
+  "method_source": "RECEIPT-L1134-2a-030000.md / L1133 postcheck (same expression; row separator '|')",
+  "jobs_1_12": "08757cf075ed473abc9b9f06e10bffd6",
+  "jobs_1_12_unchanged": true,
+  "all_jobs": "2fa1e843681ee3c1d91f926be9c15159",
+  "all_jobs_unchanged": true,
+  "job1_row_method": "md5(jobid::text || '|' || jobname || '|' || schedule || '|' || command || '|' || active::text)",
+  "job1_row": "671b791fa638938d52f643bbcb77547d",
+  "job1_row_unchanged": true,
+  "job1_cmd_md5": "caab15b0a3b771bccfd127f7c3db4df2",
+  "n_jobs": 13,
+  "min_jobid": 1,
+  "max_jobid": 13
+ },
+ "not_touched": [
+  "no function call",
+  "cron schedule and command not changed",
+  "RENEWAL_BASE_SEND not read or set",
+  "no DB writes",
+  "existing SHA256SUMS not overwritten"
+ ]
+}
