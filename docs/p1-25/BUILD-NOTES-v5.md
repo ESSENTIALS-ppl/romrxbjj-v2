@@ -38,3 +38,40 @@ ON DELETE SET NULL. Nothing applied, deployed, scheduled, or changed live. Every
 7. `scripts/p1-25-purge-deleted-accounts-test/results.json` (modified): only the generated zz_bak_p1_25_* schema
    names from re-running the v3 suite (40/40).
 The day-90 purge file `20261117010000_p1_25_purge_deleted_accounts.sql` is unchanged from v4.
+
+
+# P1-25 v5.1 follow-up (UNAPPLIED; BUILD ONLY), 2026-11-16 ET
+
+Same branch feat/p1-25-purge-v5-20261116, off the v5 tip 24508e0136c662154af8122749f75371cc98c673.
+Grant's 8:01 PM ET calls (final): keep the dry-run-count guard, signature (uuid, text, jsonb), no hook or trigger code change;
+add a MANUAL runbook step for feedback-to-notion page deletion after the function runs; write the unapplied daily
+pg_cron schedule for the 90-day purge. Stacy's cleared Privacy Policy sentence (STACY-P1-25-PURGE-PRIVACY-LINE-v2-20261116-2001.md,
+sha256 94fd190ef930d5673e089442940682e170ac2de09989427bebb603bdcdf93bcc) is applied in romrx-io-web, not this repo,
+because legal.html lives there. N = 8 (daily run: 7-day zz_bak window plus the max wait until the next run).
+Nothing applied, deployed, scheduled, or changed live. Every hunk in this commit:
+
+1. `docs/p1-25/RUNBOOK-COMPLETION-v5.md` (modified, exactly 1 hunk `@@ -8,3 +8,4 @@`): adds step 7, a MANUAL
+   completion step after the hook runs. Find and delete the feedback-to-notion Notion page(s) for that user's
+   client_feedback rows, and record the page ids deleted (or 'none found') in the completion record. Identify
+   page ids at dry run while the rows still exist, if needed; delete only after a successful apply. No trigger
+   or code change.
+2. `supabase/migrations-unapplied/20261117010200_p1_25_purge_deleted_accounts_cron.sql` (new, exactly 1 hunk
+   `@@ -0,0 +1,38 @@`): unapplied pg_cron schedule for `purge-deleted-accounts-daily` at `23 4 * * *`
+   (04:23 UTC = 11:23 PM ET standard time), command `select public.purge_deleted_accounts('apply', interval '90 days');`.
+   Name and time checked against the live 13 jobs (md5 a96d2036959f1dc2697d23e7665cb490, unchanged); no collision;
+   renewal cron not touched. The file unschedules only this job name if it already exists, then schedules it.
+   Do not apply until a gate names this file's sha256, and only after the function file is applied and a
+   count-only then dry_run live run has been reviewed. Supersedes the unchanged NOT_FOR_APPLY sibling.
+3. `supabase/migrations-unapplied/20261117010200_p1_25_purge_deleted_accounts_cron_rollback.sql` (new, exactly
+   1 hunk `@@ -0,0 +1,10 @@`): unschedules `purge-deleted-accounts-daily` by name only, if it exists. Does not
+   touch any other job.
+4. `docs/p1-25/BUILD-NOTES-v5.md` (modified, exactly 1 hunk `@@ -38,3 +38,40 @@`): this v5.1 section.
+
+No change to `20261117010100_p1_25_completion_cleanup.sql`, its rollback, the day-90 purge SQL, tests, or the
+NOT_FOR_APPLY cron file. The dry-run-count guard and (uuid, text, jsonb) signature stay as in v5.
+
+Privacy sentence (romrx-io-web, branch feat/p1-25-purge-privacy-line-20261116, base 29eb4fa66f920450d71c44e6edbad123cfd38596):
+`legal.html` only, exactly 1 hunk `@@ -112,7 +112,7 @@`. Replaces the one sentence in Privacy section 4 "Your rights"
+with Stacy's v2 AFTER text, `{N}` filled as 8. No literal `{N}` remains. Last-updated lines are unchanged (set on
+the ship day). This edit must ship in the same release that applies the completion hook AND applies and schedules
+the 90-day purge, never separately.
