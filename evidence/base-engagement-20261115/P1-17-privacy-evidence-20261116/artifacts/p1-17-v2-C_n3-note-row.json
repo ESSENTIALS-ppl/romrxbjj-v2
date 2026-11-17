@@ -1,0 +1,22 @@
+{
+  "user_id": "33333333-3333-4333-8333-333333333333",
+  "conversation": {
+    "sport": "base",
+    "provider": "rombot",
+    "context_snapshot": {
+      "kind": "checkin_d3",
+      "branch": "C",
+      "assessment_id": "aaaaaaaa-0000-4000-8000-0000000000c3",
+      "button": {
+        "label": "See my plan",
+        "path": "/dashboard/my-protocol?src=checkin-d3"
+      }
+    }
+  },
+  "message": {
+    "role": "assistant",
+    "content": "Sam, 3 sessions since your assessment. That's a great start. Keep it steady, not perfect. Your next check is Friday, Nov 20. That's when you measure again and see where you are.\nIf any move doesn't feel right, tell me here.",
+    "tokens_used": 0,
+    "latency_ms": 0
+  }
+}

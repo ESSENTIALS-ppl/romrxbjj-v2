@@ -1,0 +1,22 @@
+{
+  "user_id": "22222222-2222-4222-8222-222222222221",
+  "conversation": {
+    "sport": "base",
+    "provider": "rombot",
+    "context_snapshot": {
+      "kind": "checkin_d3",
+      "branch": "B",
+      "assessment_id": "aaaaaaaa-0000-4000-8000-0000000000b1",
+      "button": {
+        "label": "Start today's session",
+        "path": "/dashboard/my-protocol?src=checkin-d3"
+      }
+    }
+  },
+  "message": {
+    "role": "assistant",
+    "content": "Nice work, Sam. You've done 1 session since your assessment. Two more and you reach your week 1 goal of 3 sessions. Today's focus is your hips.\nAnything feel too easy or too hard? Tell me and I'll help you adjust how you do it.",
+    "tokens_used": 0,
+    "latency_ms": 0
+  }
+}
