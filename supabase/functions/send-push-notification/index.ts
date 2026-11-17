@@ -2,6 +2,8 @@
 // BRANCH ONLY, not deployed. verify_jwt must be false (pg_cron, no user JWT).
 // Fail-closed x-cron-secret via public.verify_webhook_secret (cron_webhook_secret), same as other cron senders.
 // Sends only when WEB_PUSH_SEND is exactly "on". Never logs VAPID values, endpoints, or emails.
+// r3: 404/410 clears that user's dead push_subscriptions row and any matching legacy
+// notification_preferences.push_subscription jsonb, and releases the push_sends claim.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handle, type Candidate, type Deps, type Kind, type PushSub, dedupeKey, vapidSubjectOk } from "./handler.ts";
@@ -167,8 +169,29 @@ async function markSuccess(subscriptionId: string | null): Promise<void> {
 async function markFailure(subscriptionId: string | null, gone: boolean): Promise<void> {
   if (!subscriptionId) return;
   const patch: Record<string, unknown> = { last_failure_at: new Date().toISOString() };
+  // r3: 404/410 is handled by clearDead (row delete / jsonb null), not disabled_at.
   if (gone) patch.disabled_at = new Date().toISOString();
   await admin().from("push_subscriptions").update(patch).eq("id", subscriptionId);
+}
+
+// r3: clear only this user's dead subscription. Table row is deleted by id+user_id.
+// The legacy jsonb column is nulled only when its stored endpoint matches, for this user only.
+// When a table row is cleared, a matching jsonb fallback is also nulled so listDue cannot
+// resurrect the same dead endpoint on the next run.
+async function clearDead(userId: string, subscriptionId: string | null, endpoint: string): Promise<void> {
+  const sb = admin();
+  if (subscriptionId) {
+    await sb.from("push_subscriptions").delete().eq("id", subscriptionId).eq("user_id", userId);
+  }
+  const { data } = await sb.from("notification_preferences").select("push_subscription").eq("user_id", userId).maybeSingle();
+  const stored = subFromJson((data as { push_subscription?: unknown } | null)?.push_subscription);
+  if (stored && stored.endpoint === endpoint) {
+    await sb.from("notification_preferences").update({ push_subscription: null }).eq("user_id", userId);
+  }
+}
+
+async function releaseClaim(userId: string, dedupeKeyValue: string): Promise<void> {
+  await admin().from("push_sends").delete().eq("user_id", userId).eq("dedupe_key", dedupeKeyValue);
 }
 
 async function liveSend(sub: PushSub, payload: string): Promise<{ ok: boolean; gone?: boolean }> {
@@ -200,5 +223,7 @@ Deno.serve((req) =>
     send: liveSend,
     markSuccess,
     markFailure,
+    clearDead,
+    releaseClaim,
   } satisfies Deps),
 );

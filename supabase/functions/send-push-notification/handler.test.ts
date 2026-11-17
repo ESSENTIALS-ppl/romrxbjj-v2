@@ -30,6 +30,8 @@ function base(over: Partial<Deps> = {}): Deps {
     },
     markSuccess: async () => {},
     markFailure: async () => {},
+    clearDead: async () => {},
+    releaseClaim: async () => {},
     ...over,
     // expose for assertions
     _sends: sends,
@@ -196,17 +198,45 @@ Deno.test("duplicate claim is skipped, second call does not send", async () => {
   assertEquals(sent, 1);
 });
 
-Deno.test("send failure marks failure and increments failed, 410 is gone", async () => {
-  let goneMarked = false;
+Deno.test("non-gone send failure marks failure and increments failed, claim stands", async () => {
+  let marked = 0;
+  let cleared = 0;
+  let released = 0;
   const r = await handle(req(), base({
     webPushSend: "on",
-    send: async () => ({ ok: false, gone: true }),
-    markFailure: async (_id, gone) => { goneMarked = gone; },
+    send: async () => ({ ok: false }),
+    markFailure: async () => { marked += 1; },
+    clearDead: async () => { cleared += 1; },
+    releaseClaim: async () => { released += 1; },
   }));
   const body = await json(r);
   assertEquals(body.sent, 0);
   assertEquals(body.failed, 1);
-  assertEquals(goneMarked, true);
+  assertEquals(body.cleared, 0);
+  assertEquals(body.claimed, 1);
+  assertEquals([marked, cleared, released], [1, 0, 0]);
+});
+
+Deno.test("410/404 clears the dead subscription, is not the day's send, and does not increment failed", async () => {
+  let cleared = 0;
+  let released = 0;
+  let marked = 0;
+  let clearArgs: unknown[] = [];
+  const r = await handle(req(), base({
+    webPushSend: "on",
+    send: async () => ({ ok: false, gone: true }),
+    markFailure: async () => { marked += 1; },
+    clearDead: async (userId, subscriptionId, endpoint) => { cleared += 1; clearArgs = [userId, subscriptionId, endpoint]; },
+    releaseClaim: async () => { released += 1; },
+  }));
+  const body = await json(r);
+  assertEquals(body.sent, 0);
+  assertEquals(body.failed, 0);
+  assertEquals(body.cleared, 1);
+  assertEquals(body.claimed, 0);
+  assertEquals(body.would_clear, 0);
+  assertEquals([cleared, released, marked], [1, 1, 0]);
+  assertEquals(clearArgs, ["00000000-0000-4000-8000-000000000001", "sub-1", FAKE_SUB.endpoint]);
 });
 
 Deno.test("dedupeKey is kind:localDate, no mailbox form", () => {

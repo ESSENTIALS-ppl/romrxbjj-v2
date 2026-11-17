@@ -36,6 +36,8 @@ function deps(mod: typeof H, over: Partial<Deps> = {}): Spy {
     send: async (_s, payload) => { sends.push(payload); return { ok: true }; },
     markSuccess: async () => {},
     markFailure: async () => {},
+    clearDead: async () => {},
+    releaseClaim: async () => {},
     ...over,
     sends,
     claims,
@@ -157,8 +159,8 @@ Deno.test("r2 quiet: user timezone is used; null or invalid falls back to Americ
   const day = at("2026-11-17T20:00:00Z"); // 15:00 New York, 12:00 Los Angeles
   assertFalse(inQuietHours(day, "America/Los_Angeles"));
 });
-Deno.test("r2 quiet: in-window candidate is skipped, not claimed, not sent; reported as skipped_quiet", async () => {
-  const r = await run(H, { now: () => at("2026-11-17T03:00:00Z") }); // 22:00 EST
+Deno.test("r2 quiet: in-window system nudge is skipped, not claimed, not sent; reported as skipped_quiet", async () => {
+  const r = await run(H, { now: () => at("2026-11-17T03:00:00Z"), listDue: async () => [cand({ kind: "retest" })] }); // 22:00 EST
   assertEquals([r.d.sends.length, r.d.claims.length, r.body.skipped_quiet, r.body.sent], [0, 0, 1, 0]);
 });
 
@@ -170,7 +172,7 @@ Deno.test("r2 dry-run: no network push, no claim, and it reports skip counts", a
   try {
     const due = [
       cand({ userId: "u-test", isTest: true }),
-      cand({ userId: "u-quiet", timezone: "Asia/Tokyo" }), // 04:45 Tokyo at 19:45Z
+      cand({ userId: "u-quiet", kind: "retest", timezone: "Asia/Tokyo" }), // 04:45 Tokyo at 19:45Z
       cand({ userId: "u-ok-1" }),
       cand({ userId: "u-ok-2", timezone: "America/Los_Angeles" }), // 11:45 LA
     ];
@@ -213,8 +215,10 @@ async function filtersOk(m: typeof H) {
   if (t.d.sends.length !== 0 || t.body.skipped_test !== 1) return false;
   const u = await run(m, { listDue: async () => [cand({ isTest: undefined as unknown as boolean })] });
   if (u.d.sends.length !== 0) return false;
-  const q = await run(m, { now: () => at("2026-11-17T02:00:00Z") }); // 21:00 EST
-  if (q.d.sends.length !== 0) return false;
+  const q = await run(m, { now: () => at("2026-11-17T02:00:00Z"), listDue: async () => [cand({ kind: "retest" })] }); // 21:00 EST
+  if (q.d.sends.length !== 0 || q.body.skipped_quiet !== 1) return false;
+  const proto = await run(m, { now: () => at("2026-11-17T02:00:00Z"), listDue: async () => [cand({ kind: "protocol" })] });
+  if (proto.d.sends.length !== 1 || proto.body.skipped_quiet !== 0) return false;
   const ok = await run(m);
   return ok.d.sends.length === 1;
 }
@@ -237,7 +241,8 @@ const MUTANTS: [string, string, string][] = [
   ["Kai's uncleared protocol line", "Time for today's session. Open ROMRx Base to see your plan.", "Today's plan is ready. It's built from your own assessment."],
   ["is_test filter removed", "    if (c.isTest !== false) { skippedTest += 1; continue; }\n", ""],
   ["is_test fail-open (only explicit true skipped)", "if (c.isTest !== false)", "if (c.isTest === true)"],
-  ["quiet filter removed", "    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }\n", ""],
+  ["quiet filter removed", "    if (c.kind !== \"protocol\" && inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }\n", ""],
+  ["quiet applied to protocol (exemption removed)", "c.kind !== \"protocol\" && inQuietHours(now, c.timezone)", "inQuietHours(now, c.timezone)"],
   ["quiet start off by one (>)", "hour >= QUIET_START_HOUR", "hour > QUIET_START_HOUR"],
   ["quiet end off by one (<=)", "hour < QUIET_END_HOUR", "hour <= QUIET_END_HOUR"],
   ["no midnight wrap (&&)", "hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR", "hour >= QUIET_START_HOUR && hour < QUIET_END_HOUR"],

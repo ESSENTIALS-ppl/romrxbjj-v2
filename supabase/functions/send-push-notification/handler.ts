@@ -4,6 +4,10 @@
 // No mailbox addresses, no VAPID values, and no subscription endpoints are logged or returned.
 // r2: lock-screen copy is Stacy 219378b5 section A (with Kai 481a2e9d for the CLEAR digest line), extracted by
 // script; see push_copy.cleared.json. Jim's wording yes is still needed before WEB_PUSH_SEND is flipped.
+// r3: quiet hours apply to system nudges only (retest, digest, test). A user's own chosen protocol
+// reminder time is exempt and sends even inside 21:00-08:00 local. On 404/410, clear that user's
+// dead subscription (table row and/or matching legacy jsonb) and release the day's claim so it is
+// not counted as the day's send. Dry-run reports would_clear and writes nothing.
 
 export const PUSH_COPY = {
   protocol: { title: "ROMRx Base", body: "Time for today's session. Open ROMRx Base to see your plan." },
@@ -34,8 +38,10 @@ export interface Candidate {
 }
 
 // r2 quiet hours (Vera 7420bcd9 WARN: "no separate quiet-hours window"). Her note gives no hours, so the
-// window is a constant here: local 21:00 up to 08:00 the next morning, in the user's timezone. Sends inside
-// the window are skipped and not claimed, so a retest due that day goes out on the first run at or after 08:00.
+// window is a constant here: local 21:00 up to 08:00 the next morning, in the user's timezone.
+// r3: the window applies only to system nudges (retest due, test notice, digest). A protocol reminder
+// the user chose themselves is exempt, so a 21:30 pick still sends. Skipped system nudges are not
+// claimed; a retest due that day goes out on the first run at or after 08:00.
 export const QUIET_START_HOUR = 21;
 export const QUIET_END_HOUR = 8;
 export const DEFAULT_TZ = "America/New_York";
@@ -63,6 +69,16 @@ export function inQuietHours(now: Date, tz: string | null | undefined): boolean 
   return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
 }
 
+// r3: protocol is the user's own chosen reminder time and is exempt from quiet hours.
+export function isUserChosenProtocol(kind: Kind): boolean {
+  return kind === "protocol";
+}
+
+export function skippedByQuietHours(kind: Kind, now: Date, tz: string | null | undefined): boolean {
+  if (kind === "protocol") return false;
+  return inQuietHours(now, tz);
+}
+
 export interface Deps {
   cronCallerOk: (req: Request) => Promise<boolean>;
   webPushSend: string | undefined;
@@ -75,6 +91,10 @@ export interface Deps {
   send: (sub: PushSub, payload: string) => Promise<{ ok: boolean; gone?: boolean }>;
   markSuccess: (subscriptionId: string | null) => Promise<void>;
   markFailure: (subscriptionId: string | null, gone: boolean) => Promise<void>;
+  // r3: delete that user's dead table row and/or matching legacy jsonb. No-op in dry-run (not called).
+  clearDead: (userId: string, subscriptionId: string | null, endpoint: string) => Promise<void>;
+  // r3: drop the day's claim so a 404/410 is not counted as the day's send.
+  releaseClaim: (userId: string, dedupeKey: string) => Promise<void>;
 }
 
 export function sendEnabled(value: string | undefined): boolean {
@@ -122,11 +142,12 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
   let skipped = 0;
   let skippedTest = 0;
   let skippedQuiet = 0;
+  let cleared = 0;
   const now = d.now();
   for (const c of due) {
     // r2 filters run before claim and before any send, in dry-run and live alike.
     if (c.isTest !== false) { skippedTest += 1; continue; }
-    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }
+    if (c.kind !== "protocol" && inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }
     const key = c.dedupeKey || dedupeKey(c.kind, c.localDate);
     if (live) {
       const okClaim = await d.claim(c.userId, key);
@@ -137,9 +158,18 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
       if (result.ok) {
         sent += 1;
         await d.markSuccess(c.subscriptionId);
+      } else if (result.gone) {
+        // 404/410: clear this user's dead subscription only; release the claim so it is not the day's send.
+        try {
+          await d.clearDead(c.userId, c.subscriptionId, c.sub.endpoint);
+        } finally {
+          await d.releaseClaim(c.userId, key);
+          claimed -= 1;
+          cleared += 1;
+        }
       } else {
         failed += 1;
-        await d.markFailure(c.subscriptionId, !!result.gone);
+        await d.markFailure(c.subscriptionId, false);
       }
     } else {
       skipped += 1; // counted as dry-run candidates, not claimed
@@ -147,6 +177,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
   }
 
   // Response counts only. No user ids, emails, endpoints, or keys.
+  // would_clear is 0 in dry-run because dry-run does not call send and cannot see a 404/410.
   return new Response(JSON.stringify({
     ok: true,
     dry_run: !live,
@@ -158,5 +189,7 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
     would_send: live ? 0 : skipped,
     skipped_test: skippedTest,
     skipped_quiet: skippedQuiet,
+    cleared: live ? cleared : 0,
+    would_clear: live ? 0 : 0,
   }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
