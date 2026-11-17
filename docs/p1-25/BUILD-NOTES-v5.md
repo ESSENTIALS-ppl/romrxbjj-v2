@@ -75,3 +75,30 @@ Privacy sentence (romrx-io-web, branch feat/p1-25-purge-privacy-line-20261116, b
 with Stacy's v2 AFTER text, `{N}` filled as 8. No literal `{N}` remains. Last-updated lines are unchanged (set on
 the ship day). This edit must ship in the same release that applies the completion hook AND applies and schedules
 the 90-day purge, never separately.
+
+# P1-25 v5.2 follow-up (UNAPPLIED; BUILD ONLY), 2026-11-16 ET
+
+Same branch feat/p1-25-purge-v5-20261116, off the v5.1 tip 24508e01 / c3e04415.
+Grant's 8:13 PM ET calls: docs only. Add a runbook path for a Privacy Policy contact-address
+deletion request from a lead or waitlist person (no account): delete public.leads and the live
+email-matched waitlist/pre-account lists, and delete product_events whose props.lead_id matches
+those lead ids. Manual SQL in the runbook, dry-run counts first, then deletes in one transaction,
+then a count check after. Placeholder :email only. No code, trigger, or SQL migration change.
+Stacy's Privacy Policy line v3 (STACY-P1-25-PURGE-PRIVACY-LINE-v3-20261116-2011.md,
+sha256 85d19e45078093f8e10f2bf6db9c6eb2f46f73cc760ace5fd03da5b44ba60786) is applied in
+romrx-io-web, not this repo. Nothing applied, deployed, scheduled, or changed live. Every hunk
+in this commit:
+
+1. `docs/p1-25/RUNBOOK-COMPLETION-v5.md` (modified, exactly 1 hunk `@@ -9,3 +9,93 @@`): adds the
+   "Lead or waitlist deletion request (no account)" section after step 7. Live tables named from
+   a read-only catalog: public.leads, public.sport_pack_waitlist, public.investor_requests,
+   public.partner_inquiries, public.yoga_testers. Safety stop if the email is on an account,
+   a converted lead, 7c71e421, internal_accounts, or a test fixture.
+2. `docs/p1-25/BUILD-NOTES-v5.md` (modified, exactly 1 hunk `@@ -75,3 +75,30 @@`): this v5.2 section.
+
+Privacy sentence (romrx-io-web, same branch feat/p1-25-purge-privacy-line-20261116, off 7e8190ae,
+base 29eb4fa6): `legal.html` only, exactly 1 hunk `@@ -112,7 +112,7 @@`. Replaces the v2 AFTER
+text in Privacy section 4 with Stacy's v3 AFTER text (v2 with N=8, plus one new sentence after
+the kept-records list). No literal `{N}`. Last-updated lines unchanged. Must ship in the same
+release that applies the completion hook AND applies and schedules the 90-day purge, never
+separately.
