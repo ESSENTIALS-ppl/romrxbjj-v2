@@ -1,0 +1,4 @@
+command: git diff a41a3029 -- supabase/functions/lifecycle-emails/source/ supabase/functions/lifecycle-emails/_shared/ supabase/functions/unsubscribe/source/ supabase/functions/unsubscribe/_shared/
+result: empty (function bytes did not move from a41a3029)
+changed files vs a41a3029:
+supabase/functions/lifecycle-emails/test/quick-check-guard.test.ts

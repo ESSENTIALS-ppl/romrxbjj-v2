@@ -1,0 +1,15 @@
+c4ec33969ffb7d3396f7450f6c28ab115d9982d91cb635ea8a8a9dd3303d8629  5841  rollback/live-lifecycle-emails-v3/source/index.ts
+0c920063f0cbceb8a1ebe900ba08c5c8514ae0c936c7acb299005f682692e957  5322  rollback/live-lifecycle-emails-v3/source/handler.ts
+0c13c9ae9b96e21cf0f2eaace1a26e29b2b74bab38be8de316102b47f2fd4b13  17533  rollback/live-lifecycle-emails-v3/source/logic.ts
+51c9558cef1eb6ca65a97f99666e8bf0df1bb28ef2063caae731aa80d4c4e40c  8434  rollback/live-lifecycle-emails-v3/source/email.ts
+d3d03dd640c1e2df42f3cffbd8b485f1f5ac8ae2dc5742310a621315997cd69c  1889  rollback/live-lifecycle-emails-v3/source/score.ts
+bb76634e7385bcefdda143a82589e6a387c0de0890e121c0d5ddf7602119a738  37110  rollback/live-lifecycle-emails-v3/_shared/mobility/mobilityBands.ts
+d1845820bf98d7825f5e8a170a4ee714a7e631140ecf75312ede9822ed33870c  1471  rollback/live-lifecycle-emails-v3/_shared/mobility/lumbarFlag.ts
+0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b  1216  rollback/live-lifecycle-emails-v3/_shared/email_footer.ts
+26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424  3443  rollback/live-lifecycle-emails-v3/_shared/unsub_token.ts
+edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b  1269  rollback/live-lifecycle-emails-v3/source/deletion.ts
+f78d43b429e93a9f96c6c28a57a398c76b24b6ae7eeeb4417684438fa026377b  4507  rollback/live-unsubscribe-v13/source/index.ts
+7bae6d34db82052977c138ea16c6e993d5afddc0e378f9b2df387241d27cf302  4838  rollback/live-unsubscribe-v13/_shared/rate_limit.ts
+49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  1285  rollback/live-unsubscribe-v13/_shared/events.ts
+bafad0e893f512a0ae6e1c7e7bdab44af6be49d145aa8410c3465b38fcf5671b  5342  rollback/live-unsubscribe-v13/source/token_path.ts
+26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424  3443  rollback/live-unsubscribe-v13/_shared/unsub_token.ts

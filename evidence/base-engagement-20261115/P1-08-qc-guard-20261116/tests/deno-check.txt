@@ -1,0 +1,3 @@
+Check supabase/functions/lifecycle-emails/source/handler.ts
+Check supabase/functions/lifecycle-emails/source/logic.ts
+Check supabase/functions/lifecycle-emails/source/email.ts

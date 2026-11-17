@@ -1,0 +1,72 @@
+{
+  "id": "612296fe-7b65-4062-919f-d6a6bcc14657",
+  "slug": "lifecycle-emails",
+  "status": "ACTIVE",
+  "version": 3,
+  "verify_jwt": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_612296fe-7b65-4062-919f-d6a6bcc14657_3/source/source/index.ts",
+  "ezbr_sha256": "d68e443bbcefeafc523b1452bd5fcee82aed76e546e0074e1e78213dbafaf91e",
+  "updated_at": 1794837533365,
+  "files": [
+    {
+      "name": "source/index.ts",
+      "bytes": 5841,
+      "sha256": "c4ec33969ffb7d3396f7450f6c28ab115d9982d91cb635ea8a8a9dd3303d8629",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/handler.ts",
+      "bytes": 5322,
+      "sha256": "0c920063f0cbceb8a1ebe900ba08c5c8514ae0c936c7acb299005f682692e957",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/logic.ts",
+      "bytes": 17533,
+      "sha256": "0c13c9ae9b96e21cf0f2eaace1a26e29b2b74bab38be8de316102b47f2fd4b13",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/email.ts",
+      "bytes": 8434,
+      "sha256": "51c9558cef1eb6ca65a97f99666e8bf0df1bb28ef2063caae731aa80d4c4e40c",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/score.ts",
+      "bytes": 1889,
+      "sha256": "d3d03dd640c1e2df42f3cffbd8b485f1f5ac8ae2dc5742310a621315997cd69c",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/mobility/mobilityBands.ts",
+      "bytes": 37110,
+      "sha256": "bb76634e7385bcefdda143a82589e6a387c0de0890e121c0d5ddf7602119a738",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/mobility/lumbarFlag.ts",
+      "bytes": 1471,
+      "sha256": "d1845820bf98d7825f5e8a170a4ee714a7e631140ecf75312ede9822ed33870c",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/email_footer.ts",
+      "bytes": 1216,
+      "sha256": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/unsub_token.ts",
+      "bytes": 3443,
+      "sha256": "26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/deletion.ts",
+      "bytes": 1269,
+      "sha256": "edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b",
+      "vs_prelive": "MATCH"
+    }
+  ]
+}

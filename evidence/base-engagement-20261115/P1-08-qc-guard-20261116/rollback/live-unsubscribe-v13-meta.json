@@ -1,0 +1,42 @@
+{
+  "id": "d7eaa2d5-647f-4936-a879-e3ff25e8db2b",
+  "slug": "unsubscribe",
+  "status": "ACTIVE",
+  "version": 13,
+  "verify_jwt": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_d7eaa2d5-647f-4936-a879-e3ff25e8db2b_13/source/source/index.ts",
+  "ezbr_sha256": "cfb084bb0afa91b1399a0fa8e269ad736ae445bd46f535cfd7aeb5c92fba7157",
+  "updated_at": 1794837450073,
+  "files": [
+    {
+      "name": "source/index.ts",
+      "bytes": 4507,
+      "sha256": "f78d43b429e93a9f96c6c28a57a398c76b24b6ae7eeeb4417684438fa026377b",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/rate_limit.ts",
+      "bytes": 4838,
+      "sha256": "7bae6d34db82052977c138ea16c6e993d5afddc0e378f9b2df387241d27cf302",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/events.ts",
+      "bytes": 1285,
+      "sha256": "49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "source/token_path.ts",
+      "bytes": 5342,
+      "sha256": "bafad0e893f512a0ae6e1c7e7bdab44af6be49d145aa8410c3465b38fcf5671b",
+      "vs_prelive": "MATCH"
+    },
+    {
+      "name": "_shared/unsub_token.ts",
+      "bytes": 3443,
+      "sha256": "26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424",
+      "vs_prelive": "MATCH"
+    }
+  ]
+}
