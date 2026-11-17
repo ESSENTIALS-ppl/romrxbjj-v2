@@ -1,0 +1,12 @@
+s1 cells 4867 after_cells 4867 diffs 0 mutant_diffs 27
+  mutant tables [('CROSS:athletes', 'athlete_D_owner'), ('CROSS:athletes', 'coach_C'), ('CROSS:athletes', 'school_admin_SA'), ('CROSS:athletes', 'unlinked_user_E'), ('CROSS:protocols', 'coach_C'), ('athletes', 'auth_other_B'), ('athletes', 'auth_owner_A'), ('body_metrics', 'auth_other_B'), ('body_metrics', 'auth_owner_A')]
+  outcomes {'ERR 42501': 1209, 'select': 234, 'ok>0': 1808, 'ok:0': 1328, 'ERR 23505': 200, 'ERR 23503': 52, 'ERR 42703': 36}
+s2 cells 6067 after_cells 6067 diffs 0 mutant_diffs 27
+  mutant tables [('CROSS:athletes', 'athlete_D_owner'), ('CROSS:athletes', 'coach_C'), ('CROSS:athletes', 'school_admin_SA'), ('CROSS:athletes', 'unlinked_user_E'), ('CROSS:protocols', 'coach_C'), ('athletes', 'auth_other_B'), ('athletes', 'auth_owner_A'), ('body_metrics', 'auth_other_B'), ('body_metrics', 'auth_owner_A')]
+  outcomes {'ERR 42501': 1285, 'select': 234, 'ok>0': 2380, 'ok:0': 1868, 'ERR 23505': 200, 'ERR 23503': 52, 'ERR 42703': 48}
+s1 owner-shape roles ['anon', 'auth_other_B', 'auth_owner_A', 'postgres', 'service_role']
+s1 cross roles ['anon', 'athlete_D_owner', 'coach_C', 'postgres', 'school_admin_SA', 'service_role', 'unlinked_user_E']
+s1 sample op keys ['delete_per_row', 'delete_returning_per_row', 'insert_other', 'insert_other_returning', 'insert_self', 'insert_self_returning', 'select', 'update_per_row', 'update_returning_per_row', 'upsert_other_do_nothing', 'upsert_other_do_update', 'upsert_other_do_update_returning', 'upsert_self_do_nothing', 'upsert_self_do_update', 'upsert_self_do_update_returning']
+s2 owner-shape roles ['anon', 'auth_other_B', 'auth_owner_A', 'postgres', 'service_role']
+s2 cross roles ['anon', 'athlete_D_owner', 'coach_C', 'postgres', 'school_admin_SA', 'service_role', 'unlinked_user_E']
+s2 sample op keys ['delete_per_row', 'delete_returning_per_row', 'insert_other', 'insert_other_returning', 'insert_self', 'insert_self_returning', 'select', 'update_per_row', 'update_returning_per_row', 'upsert_other_do_nothing', 'upsert_other_do_update', 'upsert_other_do_update_returning', 'upsert_self_do_nothing', 'upsert_self_do_update', 'upsert_self_do_update_returning']

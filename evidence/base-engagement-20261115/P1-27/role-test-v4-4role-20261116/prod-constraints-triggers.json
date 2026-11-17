@@ -1,0 +1,2339 @@
+{
+ "constraints": [
+  {
+   "t": "account_deletion_requests",
+   "name": "account_deletion_requests_status_check",
+   "type": "c",
+   "def": "CHECK ((status = ANY (ARRAY['requested'::text, 'in_progress'::text, 'completed'::text, 'failed'::text])))",
+   "ref": null
+  },
+  {
+   "t": "account_deletion_requests",
+   "name": "account_deletion_requests_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "ai_conversations",
+   "name": "ai_conversations_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "ai_conversations",
+   "name": "ai_conversations_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "ai_messages",
+   "name": "ai_messages_role_check",
+   "type": "c",
+   "def": "CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))",
+   "ref": null
+  },
+  {
+   "t": "ai_messages",
+   "name": "ai_messages_conversation_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE",
+   "ref": "ai_conversations"
+  },
+  {
+   "t": "ai_messages",
+   "name": "ai_messages_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "ai_messages",
+   "name": "ai_messages_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "ai_research_cache",
+   "name": "ai_research_cache_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "ai_research_cache",
+   "name": "ai_research_cache_query_hash_key",
+   "type": "u",
+   "def": "UNIQUE (query_hash)",
+   "ref": null
+  },
+  {
+   "t": "alert_dismissals",
+   "name": "alert_dismissals_athlete_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "alert_dismissals",
+   "name": "alert_dismissals_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "alert_dismissals",
+   "name": "alert_dismissals_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "alert_dismissals",
+   "name": "alert_dismissals_coach_id_athlete_id_joint_key_key",
+   "type": "u",
+   "def": "UNIQUE (coach_id, athlete_id, joint_key)",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_hard_cap_7d_ok",
+   "type": "c",
+   "def": "CHECK ((expires_at <= (created_at + '7 days'::interval)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_rolling_48h_ok",
+   "type": "c",
+   "def": "CHECK ((expires_at <= (updated_at + '48:00:00'::interval)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_step_idx_ok",
+   "type": "c",
+   "def": "CHECK (((step_idx >= 0) AND (step_idx <= 8)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_steps_ok",
+   "type": "c",
+   "def": "CHECK ((completed_steps <@ ARRAY['hip_er'::text, 'hip_ir'::text, 'shoulder_er'::text, 'shoulder_flex'::text, 'cervical_lat'::text, 'cervical_flex_ext'::text, 'hip_flex'::text, 'hip_abd'::text, 'ankle_df'::text]))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_values_ok",
+   "type": "c",
+   "def": "CHECK (assessment_draft_values_ok(step_values))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id)",
+   "ref": null
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_capture_methods_check",
+   "type": "c",
+   "def": "CHECK (((capture_methods IS NULL) OR ((jsonb_typeof(capture_methods) = 'object'::text) AND (NOT jsonb_path_exists(capture_methods, '$.*?(@.type() != \"string\" || (@ != \"lock\" && @ != \"fallback\") && @ != \"typed\")'::jsonpath)))))",
+   "ref": null
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_athlete_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_id) REFERENCES athletes(id) ON DELETE CASCADE",
+   "ref": "athletes"
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "athlete_injuries",
+   "name": "athlete_injuries_severity_check",
+   "type": "c",
+   "def": "CHECK (((severity >= 1) AND (severity <= 10)))",
+   "ref": null
+  },
+  {
+   "t": "athlete_injuries",
+   "name": "athlete_injuries_stage_check",
+   "type": "c",
+   "def": "CHECK (((stage >= 0) AND (stage <= 9)))",
+   "ref": null
+  },
+  {
+   "t": "athlete_injuries",
+   "name": "athlete_injuries_status_check",
+   "type": "c",
+   "def": "CHECK ((status = ANY (ARRAY['active'::text, 'monitoring'::text, 'cleared'::text])))",
+   "ref": null
+  },
+  {
+   "t": "athlete_injuries",
+   "name": "athlete_injuries_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "athlete_injuries",
+   "name": "athlete_injuries_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_belt_check",
+   "type": "c",
+   "def": "CHECK ((belt = ANY (ARRAY['white'::text, 'blue'::text, 'purple'::text, 'brown'::text, 'black'::text])))",
+   "ref": null
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_dominant_side_check",
+   "type": "c",
+   "def": "CHECK ((dominant_side = ANY (ARRAY['right'::text, 'left'::text])))",
+   "ref": null
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_onboarding_status_check",
+   "type": "c",
+   "def": "CHECK ((onboarding_status = ANY (ARRAY['pending_consent'::text, 'consent_signed'::text, 'assessment_in_progress'::text, 'active'::text])))",
+   "ref": null
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE SET NULL",
+   "ref": "coaches"
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_gym_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (gym_id) REFERENCES schools(id) ON DELETE SET NULL",
+   "ref": "schools"
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "attendance",
+   "name": "attendance_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "attendance",
+   "name": "attendance_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "attendance",
+   "name": "attendance_coach_id_athlete_user_id_class_date_key",
+   "type": "u",
+   "def": "UNIQUE (coach_id, athlete_user_id, class_date)",
+   "ref": null
+  },
+  {
+   "t": "billing_consents",
+   "name": "billing_consents_consent_method_check",
+   "type": "c",
+   "def": "CHECK ((consent_method = ANY (ARRAY['stripe_terms_of_service'::text, 'in_app_checkbox'::text, 'reconfirm'::text, 'none'::text])))",
+   "ref": null
+  },
+  {
+   "t": "billing_consents",
+   "name": "billing_consents_offer_check",
+   "type": "c",
+   "def": "CHECK ((offer = ANY (ARRAY['base'::text, 'sport'::text, 'combo'::text, 'reconfirm'::text])))",
+   "ref": null
+  },
+  {
+   "t": "billing_consents",
+   "name": "billing_consents_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "billing_consents",
+   "name": "billing_consents_stripe_checkout_session_id_key",
+   "type": "u",
+   "def": "UNIQUE (stripe_checkout_session_id)",
+   "ref": null
+  },
+  {
+   "t": "body_metrics",
+   "name": "body_metrics_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "body_metrics",
+   "name": "body_metrics_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "body_metrics",
+   "name": "body_metrics_user_id_measured_at_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, measured_at)",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_category_check",
+   "type": "c",
+   "def": "CHECK ((category = ANY (ARRAY['bug'::text, 'feature'::text, 'general'::text])))",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_message_check",
+   "type": "c",
+   "def": "CHECK (((char_length(message) >= 5) AND (char_length(message) <= 1000)))",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_severity_check",
+   "type": "c",
+   "def": "CHECK ((severity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])))",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_sport_check",
+   "type": "c",
+   "def": "CHECK ((sport = ANY (ARRAY['base'::text, 'bjj'::text, 'bodybuilding'::text])))",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_status_check",
+   "type": "c",
+   "def": "CHECK ((status = ANY (ARRAY['open'::text, 'triaged'::text, 'in_progress'::text, 'resolved'::text, 'wont_fix'::text, 'duplicate'::text])))",
+   "ref": null
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+   "ref": "auth.users"
+  },
+  {
+   "t": "client_feedback",
+   "name": "client_feedback_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "clients",
+   "name": "clients_onboarding_step_check",
+   "type": "c",
+   "def": "CHECK ((onboarding_step = ANY (ARRAY['signup'::text, 'consent'::text, 'assessment'::text, 'done'::text])))",
+   "ref": null
+  },
+  {
+   "t": "clients",
+   "name": "clients_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "clients",
+   "name": "clients_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id)",
+   "ref": null
+  },
+  {
+   "t": "coach_assignments",
+   "name": "coach_assignments_athlete_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "coach_assignments",
+   "name": "coach_assignments_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_assignments",
+   "name": "coach_assignments_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "coach_competitors",
+   "name": "coach_competitors_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_competitors",
+   "name": "coach_competitors_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "coach_competitors",
+   "name": "coach_competitors_coach_id_athlete_user_id_key",
+   "type": "u",
+   "def": "UNIQUE (coach_id, athlete_user_id)",
+   "ref": null
+  },
+  {
+   "t": "coach_journal_notes",
+   "name": "coach_journal_notes_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_journal_notes",
+   "name": "coach_journal_notes_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (coach_id)",
+   "ref": null
+  },
+  {
+   "t": "coach_notes",
+   "name": "coach_notes_athlete_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "coach_notes",
+   "name": "coach_notes_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_notes",
+   "name": "coach_notes_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "coach_notes",
+   "name": "coach_notes_coach_athlete_unique",
+   "type": "u",
+   "def": "UNIQUE (coach_id, athlete_id)",
+   "ref": null
+  },
+  {
+   "t": "coach_notes",
+   "name": "coach_notes_coach_id_athlete_id_key",
+   "type": "u",
+   "def": "UNIQUE (coach_id, athlete_id)",
+   "ref": null
+  },
+  {
+   "t": "coach_teaching_log",
+   "name": "coach_teaching_log_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_teaching_log",
+   "name": "coach_teaching_log_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "coach_teaching_log",
+   "name": "coach_teaching_log_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "coach_video_feedback",
+   "name": "coach_video_feedback_athlete_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "coach_video_feedback",
+   "name": "coach_video_feedback_coach_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE CASCADE",
+   "ref": "coaches"
+  },
+  {
+   "t": "coach_video_feedback",
+   "name": "coach_video_feedback_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "coaches",
+   "name": "coaches_school_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL",
+   "ref": "schools"
+  },
+  {
+   "t": "coaches",
+   "name": "coaches_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "coaches",
+   "name": "coaches_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_action_taken_check",
+   "type": "c",
+   "def": "CHECK ((action_taken = ANY (ARRAY['meta_pixel_capi_off'::text, 'meta_pixel_capi_on'::text, 'none'::text])))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_anon_id_hash_check",
+   "type": "c",
+   "def": "CHECK ((anon_id_hash ~ '^[0-9a-f]{64}$'::text))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_banner_region_check",
+   "type": "c",
+   "def": "CHECK (((banner_region IS NULL) OR (banner_region = ANY (ARRAY['us'::text, 'eu_uk'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_banner_version_check",
+   "type": "c",
+   "def": "CHECK ((banner_version ~ '^[A-Za-z0-9._-]{1,64}$'::text))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_denial_reason_check",
+   "type": "c",
+   "def": "CHECK (((denial_reason IS NULL) OR (length(denial_reason) <= 200)))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_method_check",
+   "type": "c",
+   "def": "CHECK ((method = ANY (ARRAY['banner'::text, 'footer'::text, 'settings'::text, 'gpc'::text, 'email'::text])))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_page_path_check",
+   "type": "c",
+   "def": "CHECK (((page_path ~ '^/'::text) AND (page_path !~ '[?#]'::text) AND (length(page_path) <= 512)))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_policy_version_check",
+   "type": "c",
+   "def": "CHECK ((policy_version ~ '^[A-Za-z0-9._-]{1,64}$'::text))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_region_country_check",
+   "type": "c",
+   "def": "CHECK (((region_country IS NULL) OR (region_country ~ '^[A-Z]{2}$'::text)))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_region_state_check",
+   "type": "c",
+   "def": "CHECK (((region_state IS NULL) OR (region_state ~ '^[A-Z0-9]{1,3}$'::text)))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_request_ticket_id_check",
+   "type": "c",
+   "def": "CHECK (((request_ticket_id IS NULL) OR (request_ticket_id ~ '^(DEL|ACC|COR|OPT)-[0-9]{4}-[0-9]{3,}$'::text)))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_site_check",
+   "type": "c",
+   "def": "CHECK ((site = ANY (ARRAY['romrx.io'::text, 'romrxbjj.com'::text, 'romrxbodybuilding.com'::text])))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_state_check",
+   "type": "c",
+   "def": "CHECK ((state = ANY (ARRAY['granted'::text, 'denied'::text, 'revoked'::text])))",
+   "ref": null
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+   "ref": "auth.users"
+  },
+  {
+   "t": "consent_events",
+   "name": "consent_events_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "consents",
+   "name": "consents_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "consents",
+   "name": "consents_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "consents",
+   "name": "consents_user_id_terms_version_medical_waiver_version_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, terms_version, medical_waiver_version)",
+   "ref": null
+  },
+  {
+   "t": "drill_sessions",
+   "name": "drill_sessions_game_plan_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (game_plan_id) REFERENCES game_plans(id) ON DELETE SET NULL",
+   "ref": "game_plans"
+  },
+  {
+   "t": "drill_sessions",
+   "name": "drill_sessions_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "drill_sessions",
+   "name": "drill_sessions_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "drill_sessions",
+   "name": "drill_sessions_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "email_sends",
+   "name": "email_sends_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "email_sends",
+   "name": "email_sends_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id, email_id)",
+   "ref": null
+  },
+  {
+   "t": "exercises",
+   "name": "exercises_exercise_type_check",
+   "type": "c",
+   "def": "CHECK ((exercise_type = ANY (ARRAY['resistance'::text, 'stretch'::text, 'foam_roll'::text])))",
+   "ref": null
+  },
+  {
+   "t": "exercises",
+   "name": "exercises_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "fuel_logs",
+   "name": "fuel_logs_kind_check",
+   "type": "c",
+   "def": "CHECK ((kind = ANY (ARRAY['nutrition'::text, 'hydration'::text])))",
+   "ref": null
+  },
+  {
+   "t": "fuel_logs",
+   "name": "fuel_logs_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "fuel_logs",
+   "name": "fuel_logs_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "game_plans",
+   "name": "game_plans_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "game_plans",
+   "name": "game_plans_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "game_plans",
+   "name": "game_plans_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "game_plans",
+   "name": "game_plans_share_slug_key",
+   "type": "u",
+   "def": "UNIQUE (share_slug)",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_email_check",
+   "type": "c",
+   "def": "CHECK ((((length(email) >= 3) AND (length(email) <= 320)) AND (POSITION(('@'::text) IN (email)) > 1)))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_firm_check",
+   "type": "c",
+   "def": "CHECK (((firm IS NULL) OR (length(firm) <= 200)))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_name_check",
+   "type": "c",
+   "def": "CHECK (((length(name) >= 1) AND (length(name) <= 200)))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_notes_check",
+   "type": "c",
+   "def": "CHECK (((notes IS NULL) OR (length(notes) <= 5000)))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_source_check",
+   "type": "c",
+   "def": "CHECK ((length(source) <= 100))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_stage_check",
+   "type": "c",
+   "def": "CHECK (((stage IS NULL) OR (length(stage) <= 50)))",
+   "ref": null
+  },
+  {
+   "t": "investor_requests",
+   "name": "investor_requests_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "joint_scores",
+   "name": "joint_scores_asymmetry_flag_check",
+   "type": "c",
+   "def": "CHECK ((asymmetry_flag = ANY (ARRAY['GREEN'::text, 'YELLOW'::text, 'RED'::text])))",
+   "ref": null
+  },
+  {
+   "t": "joint_scores",
+   "name": "joint_scores_score_check",
+   "type": "c",
+   "def": "CHECK ((score = ANY (ARRAY[1, 2, 3])))",
+   "ref": null
+  },
+  {
+   "t": "joint_scores",
+   "name": "joint_scores_assessment_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE",
+   "ref": "assessments"
+  },
+  {
+   "t": "joint_scores",
+   "name": "joint_scores_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "joint_scores",
+   "name": "joint_scores_assessment_id_joint_key_key",
+   "type": "u",
+   "def": "UNIQUE (assessment_id, joint_key)",
+   "ref": null
+  },
+  {
+   "t": "leads",
+   "name": "leads_capture_methods_check",
+   "type": "c",
+   "def": "CHECK (((capture_methods IS NULL) OR ((jsonb_typeof(capture_methods) = 'object'::text) AND (NOT jsonb_path_exists(capture_methods, '$.*?(@.type() != \"string\" || (@ != \"lock\" && @ != \"fallback\") && @ != \"typed\")'::jsonpath)))))",
+   "ref": null
+  },
+  {
+   "t": "leads",
+   "name": "leads_tier_check",
+   "type": "c",
+   "def": "CHECK ((tier = ANY (ARRAY['ELITE'::text, 'STRONG'::text, 'DEVELOPING'::text, 'RESTRICTED'::text, 'AT_RISK'::text])))",
+   "ref": null
+  },
+  {
+   "t": "leads",
+   "name": "leads_converted_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (converted_user_id) REFERENCES users(id) ON DELETE SET NULL",
+   "ref": "users"
+  },
+  {
+   "t": "leads",
+   "name": "leads_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "leads",
+   "name": "leads_unlock_token_key",
+   "type": "u",
+   "def": "UNIQUE (unlock_token)",
+   "ref": null
+  },
+  {
+   "t": "mesocycles",
+   "name": "mesocycles_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "mesocycles",
+   "name": "mesocycles_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_context_check",
+   "type": "c",
+   "def": "CHECK ((context = ANY (ARRAY['onboarding'::text, 'quick'::text])))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_energy_check",
+   "type": "c",
+   "def": "CHECK (((energy >= 0) AND (energy <= 100)))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_opted_in_check",
+   "type": "c",
+   "def": "CHECK ((opted_in = true))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_pleasantness_check",
+   "type": "c",
+   "def": "CHECK (((pleasantness >= 0) AND (pleasantness <= 100)))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_quadrant_check",
+   "type": "c",
+   "def": "CHECK ((quadrant = ANY (ARRAY['high_unpleasant'::text, 'high_pleasant'::text, 'low_unpleasant'::text, 'low_pleasant'::text])))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_tick_not_future",
+   "type": "c",
+   "def": "CHECK ((opted_in_at <= (created_at + '00:05:00'::interval)))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_word_check",
+   "type": "c",
+   "def": "CHECK (((word IS NULL) OR (word = ANY (ARRAY['Riled'::text, 'Wired'::text, 'Angry'::text, 'Tense'::text, 'Excited'::text, 'Upbeat'::text, 'Happy'::text, 'Lively'::text, 'Low'::text, 'Flat'::text, 'Drained'::text, 'Bored'::text, 'Calm'::text, 'Content'::text, 'Relaxed'::text, 'Mellow'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "mood_settings",
+   "name": "mood_settings_on_needs_tick",
+   "type": "c",
+   "def": "CHECK (((saving_on = false) OR (opted_in_at IS NOT NULL)))",
+   "ref": null
+  },
+  {
+   "t": "mood_settings",
+   "name": "mood_settings_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "mood_settings",
+   "name": "mood_settings_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id)",
+   "ref": null
+  },
+  {
+   "t": "muscle_volume_landmarks",
+   "name": "muscle_volume_landmarks_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (muscle)",
+   "ref": null
+  },
+  {
+   "t": "notification_preferences",
+   "name": "notification_preferences_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "notification_preferences",
+   "name": "notification_preferences_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "notification_preferences",
+   "name": "notification_preferences_user_id_key",
+   "type": "u",
+   "def": "UNIQUE (user_id)",
+   "ref": null
+  },
+  {
+   "t": "partner_inquiries",
+   "name": "partner_inquiries_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "pr_records",
+   "name": "pr_records_set_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (set_id) REFERENCES workout_sets(id) ON DELETE SET NULL",
+   "ref": "workout_sets"
+  },
+  {
+   "t": "pr_records",
+   "name": "pr_records_technique_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (technique_id) REFERENCES techniques(id) ON DELETE SET NULL",
+   "ref": "techniques"
+  },
+  {
+   "t": "pr_records",
+   "name": "pr_records_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "pr_records",
+   "name": "pr_records_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "pr_records",
+   "name": "pr_records_user_id_exercise_name_pr_type_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, exercise_name, pr_type)",
+   "ref": null
+  },
+  {
+   "t": "product_events",
+   "name": "product_events_event_check",
+   "type": "c",
+   "def": "CHECK (((length(event) >= 1) AND (length(event) <= 64)))",
+   "ref": null
+  },
+  {
+   "t": "product_events",
+   "name": "product_events_props_check",
+   "type": "c",
+   "def": "CHECK ((pg_column_size(props) <= 4096))",
+   "ref": null
+  },
+  {
+   "t": "product_events",
+   "name": "product_events_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL",
+   "ref": "auth.users"
+  },
+  {
+   "t": "product_events",
+   "name": "product_events_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "progress_photos",
+   "name": "progress_photos_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "progress_photos",
+   "name": "progress_photos_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_difficulty_rating_check",
+   "type": "c",
+   "def": "CHECK (((difficulty_rating >= 1) AND (difficulty_rating <= 5)))",
+   "ref": null
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_pain_rating_check",
+   "type": "c",
+   "def": "CHECK (((pain_rating >= 0) AND (pain_rating <= 10)))",
+   "ref": null
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_assessment_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE SET NULL",
+   "ref": "assessments"
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_exercise_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE SET NULL",
+   "ref": "exercises"
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "protocol_completions",
+   "name": "protocol_completions_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "protocol_sessions",
+   "name": "protocol_sessions_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "protocol_sessions",
+   "name": "protocol_sessions_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "protocol_sessions",
+   "name": "protocol_sessions_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "protocol_sessions",
+   "name": "protocol_sessions_user_id_session_date_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, session_date)",
+   "ref": null
+  },
+  {
+   "t": "protocols",
+   "name": "protocols_priority_rank_check",
+   "type": "c",
+   "def": "CHECK ((priority_rank = ANY (ARRAY[1, 2, 3])))",
+   "ref": null
+  },
+  {
+   "t": "protocols",
+   "name": "protocols_assessment_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE",
+   "ref": "assessments"
+  },
+  {
+   "t": "protocols",
+   "name": "protocols_exercise_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (exercise_id) REFERENCES exercises(id)",
+   "ref": "exercises"
+  },
+  {
+   "t": "protocols",
+   "name": "protocols_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "protocols",
+   "name": "protocols_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "push_sends",
+   "name": "push_sends_dedupe_key_check",
+   "type": "c",
+   "def": "CHECK ((dedupe_key ~ '^[a-z0-9:_-]{3,64}$'::text))",
+   "ref": null
+  },
+  {
+   "t": "push_sends",
+   "name": "push_sends_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "push_sends",
+   "name": "push_sends_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id, dedupe_key)",
+   "ref": null
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_auth_check",
+   "type": "c",
+   "def": "CHECK (((length(auth) >= 8) AND (length(auth) <= 100)))",
+   "ref": null
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_endpoint_check",
+   "type": "c",
+   "def": "CHECK (((endpoint ~ '^https://'::text) AND (length(endpoint) <= 2048)))",
+   "ref": null
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_p256dh_check",
+   "type": "c",
+   "def": "CHECK (((length(p256dh) >= 20) AND (length(p256dh) <= 200)))",
+   "ref": null
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_endpoint_key",
+   "type": "u",
+   "def": "UNIQUE (endpoint)",
+   "ref": null
+  },
+  {
+   "t": "rate_limit_buckets",
+   "name": "rate_limit_buckets_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (bucket_key)",
+   "ref": null
+  },
+  {
+   "t": "renewal_reminders",
+   "name": "renewal_reminders_reminder_type_check",
+   "type": "c",
+   "def": "CHECK ((reminder_type = ANY (ARRAY['45_day'::text, '30_day'::text, '2_day'::text])))",
+   "ref": null
+  },
+  {
+   "t": "renewal_reminders",
+   "name": "renewal_reminders_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "renewal_reminders",
+   "name": "renewal_reminders_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "renewal_reminders",
+   "name": "renewal_reminders_user_id_reminder_type_subscription_expiry_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, reminder_type, subscription_expiry)",
+   "ref": null
+  },
+  {
+   "t": "rom_thresholds",
+   "name": "rom_thresholds_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "rom_thresholds",
+   "name": "rom_thresholds_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "rombot_knowledge",
+   "name": "rombot_knowledge_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "rombot_knowledge",
+   "name": "rombot_knowledge_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "schools",
+   "name": "schools_tier_check",
+   "type": "c",
+   "def": "CHECK ((tier = ANY (ARRAY['starter'::text, 'pro'::text, 'elite'::text, 'enterprise'::text])))",
+   "ref": null
+  },
+  {
+   "t": "schools",
+   "name": "schools_admin_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL",
+   "ref": "users"
+  },
+  {
+   "t": "schools",
+   "name": "schools_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "scoring_cutovers",
+   "name": "scoring_cutovers_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (key)",
+   "ref": null
+  },
+  {
+   "t": "sport_config",
+   "name": "sport_config_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (slug)",
+   "ref": null
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "sport_entitlements_status_check",
+   "type": "c",
+   "def": "CHECK ((status = ANY (ARRAY['active'::text, 'past_due'::text, 'canceled'::text])))",
+   "ref": null
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "sport_entitlements_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug) ON UPDATE CASCADE",
+   "ref": "sport_config"
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "sport_entitlements_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "sport_entitlements_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "sport_entitlements_user_id_sport_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, sport)",
+   "ref": null
+  },
+  {
+   "t": "sport_pack_waitlist",
+   "name": "sport_pack_waitlist_role_chk",
+   "type": "c",
+   "def": "CHECK (((role IS NULL) OR (role = ANY (ARRAY['coach'::text, 'trainer'::text, 'gym'::text, 'school'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "sport_pack_waitlist",
+   "name": "sport_pack_waitlist_site_chk",
+   "type": "c",
+   "def": "CHECK (((site IS NULL) OR (site = ANY (ARRAY['bjj'::text, 'bb'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "sport_pack_waitlist",
+   "name": "sport_pack_waitlist_site_row_chk",
+   "type": "c",
+   "def": "CHECK (((site IS NULL) OR ((role IS NOT NULL) AND (name IS NOT NULL) AND ((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 100)) AND (consent_at IS NOT NULL) AND (consent_text_version IS NOT NULL) AND (consent_text_sha256 IS NOT NULL) AND (consent_text_sha256 ~ '^[0-9a-f]{64}$'::text) AND (email = lower(email)) AND (char_length(email) <= 254) AND (email ~ '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'::text) AND (sport = ((site || ':'::text) || role)))))",
+   "ref": null
+  },
+  {
+   "t": "sport_pack_waitlist",
+   "name": "sport_pack_waitlist_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "sport_pack_waitlist",
+   "name": "sport_pack_waitlist_email_sport_key",
+   "type": "u",
+   "def": "UNIQUE (email, sport)",
+   "ref": null
+  },
+  {
+   "t": "surveys",
+   "name": "surveys_status_check",
+   "type": "c",
+   "def": "CHECK ((status = ANY (ARRAY['open'::text, 'completed'::text, 'dismissed'::text])))",
+   "ref": null
+  },
+  {
+   "t": "surveys",
+   "name": "surveys_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "surveys",
+   "name": "surveys_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_tier_check",
+   "type": "c",
+   "def": "CHECK ((tier = ANY (ARRAY['GREEN'::text, 'YELLOW'::text, 'RED'::text])))",
+   "ref": null
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_assessment_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE",
+   "ref": "assessments"
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_athlete_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (athlete_id) REFERENCES athletes(id) ON DELETE CASCADE",
+   "ref": "athletes"
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_technique_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (technique_id) REFERENCES techniques(id)",
+   "ref": "techniques"
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "technique_eligibility",
+   "name": "technique_eligibility_user_id_assessment_id_technique_id_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, assessment_id, technique_id)",
+   "ref": null
+  },
+  {
+   "t": "technique_warmups",
+   "name": "technique_warmups_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (code)",
+   "ref": null
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_belt_check",
+   "type": "c",
+   "def": "CHECK (((belt IS NULL) OR (belt = ANY (ARRAY['white'::text, 'blue'::text, 'purple'::text, 'brown'::text, 'black'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_ruleset_check",
+   "type": "c",
+   "def": "CHECK ((ruleset = ANY (ARRAY['gi'::text, 'nogi'::text, 'both'::text])))",
+   "ref": null
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_tier_check",
+   "type": "c",
+   "def": "CHECK (((tier IS NULL) OR (tier = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "techniques",
+   "name": "techniques_code_key",
+   "type": "u",
+   "def": "UNIQUE (code)",
+   "ref": null
+  },
+  {
+   "t": "user_ads_consent",
+   "name": "user_ads_consent_state_check",
+   "type": "c",
+   "def": "CHECK ((state = ANY (ARRAY['granted'::text, 'denied'::text, 'revoked'::text])))",
+   "ref": null
+  },
+  {
+   "t": "user_ads_consent",
+   "name": "user_ads_consent_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "user_ads_consent",
+   "name": "user_ads_consent_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id)",
+   "ref": null
+  },
+  {
+   "t": "user_ai_preferences",
+   "name": "user_ai_preferences_provider_check",
+   "type": "c",
+   "def": "CHECK ((provider = ANY (ARRAY['rombot'::text, 'openai'::text, 'anthropic'::text, 'google'::text, 'perplexity'::text])))",
+   "ref": null
+  },
+  {
+   "t": "user_ai_preferences",
+   "name": "user_ai_preferences_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "user_ai_preferences",
+   "name": "user_ai_preferences_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "user_ai_preferences",
+   "name": "user_ai_preferences_user_id_key",
+   "type": "u",
+   "def": "UNIQUE (user_id)",
+   "ref": null
+  },
+  {
+   "t": "user_technique_competency",
+   "name": "user_technique_competency_state_check",
+   "type": "c",
+   "def": "CHECK ((state = ANY (ARRAY['none'::text, 'learning'::text, 'drilled'::text, 'rolling'::text, 'taught'::text])))",
+   "ref": null
+  },
+  {
+   "t": "user_technique_competency",
+   "name": "user_technique_competency_technique_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (technique_id) REFERENCES techniques(id) ON DELETE CASCADE",
+   "ref": "techniques"
+  },
+  {
+   "t": "user_technique_competency",
+   "name": "user_technique_competency_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "user_technique_competency",
+   "name": "user_technique_competency_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "user_technique_competency",
+   "name": "user_technique_competency_user_id_technique_id_key",
+   "type": "u",
+   "def": "UNIQUE (user_id, technique_id)",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_active_bb_tier_check",
+   "type": "c",
+   "def": "CHECK (((active_bb_tier IS NULL) OR (active_bb_tier = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_age_bucket_check",
+   "type": "c",
+   "def": "CHECK ((age_bucket = ANY (ARRAY['18-29'::text, '30-44'::text, '45-59'::text, '60+'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_base_status_check",
+   "type": "c",
+   "def": "CHECK ((base_status = ANY (ARRAY['inactive'::text, 'active'::text, 'past_due'::text, 'canceled'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_belt_check",
+   "type": "c",
+   "def": "CHECK ((belt = ANY (ARRAY['white'::text, 'blue'::text, 'purple'::text, 'brown'::text, 'black'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_gender_check",
+   "type": "c",
+   "def": "CHECK ((gender = ANY (ARRAY['male'::text, 'female'::text, 'other'::text, 'prefer_not_to_say'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_height_bucket_check",
+   "type": "c",
+   "def": "CHECK ((height_bucket = ANY (ARRAY['under_5_0'::text, '5_0_5_3'::text, '5_4_5_7'::text, '5_8_5_11'::text, '6_0_6_3'::text, '6_4_plus'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_portal_role_check",
+   "type": "c",
+   "def": "CHECK ((portal_role = ANY (ARRAY['athlete'::text, 'coach'::text, 'school'::text, 'admin'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_subscription_status_check",
+   "type": "c",
+   "def": "CHECK ((subscription_status = ANY (ARRAY['active'::text, 'inactive'::text, 'trialing'::text, 'canceled'::text, 'past_due'::text, 'incomplete'::text, 'incomplete_expired'::text, 'unpaid'::text, 'paused'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_subscription_tier_check",
+   "type": "c",
+   "def": "CHECK ((subscription_tier = ANY (ARRAY['free'::text, 'athlete'::text, 'coach'::text, 'school_starter'::text, 'school_pro'::text, 'school_elite'::text, 'school_enterprise'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_weight_bucket_check",
+   "type": "c",
+   "def": "CHECK ((weight_bucket = ANY (ARRAY['under_120'::text, '120_149'::text, '150_179'::text, '180_209'::text, '210_239'::text, '240_269'::text, '270_plus'::text])))",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "fk_users_coach",
+   "type": "f",
+   "def": "FOREIGN KEY (coach_id) REFERENCES coaches(id) ON DELETE SET NULL",
+   "ref": "coaches"
+  },
+  {
+   "t": "users",
+   "name": "fk_users_school",
+   "type": "f",
+   "def": "FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL",
+   "ref": "schools"
+  },
+  {
+   "t": "users",
+   "name": "users_active_sport_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (active_sport) REFERENCES sport_config(slug)",
+   "ref": "sport_config"
+  },
+  {
+   "t": "users",
+   "name": "users_id_auth_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE NOT VALID",
+   "ref": "auth.users"
+  },
+  {
+   "t": "users",
+   "name": "users_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "users",
+   "name": "users_email_key",
+   "type": "u",
+   "def": "UNIQUE (email)",
+   "ref": null
+  },
+  {
+   "t": "workout_exercises",
+   "name": "workout_exercises_alternative_of_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (alternative_of) REFERENCES workout_exercises(id) ON DELETE SET NULL",
+   "ref": "workout_exercises"
+  },
+  {
+   "t": "workout_exercises",
+   "name": "workout_exercises_technique_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (technique_id) REFERENCES techniques(id) ON DELETE SET NULL",
+   "ref": "techniques"
+  },
+  {
+   "t": "workout_exercises",
+   "name": "workout_exercises_workout_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE",
+   "ref": "workouts"
+  },
+  {
+   "t": "workout_exercises",
+   "name": "workout_exercises_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "workout_exercises",
+   "name": "workout_ex_unique_position",
+   "type": "u",
+   "def": "UNIQUE (workout_id, \"position\")",
+   "ref": null
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_set_type_chk",
+   "type": "c",
+   "def": "CHECK ((set_type = ANY (ARRAY['straight'::text, 'superset'::text, 'dropset'::text, 'myorep'::text])))",
+   "ref": null
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_exercise_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (exercise_id) REFERENCES workout_exercises(id) ON DELETE SET NULL",
+   "ref": "workout_exercises"
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_technique_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (technique_id) REFERENCES techniques(id) ON DELETE SET NULL",
+   "ref": "techniques"
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_workout_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE SET NULL",
+   "ref": "workouts"
+  },
+  {
+   "t": "workout_sets",
+   "name": "workout_sets_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "workouts",
+   "name": "workouts_template_or_user",
+   "type": "c",
+   "def": "CHECK ((((is_template = true) AND (user_id IS NULL)) OR ((is_template = false) AND (user_id IS NOT NULL))))",
+   "ref": null
+  },
+  {
+   "t": "workouts",
+   "name": "workouts_tier_check",
+   "type": "c",
+   "def": "CHECK (((tier IS NULL) OR (tier = ANY (ARRAY['beginner'::text, 'intermediate'::text, 'advanced'::text]))))",
+   "ref": null
+  },
+  {
+   "t": "workouts",
+   "name": "workouts_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+   "ref": "users"
+  },
+  {
+   "t": "workouts",
+   "name": "workouts_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (id)",
+   "ref": null
+  },
+  {
+   "t": "yoga_testers",
+   "name": "yoga_testers_email_check",
+   "type": "c",
+   "def": "CHECK ((email = lower(email)))",
+   "ref": null
+  },
+  {
+   "t": "yoga_testers",
+   "name": "yoga_testers_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (email)",
+   "ref": null
+  }
+ ],
+ "triggers": [
+  {
+   "t": "account_deletion_requests",
+   "name": "account_deletion_requests_touch",
+   "def": "CREATE TRIGGER account_deletion_requests_touch BEFORE UPDATE ON public.account_deletion_requests FOR EACH ROW EXECUTE FUNCTION account_deletion_requests_touch()",
+   "fn": "public.account_deletion_requests_touch",
+   "enabled": "O"
+  },
+  {
+   "t": "ai_conversations",
+   "name": "set_ai_conversations_updated_at",
+   "def": "CREATE TRIGGER set_ai_conversations_updated_at BEFORE UPDATE ON public.ai_conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "ai_messages",
+   "name": "on_ai_message_inserted",
+   "def": "CREATE TRIGGER on_ai_message_inserted AFTER INSERT ON public.ai_messages FOR EACH ROW EXECUTE FUNCTION increment_message_count()",
+   "fn": "public.increment_message_count",
+   "enabled": "O"
+  },
+  {
+   "t": "ai_messages",
+   "name": "zz_pe_ai_message",
+   "def": "CREATE TRIGGER zz_pe_ai_message AFTER INSERT ON public.ai_messages FOR EACH ROW EXECUTE FUNCTION tg_pe_ai_message()",
+   "fn": "public.tg_pe_ai_message",
+   "enabled": "O"
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_touch_biu",
+   "def": "CREATE TRIGGER assessment_drafts_touch_biu BEFORE INSERT OR UPDATE ON public.assessment_drafts FOR EACH ROW EXECUTE FUNCTION assessment_drafts_touch()",
+   "fn": "public.assessment_drafts_touch",
+   "enabled": "O"
+  },
+  {
+   "t": "assessments",
+   "name": "assessments",
+   "def": "CREATE TRIGGER assessments AFTER INSERT ON public.assessments FOR EACH ROW EXECUTE FUNCTION tg_assessments_compute_tiers()",
+   "fn": "public.tg_assessments_compute_tiers",
+   "enabled": "O"
+  },
+  {
+   "t": "assessments",
+   "name": "assessments_clear_draft_ai",
+   "def": "CREATE TRIGGER assessments_clear_draft_ai AFTER INSERT ON public.assessments FOR EACH ROW EXECUTE FUNCTION assessment_drafts_clear_on_submit()",
+   "fn": "public.assessment_drafts_clear_on_submit",
+   "enabled": "O"
+  },
+  {
+   "t": "assessments",
+   "name": "trg_assessments_autofill_athlete_id",
+   "def": "CREATE TRIGGER trg_assessments_autofill_athlete_id BEFORE INSERT ON public.assessments FOR EACH ROW EXECUTE FUNCTION assessments_autofill_athlete_id()",
+   "fn": "public.assessments_autofill_athlete_id",
+   "enabled": "O"
+  },
+  {
+   "t": "assessments",
+   "name": "zz_pe_assessment_inserted",
+   "def": "CREATE TRIGGER zz_pe_assessment_inserted AFTER INSERT ON public.assessments FOR EACH ROW EXECUTE FUNCTION tg_pe_assessment_inserted()",
+   "fn": "public.tg_pe_assessment_inserted",
+   "enabled": "O"
+  },
+  {
+   "t": "athletes",
+   "name": "aaa_guard_athletes_coach_id",
+   "def": "CREATE TRIGGER aaa_guard_athletes_coach_id BEFORE UPDATE OF coach_id ON public.athletes FOR EACH ROW EXECUTE FUNCTION guard_athletes_coach_id()",
+   "fn": "public.guard_athletes_coach_id",
+   "enabled": "O"
+  },
+  {
+   "t": "athletes",
+   "name": "athletes_updated_at",
+   "def": "CREATE TRIGGER athletes_updated_at BEFORE UPDATE ON public.athletes FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "client_feedback",
+   "name": "feedback-to-notion",
+   "def": "CREATE TRIGGER \"feedback-to-notion\" AFTER INSERT ON public.client_feedback FOR EACH ROW EXECUTE FUNCTION tg_webhook_feedback_to_notion()",
+   "fn": "public.tg_webhook_feedback_to_notion",
+   "enabled": "O"
+  },
+  {
+   "t": "client_feedback",
+   "name": "trg_client_feedback_updated_at",
+   "def": "CREATE TRIGGER trg_client_feedback_updated_at BEFORE UPDATE ON public.client_feedback FOR EACH ROW EXECUTE FUNCTION set_client_feedback_updated_at()",
+   "fn": "public.set_client_feedback_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "coaches",
+   "name": "aaa_guard_coaches_self_grant",
+   "def": "CREATE TRIGGER aaa_guard_coaches_self_grant BEFORE INSERT OR UPDATE ON public.coaches FOR EACH ROW EXECUTE FUNCTION guard_coaches_self_grant()",
+   "fn": "public.guard_coaches_self_grant",
+   "enabled": "O"
+  },
+  {
+   "t": "coaches",
+   "name": "coaches_updated_at",
+   "def": "CREATE TRIGGER coaches_updated_at BEFORE UPDATE ON public.coaches FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "consents",
+   "name": "on_consent_inserted",
+   "def": "CREATE TRIGGER on_consent_inserted AFTER INSERT ON public.consents FOR EACH ROW EXECUTE FUNCTION handle_consent_signed()",
+   "fn": "public.handle_consent_signed",
+   "enabled": "O"
+  },
+  {
+   "t": "consents",
+   "name": "trg_after_consent_insert",
+   "def": "CREATE TRIGGER trg_after_consent_insert AFTER INSERT ON public.consents FOR EACH ROW EXECUTE FUNCTION tg_after_consent_insert()",
+   "fn": "public.tg_after_consent_insert",
+   "enabled": "O"
+  },
+  {
+   "t": "consents",
+   "name": "zz_pe_consent",
+   "def": "CREATE TRIGGER zz_pe_consent AFTER INSERT ON public.consents FOR EACH ROW EXECUTE FUNCTION tg_pe_consent()",
+   "fn": "public.tg_pe_consent",
+   "enabled": "O"
+  },
+  {
+   "t": "game_plans",
+   "name": "game_plans_updated_at",
+   "def": "CREATE TRIGGER game_plans_updated_at BEFORE UPDATE ON public.game_plans FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "investor_requests",
+   "name": "notify_inbound_lead",
+   "def": "CREATE TRIGGER notify_inbound_lead AFTER INSERT ON public.investor_requests FOR EACH ROW EXECUTE FUNCTION tg_webhook_notify_inbound_lead()",
+   "fn": "public.tg_webhook_notify_inbound_lead",
+   "enabled": "O"
+  },
+  {
+   "t": "leads",
+   "name": "zz_pe_lead",
+   "def": "CREATE TRIGGER zz_pe_lead AFTER INSERT ON public.leads FOR EACH ROW EXECUTE FUNCTION tg_pe_lead()",
+   "fn": "public.tg_pe_lead",
+   "enabled": "O"
+  },
+  {
+   "t": "mood_entries",
+   "name": "mood_entries_daily_cap",
+   "def": "CREATE TRIGGER mood_entries_daily_cap BEFORE INSERT ON public.mood_entries FOR EACH ROW EXECUTE FUNCTION romood_enforce_daily_cap()",
+   "fn": "public.romood_enforce_daily_cap",
+   "enabled": "O"
+  },
+  {
+   "t": "mood_settings",
+   "name": "mood_settings_touch_updated_at",
+   "def": "CREATE TRIGGER mood_settings_touch_updated_at BEFORE UPDATE ON public.mood_settings FOR EACH ROW EXECUTE FUNCTION romood_touch_updated_at()",
+   "fn": "public.romood_touch_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "notification_preferences",
+   "name": "notif_opt_in_guard",
+   "def": "CREATE TRIGGER notif_opt_in_guard BEFORE INSERT OR UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION notif_opt_in_guard()",
+   "fn": "public.notif_opt_in_guard",
+   "enabled": "O"
+  },
+  {
+   "t": "notification_preferences",
+   "name": "notif_updated_at",
+   "def": "CREATE TRIGGER notif_updated_at BEFORE UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "partner_inquiries",
+   "name": "notify_inbound_lead",
+   "def": "CREATE TRIGGER notify_inbound_lead AFTER INSERT ON public.partner_inquiries FOR EACH ROW EXECUTE FUNCTION tg_webhook_notify_inbound_lead()",
+   "fn": "public.tg_webhook_notify_inbound_lead",
+   "enabled": "O"
+  },
+  {
+   "t": "protocol_sessions",
+   "name": "zz_pe_protocol_session",
+   "def": "CREATE TRIGGER zz_pe_protocol_session AFTER INSERT ON public.protocol_sessions FOR EACH ROW EXECUTE FUNCTION tg_pe_protocol_session()",
+   "fn": "public.tg_pe_protocol_session",
+   "enabled": "O"
+  },
+  {
+   "t": "push_subscriptions",
+   "name": "push_subscriptions_cap_trg",
+   "def": "CREATE TRIGGER push_subscriptions_cap_trg BEFORE INSERT ON public.push_subscriptions FOR EACH ROW EXECUTE FUNCTION push_subscriptions_cap()",
+   "fn": "public.push_subscriptions_cap",
+   "enabled": "O"
+  },
+  {
+   "t": "schools",
+   "name": "schools_updated_at",
+   "def": "CREATE TRIGGER schools_updated_at BEFORE UPDATE ON public.schools FOR EACH ROW EXECUTE FUNCTION set_schools_updated_at()",
+   "fn": "public.set_schools_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "sport_config",
+   "name": "sport_config_set_updated_at",
+   "def": "CREATE TRIGGER sport_config_set_updated_at BEFORE UPDATE ON public.sport_config FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "sport_entitlements",
+   "name": "zz_pe_sport_entitlement",
+   "def": "CREATE TRIGGER zz_pe_sport_entitlement AFTER INSERT OR UPDATE ON public.sport_entitlements FOR EACH ROW EXECUTE FUNCTION tg_pe_sport_entitlement()",
+   "fn": "public.tg_pe_sport_entitlement",
+   "enabled": "O"
+  },
+  {
+   "t": "user_ai_preferences",
+   "name": "set_user_ai_prefs_updated_at",
+   "def": "CREATE TRIGGER set_user_ai_prefs_updated_at BEFORE UPDATE ON public.user_ai_preferences FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+   "fn": "public.set_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "aaa_guard_users_protected_columns",
+   "def": "CREATE TRIGGER aaa_guard_users_protected_columns BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION guard_users_protected_columns()",
+   "fn": "public.guard_users_protected_columns",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "aab_users_age_18_plus",
+   "def": "CREATE TRIGGER aab_users_age_18_plus BEFORE INSERT OR UPDATE OF age_bucket ON public.users FOR EACH ROW EXECUTE FUNCTION reject_under_18_age_bucket()",
+   "fn": "public.reject_under_18_age_bucket",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "trg_ensure_notif_prefs",
+   "def": "CREATE TRIGGER trg_ensure_notif_prefs AFTER INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION ensure_notif_prefs_for_user()",
+   "fn": "public.ensure_notif_prefs_for_user",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "users_sync_sports",
+   "def": "CREATE TRIGGER users_sync_sports BEFORE INSERT OR UPDATE OF platforms, sports_enabled, active_sport ON public.users FOR EACH ROW EXECUTE FUNCTION sync_user_sports()",
+   "fn": "public.sync_user_sports",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "users_updated_at",
+   "def": "CREATE TRIGGER users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION update_updated_at()",
+   "fn": "public.update_updated_at",
+   "enabled": "O"
+  },
+  {
+   "t": "users",
+   "name": "zz_pe_user_base_status",
+   "def": "CREATE TRIGGER zz_pe_user_base_status AFTER UPDATE OF base_status ON public.users FOR EACH ROW EXECUTE FUNCTION tg_pe_user_base_status()",
+   "fn": "public.tg_pe_user_base_status",
+   "enabled": "O"
+  },
+  {
+   "t": "workouts",
+   "name": "trg_workouts_updated_at",
+   "def": "CREATE TRIGGER trg_workouts_updated_at BEFORE UPDATE ON public.workouts FOR EACH ROW EXECUTE FUNCTION set_workouts_updated_at()",
+   "fn": "public.set_workouts_updated_at",
+   "enabled": "O"
+  }
+ ],
+ "trigger_fns": [
+  {
+   "fn": "public.account_deletion_requests_touch",
+   "def": "CREATE OR REPLACE FUNCTION public.account_deletion_requests_touch()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  if new.user_id is distinct from old.user_id or new.requested_at is distinct from old.requested_at then\n    raise exception 'account_deletion_requests: user_id and requested_at are immutable';\n  end if;\n  new.updated_at := now();\n  if new.status = 'completed' then new.completed_at := coalesce(old.completed_at, now()); else new.completed_at := null; end if;\n  return new;\nend $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.assessment_drafts_clear_on_submit",
+   "def": "CREATE OR REPLACE FUNCTION public.assessment_drafts_clear_on_submit()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  -- The draft delete must never block a real assessment insert (Vera D2): if the table is missing\n  -- (rolled back out of order) or the delete fails for any reason, warn and let the insert go through.\n  begin\n    delete from public.assessment_drafts where user_id = new.user_id;\n  exception when others then\n    raise warning 'assessment_drafts_clear_on_submit: draft delete skipped (%): %', sqlstate, sqlerrm;\n  end;\n  return new;\nend $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.assessment_drafts_touch",
+   "def": "CREATE OR REPLACE FUNCTION public.assessment_drafts_touch()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nbegin\n  new.updated_at := now();\n  if tg_op = 'INSERT' then\n    new.created_at := now();\n  elsif old.expires_at <= now() then\n    new.created_at := now();\n  else\n    new.created_at := old.created_at;\n  end if;\n  new.expires_at := least(now() + interval '48 hours', new.created_at + interval '7 days');\n  return new;\nend $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.assessments_autofill_athlete_id",
+   "def": "CREATE OR REPLACE FUNCTION public.assessments_autofill_athlete_id()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.athlete_id IS NULL AND NEW.user_id IS NOT NULL THEN\n    SELECT id INTO NEW.athlete_id\n    FROM public.athletes\n    WHERE user_id = NEW.user_id\n    ORDER BY created_at ASC\n    LIMIT 1;\n  END IF;\n  IF NEW.user_id IS NULL AND NEW.athlete_id IS NOT NULL THEN\n    SELECT user_id INTO NEW.user_id\n    FROM public.athletes\n    WHERE id = NEW.athlete_id\n    LIMIT 1;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.ensure_notif_prefs_for_user",
+   "def": "CREATE OR REPLACE FUNCTION public.ensure_notif_prefs_for_user()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  INSERT INTO public.notification_preferences (user_id, email_reminders, push_reminders, reminder_time, timezone, retest_reminders, weekly_digest)\n  VALUES (NEW.id, true, false, '07:00', 'America/New_York', true, false)\n  ON CONFLICT (user_id) DO NOTHING;\n  RETURN NEW;\nEND $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.guard_athletes_coach_id",
+   "def": "CREATE OR REPLACE FUNCTION public.guard_athletes_coach_id()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  -- Only direct API writes are checked. current_setting('role') is the PostgREST role and stays the same inside\n  -- SECURITY DEFINER functions (same test the coaches service policy uses). service_role, migrations and the FK's\n  -- ON DELETE SET NULL pass.\n  if coalesce(current_setting('role', true), 'none') not in ('authenticated', 'anon') then\n    return new;\n  end if;\n  if new.coach_id is not distinct from old.coach_id then\n    return new;\n  end if;\n  if new.coach_id is null then\n    return new;  -- unlink / Disconnect always allowed\n  end if;\n  if current_setting('romrx.coach_connect', true) = new.coach_id::text then\n    return new;  -- set by connect_coach_by_email in this transaction\n  end if;\n  -- SECURITY DEFINER so this lookup can see coaches/users (athletes cannot read other users' rows under RLS).\n  if not exists (\n    select 1\n    from public.coaches c\n    join public.users u on u.id = c.user_id\n    where c.id = new.coach_id\n      and u.portal_role = 'coach'\n      and c.user_id is distinct from auth.uid()\n  ) then\n    raise exception 'athletes: coach_id must be an existing coach'\n      using errcode = '42501', hint = 'Connect a coach with connect_coach_by_email.';\n  end if;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.guard_coaches_self_grant",
+   "def": "CREATE OR REPLACE FUNCTION public.guard_coaches_self_grant()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nBEGIN\n  -- Only direct API writes are checked (same test as guard_athletes_coach_id). service_role, migrations and the invite flow pass.\n  IF coalesce(current_setting('role', true), 'none') NOT IN ('authenticated', 'anon') THEN RETURN NEW; END IF;\n  IF auth.uid() IS NULL OR NEW.user_id IS DISTINCT FROM auth.uid() THEN\n    RAISE EXCEPTION 'coaches: a coach row can only be your own' USING errcode = '42501';\n  END IF;\n  IF TG_OP = 'UPDATE' AND NEW.user_id IS DISTINCT FROM OLD.user_id THEN\n    RAISE EXCEPTION 'coaches: user_id cannot change' USING errcode = '42501';\n  END IF;\n  -- portal_role and school_id on users are protected columns (service role / admin only), so these two checks cannot be self-set.\n  IF NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id = NEW.user_id AND u.portal_role = 'coach'\n                 AND NEW.school_id IS NOT DISTINCT FROM u.school_id) THEN\n    RAISE EXCEPTION 'coaches: coach role and school are assigned by ROMRx, not self-set' USING errcode = '42501',\n      HINT = 'Ask support to enable the coach account.';\n  END IF;\n  RETURN NEW;\nEND $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.guard_users_protected_columns",
+   "def": "CREATE OR REPLACE FUNCTION public.guard_users_protected_columns()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  if current_user in ('postgres','supabase_admin','supabase_auth_admin','service_role','dashboard_user') then\n    return new;\n  end if;\n  if new.id is distinct from old.id\n     or new.email is distinct from old.email\n     or new.created_at is distinct from old.created_at\n     or new.portal_role is distinct from old.portal_role\n     or new.school_id is distinct from old.school_id\n     or new.coach_id is distinct from old.coach_id\n     or new.platforms is distinct from old.platforms\n     or new.sports_enabled is distinct from old.sports_enabled\n     or new.subscription_status is distinct from old.subscription_status\n     or new.subscription_tier is distinct from old.subscription_tier\n     or new.subscription_expiry is distinct from old.subscription_expiry\n     or new.stripe_customer_id is distinct from old.stripe_customer_id\n     or new.stripe_subscription_id is distinct from old.stripe_subscription_id\n     or new.paywall_frozen_until is distinct from old.paywall_frozen_until\n     or new.grandfathered_at is distinct from old.grandfathered_at\n     or new.base_status is distinct from old.base_status\n     or new.base_stripe_subscription_id is distinct from old.base_stripe_subscription_id\n     or new.base_expiry is distinct from old.base_expiry\n  then\n    raise exception 'users: protected column change rejected for role %', current_user\n      using errcode = '42501', hint = 'Entitlement and billing fields are set by the Stripe webhook only.';\n  end if;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.handle_consent_signed",
+   "def": "CREATE OR REPLACE FUNCTION public.handle_consent_signed()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  update public.athletes\n  set\n    terms_accepted_at          = new.signed_at,\n    medical_waiver_accepted_at = case when new.medical_waiver_version is not null\n                                      then new.signed_at else medical_waiver_accepted_at end,\n    onboarding_status          = case when onboarding_status = 'pending_consent'\n                                      then 'consent_signed' else onboarding_status end,\n    updated_at                 = now()\n  where user_id = new.user_id;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.increment_message_count",
+   "def": "CREATE OR REPLACE FUNCTION public.increment_message_count()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$ BEGIN UPDATE public.ai_conversations SET message_count = message_count + 1, updated_at = now() WHERE id = NEW.conversation_id; RETURN NEW; END; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.notif_opt_in_guard",
+   "def": "CREATE OR REPLACE FUNCTION public.notif_opt_in_guard()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nbegin\n  if current_user in ('anon', 'authenticated') then\n    if tg_op = 'INSERT' then\n      new.retest_opt_in_at := null; new.protocol_opt_in_at := null; new.digest_opt_in_at := null;\n    else\n      new.retest_opt_in_at := old.retest_opt_in_at; new.protocol_opt_in_at := old.protocol_opt_in_at; new.digest_opt_in_at := old.digest_opt_in_at;\n    end if;\n  end if;\n  if new.retest_reminders   is not true then new.retest_opt_in_at   := null; end if;\n  if new.email_reminders    is not true then new.protocol_opt_in_at := null; end if;\n  if new.weekly_digest      is not true then new.digest_opt_in_at   := null; end if;\n  return new;\nend $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.push_subscriptions_cap",
+   "def": "CREATE OR REPLACE FUNCTION public.push_subscriptions_cap()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF (SELECT count(*) FROM public.push_subscriptions WHERE user_id = NEW.user_id AND disabled_at IS NULL) >= 10 THEN\n    RAISE EXCEPTION 'push_subscriptions: device limit reached' USING ERRCODE = '23514';\n  END IF;\n  RETURN NEW;\nEND $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.reject_under_18_age_bucket",
+   "def": "CREATE OR REPLACE FUNCTION public.reject_under_18_age_bucket()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  if new.age_bucket = any (array['13-17'])\n     and (tg_op = 'INSERT' or new.age_bucket is distinct from old.age_bucket) then\n    raise exception 'ROMRx is for adults 18 and older (age_bucket %)', new.age_bucket\n      using errcode = '23514';\n  end if;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.romood_enforce_daily_cap",
+   "def": "CREATE OR REPLACE FUNCTION public.romood_enforce_daily_cap()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\ndeclare\n  day_start timestamptz;\n  n integer;\nbegin\n  perform pg_advisory_xact_lock(hashtextextended('romood_daily_cap:' || new.user_id::text, 0));\n  -- Ignore any created_at the client sends (backdated or future). The row is stamped with server time,\n  -- so the day count below, the cap, and the email window cannot be skipped by faking a time.\n  new.created_at := now();\n  day_start := (date_trunc('day', now() at time zone 'America/New_York')) at time zone 'America/New_York';\n  select count(*) into n\n    from public.mood_entries\n   where user_id = new.user_id\n     and created_at >= day_start\n     and created_at < day_start + interval '1 day';\n  if n >= 4 then\n    raise exception using errcode = 'RM429', message = 'romood_daily_cap',\n      detail = 'Mood check-ins are limited to 4 per day (America/New_York).';\n  end if;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.romood_touch_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.romood_touch_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nbegin\n  new.updated_at := now();\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.set_client_feedback_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.set_client_feedback_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.set_schools_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.set_schools_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nBEGIN NEW.updated_at = now(); RETURN NEW; END;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.set_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.set_workouts_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.set_workouts_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  NEW.updated_at = now();\n  RETURN NEW;\nEND;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.sync_user_sports",
+   "def": "CREATE OR REPLACE FUNCTION public.sync_user_sports()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nBEGIN\n  IF TG_OP = 'UPDATE' AND NEW.platforms IS DISTINCT FROM OLD.platforms AND NEW.sports_enabled IS NOT DISTINCT FROM OLD.sports_enabled THEN\n    NEW.sports_enabled := NEW.platforms;\n  END IF;\n  IF TG_OP = 'UPDATE' AND NEW.sports_enabled IS DISTINCT FROM OLD.sports_enabled AND NEW.platforms IS NOT DISTINCT FROM OLD.platforms THEN\n    NEW.platforms := NEW.sports_enabled;\n  END IF;\n  IF TG_OP = 'INSERT' THEN\n    IF NEW.platforms IS NOT NULL AND cardinality(NEW.platforms) > 0 AND NEW.sports_enabled IS NULL THEN\n      NEW.sports_enabled := NEW.platforms;\n    ELSIF NEW.sports_enabled IS NOT NULL AND cardinality(NEW.sports_enabled) > 0 AND (NEW.platforms IS NULL OR cardinality(NEW.platforms) = 0) THEN\n      NEW.platforms := NEW.sports_enabled;\n    END IF;\n  END IF;\n  IF NEW.sports_enabled IS NOT NULL AND cardinality(NEW.sports_enabled) > 0\n     AND NOT (NEW.active_sport = ANY (NEW.sports_enabled)) AND NEW.active_sport <> 'general' THEN\n    NEW.active_sport := NEW.sports_enabled[1];\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_after_consent_insert",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_after_consent_insert()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nbegin\r\n  update public.clients\r\n     set onboarding_step = 'assessment',\r\n         current_terms_version = new.terms_version,\r\n         current_waiver_version = new.medical_waiver_version\r\n   where user_id = new.user_id;\r\n  return new;\r\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_assessments_compute_tiers",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_assessments_compute_tiers()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_secret text; v_headers jsonb;\nbegin\n  select ds.decrypted_secret into v_secret from vault.decrypted_secrets ds where ds.name = 'cron_webhook_secret';\n  v_headers := jsonb_build_object('Content-Type','application/json');\n  if v_secret is not null then v_headers := v_headers || jsonb_build_object('x-cron-secret', v_secret); end if;\n  perform net.http_post(\n    url := 'https://cqzvqzwwevnflinxgnpp.supabase.co/functions/v1/compute-tiers',\n    body := jsonb_build_object('type','INSERT','table',tg_table_name,'schema',tg_table_schema,'record',to_jsonb(new),'old_record',null),\n    headers := v_headers,\n    timeout_milliseconds := 5000);\n  return new;\nexception when others then\n  raise warning 'compute-tiers trigger call failed: %', sqlerrm;\n  return new;\nend $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_ai_message",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_ai_message()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_sport text;\nbegin\n  if new.role = 'user' then\n    select sport into v_sport from public.ai_conversations where id = new.conversation_id;\n    perform public.log_product_event(new.user_id, 'rombot_message_sent',\n      jsonb_build_object('conversation_id', new.conversation_id, 'chars', length(coalesce(new.content, ''))), v_sport);\n  end if;\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_assessment_inserted",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_assessment_inserted()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_measured int; v_prior int;\nbegin\n  select count(*) into v_measured from jsonb_each_text(to_jsonb(new)) e\n   where e.value is not null and (e.key like 'hip_%' or e.key like 'shoulder_%' or e.key like 'ankle_%' or e.key like 'cervical_%' or e.key like 'lumbar_%' or e.key like 'thoracic_%' or e.key like 'balance_%');\n  select count(*) into v_prior from public.assessments a where a.user_id = new.user_id and a.id <> new.id;\n  perform public.log_product_event(new.user_id, 'assessment_submitted',\n    jsonb_build_object('assessment_id', new.id, 'measured_fields', v_measured, 'is_reassessment', v_prior > 0, 'prior_count', v_prior),\n    new.sport);\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_consent",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_consent()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  perform public.log_product_event(new.user_id, 'consent_signed',\n    jsonb_build_object('terms_version', new.terms_version, 'waiver_version', new.medical_waiver_version));\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_lead",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_lead()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  perform public.log_product_event(null, 'lead_assessment_submitted',\n    jsonb_build_object('lead_id', new.id, 'source', new.source, 'tier', new.tier, 'prs_score', new.prs_score, 'is_test', public.is_test_account(new.email)));\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_protocol_session",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_protocol_session()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  perform public.log_product_event(new.user_id, 'protocol_session_logged',\n    jsonb_build_object('session_date', new.session_date, 'protocol_day', new.protocol_day), new.sport);\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_sport_entitlement",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_sport_entitlement()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  if tg_op = 'INSERT' or new.status is distinct from old.status then\n    perform public.log_product_event(new.user_id, 'sport_entitlement_changed',\n      jsonb_build_object('from', case when tg_op = 'UPDATE' then old.status end, 'to', new.status, 'expires_at', new.expires_at), new.sport);\n  end if;\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_pe_user_base_status",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_pe_user_base_status()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  if new.base_status is distinct from old.base_status then\n    perform public.log_product_event(new.id, 'base_status_changed',\n      jsonb_build_object('from', old.base_status, 'to', new.base_status, 'base_expiry', new.base_expiry), new.active_sport);\n    if new.base_status = 'active' then\n      perform public.log_product_event(new.id, 'base_activated', jsonb_build_object('base_expiry', new.base_expiry), new.active_sport);\n    end if;\n  end if;\n  return new;\nend; $function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_webhook_feedback_to_notion",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_webhook_feedback_to_notion()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_secret text;\nbegin\n  select ds.decrypted_secret into v_secret\n  from vault.decrypted_secrets ds\n  where ds.name = 'feedback_to_notion_webhook_secret';\n  if v_secret is null then\n    raise warning 'tg_webhook_feedback_to_notion: vault secret missing; webhook skipped for %', new.id;\n    return new;\n  end if;\n  perform net.http_post(\n    url := 'https://cqzvqzwwevnflinxgnpp.supabase.co/functions/v1/feedback-to-notion',\n    body := jsonb_build_object(\n      'type', 'INSERT', 'schema', tg_table_schema, 'table', tg_table_name,\n      'record', to_jsonb(new), 'old_record', null),\n    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', v_secret),\n    timeout_milliseconds := 5000\n  );\n  return new;\nexception when others then\n  raise warning 'tg_webhook_feedback_to_notion failed (insert not blocked): %', sqlerrm;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.tg_webhook_notify_inbound_lead",
+   "def": "CREATE OR REPLACE FUNCTION public.tg_webhook_notify_inbound_lead()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_secret text;\nbegin\n  select ds.decrypted_secret into v_secret\n  from vault.decrypted_secrets ds\n  where ds.name = 'lead_notify_webhook_secret';\n  if v_secret is null then\n    raise warning 'tg_webhook_notify_inbound_lead: vault secret missing; % % not emailed', tg_table_name, new.id;\n    return new;\n  end if;\n  perform net.http_post(\n    url := 'https://cqzvqzwwevnflinxgnpp.supabase.co/functions/v1/notify-inbound-lead',\n    body := jsonb_build_object(\n      'type', 'INSERT', 'schema', tg_table_schema, 'table', tg_table_name,\n      'record', to_jsonb(new), 'old_record', null),\n    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', v_secret),\n    timeout_milliseconds := 5000\n  );\n  return new;\nexception when others then\n  raise warning 'tg_webhook_notify_inbound_lead failed (insert not blocked): %', sqlerrm;\n  return new;\nend;\n$function$\n",
+   "lang": "plpgsql"
+  },
+  {
+   "fn": "public.update_updated_at",
+   "def": "CREATE OR REPLACE FUNCTION public.update_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  NEW.updated_at = NOW();\n  RETURN NEW;\nEND;\n$function$\n",
+   "lang": "plpgsql"
+  }
+ ],
+ "captured_at": "2026-11-16T02:42:41.596748+00:00"
+}

@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-16 20:13 ET (America/New_York)",
+  "project": "cqzvqzwwevnflinxgnpp",
+  "live_migration_head": "20261117010702",
+  "restore_schema_head": "20261116024102",
+  "named_policies_in_040100": 89,
+  "named_policies_present_on_live": 89,
+  "named_policies_missing_on_live": 0,
+  "public_policy_total_live": 146,
+  "public_policy_total_in_restore": 141,
+  "index_consents_user_id_idx": 1,
+  "index_eligibility_athlete_id_idx": 1,
+  "index_techniques_sport_idx": 1,
+  "constraint_coach_notes_coach_id_athlete_id_key": 1,
+  "constraint_coach_notes_coach_athlete_unique": 1,
+  "writes": "none (SELECT only)"
+}

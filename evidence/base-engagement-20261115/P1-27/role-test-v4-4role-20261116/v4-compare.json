@@ -1,0 +1,52 @@
+{
+ "s1": {
+  "cells": 4867,
+  "diffs": 0,
+  "mutant_diffs": 27,
+  "mutant_where": [
+   "CROSS:athletes/athlete_D_owner",
+   "CROSS:athletes/coach_C",
+   "CROSS:athletes/school_admin_SA",
+   "CROSS:athletes/unlinked_user_E",
+   "CROSS:protocols/coach_C",
+   "athletes/auth_other_B",
+   "athletes/auth_owner_A",
+   "body_metrics/auth_other_B",
+   "body_metrics/auth_owner_A"
+  ],
+  "outcomes": {
+   "ERR 42501": 1209,
+   "select": 234,
+   "ok>0": 1808,
+   "ok:0": 1328,
+   "ERR 23505": 200,
+   "ERR 23503": 52,
+   "ERR 42703": 36
+  }
+ },
+ "s2": {
+  "cells": 6067,
+  "diffs": 0,
+  "mutant_diffs": 27,
+  "mutant_where": [
+   "CROSS:athletes/athlete_D_owner",
+   "CROSS:athletes/coach_C",
+   "CROSS:athletes/school_admin_SA",
+   "CROSS:athletes/unlinked_user_E",
+   "CROSS:protocols/coach_C",
+   "athletes/auth_other_B",
+   "athletes/auth_owner_A",
+   "body_metrics/auth_other_B",
+   "body_metrics/auth_owner_A"
+  ],
+  "outcomes": {
+   "ERR 42501": 1285,
+   "select": 234,
+   "ok>0": 2380,
+   "ok:0": 1868,
+   "ERR 23505": 200,
+   "ERR 23503": 52,
+   "ERR 42703": 48
+  }
+ }
+}

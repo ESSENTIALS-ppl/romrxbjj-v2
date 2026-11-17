@@ -1,0 +1,274 @@
+{
+ "head": [
+  {
+   "v": "20261116024102",
+   "n": "assessment_drafts_purge_cron"
+  },
+  {
+   "v": "20261116024056",
+   "n": "assessment_drafts_clear_on_submit"
+  },
+  {
+   "v": "20261116024051",
+   "n": "assessment_drafts"
+  },
+  {
+   "v": "20261103232557",
+   "n": "row12_v2_change1_security_advisors_l983"
+  }
+ ],
+ "table": {
+  "name": "assessment_drafts",
+  "rls": true,
+  "force": false,
+  "cols": [
+   {
+    "n": "user_id",
+    "t": "uuid",
+    "nn": true,
+    "def": null,
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "step_values",
+    "t": "jsonb",
+    "nn": true,
+    "def": "'{}'::jsonb",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "completed_steps",
+    "t": "text[]",
+    "nn": true,
+    "def": "'{}'::text[]",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "step_idx",
+    "t": "smallint",
+    "nn": true,
+    "def": "0",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "client_saved_at",
+    "t": "timestamp with time zone",
+    "nn": false,
+    "def": null,
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "created_at",
+    "t": "timestamp with time zone",
+    "nn": true,
+    "def": "now()",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "updated_at",
+    "t": "timestamp with time zone",
+    "nn": true,
+    "def": "now()",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   },
+   {
+    "n": "expires_at",
+    "t": "timestamp with time zone",
+    "nn": true,
+    "def": "(now() + '48:00:00'::interval)",
+    "gen": "",
+    "ident": "",
+    "typtype": "b",
+    "typns": "pg_catalog"
+   }
+  ],
+  "pk": "PRIMARY KEY (user_id)",
+  "indexes": [
+   {
+    "name": "assessment_drafts_pkey",
+    "def": "CREATE UNIQUE INDEX assessment_drafts_pkey ON public.assessment_drafts USING btree (user_id)"
+   }
+  ],
+  "grants": [
+   {
+    "g": "service_role",
+    "p": "INSERT"
+   },
+   {
+    "g": "service_role",
+    "p": "SELECT"
+   },
+   {
+    "g": "service_role",
+    "p": "UPDATE"
+   },
+   {
+    "g": "service_role",
+    "p": "DELETE"
+   },
+   {
+    "g": "service_role",
+    "p": "TRUNCATE"
+   },
+   {
+    "g": "service_role",
+    "p": "REFERENCES"
+   },
+   {
+    "g": "service_role",
+    "p": "TRIGGER"
+   },
+   {
+    "g": "authenticated",
+    "p": "INSERT"
+   },
+   {
+    "g": "authenticated",
+    "p": "SELECT"
+   },
+   {
+    "g": "authenticated",
+    "p": "UPDATE"
+   },
+   {
+    "g": "authenticated",
+    "p": "DELETE"
+   }
+  ]
+ },
+ "policies": [
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_delete_own",
+   "permissive": "PERMISSIVE",
+   "roles": [
+    "authenticated"
+   ],
+   "cmd": "DELETE",
+   "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+   "check": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_insert_own",
+   "permissive": "PERMISSIVE",
+   "roles": [
+    "authenticated"
+   ],
+   "cmd": "INSERT",
+   "qual": null,
+   "check": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_select_own",
+   "permissive": "PERMISSIVE",
+   "roles": [
+    "authenticated"
+   ],
+   "cmd": "SELECT",
+   "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+   "check": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_update_own",
+   "permissive": "PERMISSIVE",
+   "roles": [
+    "authenticated"
+   ],
+   "cmd": "UPDATE",
+   "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+   "check": "(( SELECT auth.uid() AS uid) = user_id)"
+  }
+ ],
+ "constraints": [
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_hard_cap_7d_ok",
+   "type": "c",
+   "def": "CHECK ((expires_at <= (created_at + '7 days'::interval)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_pkey",
+   "type": "p",
+   "def": "PRIMARY KEY (user_id)",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_rolling_48h_ok",
+   "type": "c",
+   "def": "CHECK ((expires_at <= (updated_at + '48:00:00'::interval)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_step_idx_ok",
+   "type": "c",
+   "def": "CHECK (((step_idx >= 0) AND (step_idx <= 8)))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_steps_ok",
+   "type": "c",
+   "def": "CHECK ((completed_steps <@ ARRAY['hip_er'::text, 'hip_ir'::text, 'shoulder_er'::text, 'shoulder_flex'::text, 'cervical_lat'::text, 'cervical_flex_ext'::text, 'hip_flex'::text, 'hip_abd'::text, 'ankle_df'::text]))",
+   "ref": null
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_user_id_fkey",
+   "type": "f",
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "ref": "auth.users"
+  },
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_values_ok",
+   "type": "c",
+   "def": "CHECK (assessment_draft_values_ok(step_values))",
+   "ref": null
+  }
+ ],
+ "triggers": [
+  {
+   "t": "assessment_drafts",
+   "name": "assessment_drafts_touch_biu",
+   "def": "CREATE TRIGGER assessment_drafts_touch_biu BEFORE INSERT OR UPDATE ON public.assessment_drafts FOR EACH ROW EXECUTE FUNCTION assessment_drafts_touch()",
+   "fn": "public.assessment_drafts_touch",
+   "enabled": "O"
+  }
+ ],
+ "trigger_fns": [
+  {
+   "fn": "public.assessment_drafts_touch",
+   "def": "CREATE OR REPLACE FUNCTION public.assessment_drafts_touch()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nbegin\n  new.updated_at := now();\n  if tg_op = 'INSERT' then\n    new.created_at := now();\n  elsif old.expires_at <= now() then\n    new.created_at := now();\n  else\n    new.created_at := old.created_at;\n  end if;\n  new.expires_at := least(now() + interval '48 hours', new.created_at + interval '7 days');\n  return new;\nend $function$\n"
+  }
+ ],
+ "policy_count_public": 141,
+ "captured_at": "2026-11-16T02:42:17.043208+00:00"
+}
