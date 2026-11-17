@@ -1,0 +1,13 @@
+M1 drop product_event from activity: KILLED (92 passed, 4 failed)
+M2 drop session activity: KILLED (94 passed, 2 failed)
+M3 remove fail-closed on read failure: KILLED (95 passed, 1 failed)
+M4 earliest instead of latest: KILLED (90 passed, 6 failed)
+M5 threshold 14->13: KILLED (90 passed, 6 failed)
+M6 revert to v4 sign-in only: KILLED (91 passed, 5 failed)
+M7 loader: drop web filter: KILLED (95 passed, 1 failed)
+M8 loader: oldest first: KILLED (95 passed, 1 failed)
+M9 loader: error ignored: KILLED (95 passed, 1 failed)
+M10 loader: value not passed: KILLED (95 passed, 1 failed)
+M11 grace 3->4: KILLED (94 passed, 2 failed)
+M12 timezone ignored (UTC date): KILLED (94 passed, 2 failed)
+12/12 killed
