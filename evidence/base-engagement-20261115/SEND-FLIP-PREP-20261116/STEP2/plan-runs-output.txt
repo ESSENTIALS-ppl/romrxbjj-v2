@@ -1,0 +1,20 @@
+Tue, Nov 17, 7:30 AM ET | protocol:lc-protocol-2026-11-17:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Tue, Nov 17, 8:30 AM ET | protocol:lc-protocol-2026-11-17:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Tue, Nov 17, 9:30 AM ET | protocol:lc-protocol-2026-11-17:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Wed, Nov 18, 7:30 AM ET | protocol:lc-protocol-2026-11-18:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Wed, Nov 18, 8:30 AM ET | protocol:lc-protocol-2026-11-18:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Wed, Nov 18, 9:30 AM ET | protocol:lc-protocol-2026-11-18:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Thu, Nov 19, 7:30 AM ET | protocol:lc-protocol-2026-11-19:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Thu, Nov 19, 8:30 AM ET | protocol:lc-protocol-2026-11-19:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Thu, Nov 19, 9:30 AM ET | protocol:lc-protocol-2026-11-19:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Fri, Nov 20, 7:30 AM ET | protocol:lc-protocol-2026-11-20:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Fri, Nov 20, 8:30 AM ET | protocol:lc-protocol-2026-11-20:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Fri, Nov 20, 9:30 AM ET | protocol:lc-protocol-2026-11-20:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sat, Nov 21, 7:30 AM ET | protocol:lc-protocol-2026-11-21:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sat, Nov 21, 8:30 AM ET | protocol:lc-protocol-2026-11-21:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sat, Nov 21, 9:30 AM ET | protocol:lc-protocol-2026-11-21:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sun, Nov 22, 7:30 AM ET | protocol:lc-protocol-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sun, Nov 22, 8:30 AM ET | protocol:lc-protocol-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sun, Nov 22, 9:30 AM ET | protocol:lc-protocol-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d, digest:lc-digest-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sun, Nov 22, 10:30 AM ET | digest:lc-digest-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d
+Sun, Nov 22, 11:30 AM ET | digest:lc-digest-2026-11-22:7c71e421-929b-4691-a6bc-cc614ed2a08d
