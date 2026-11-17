@@ -22,9 +22,9 @@ export function appScore(a: Record<string, unknown>, hipFlexCutoverMs: number | 
   return mobilityScoreForAssessment(view);
 }
 
-/** The label the apps put on this number: BJJ and BB My Body show "Position Readiness Score", Base My Body shows "Body score". ONE place. */
+/** The digest label per brand. BJJ keeps "Position Readiness Score"; BB email says "ROM Readiness Score" (Stacy eb37962d, BB only); Base says "Body score". ONE place. */
 export const SCORE_LABEL: Record<"bjj" | "bodybuilding" | "base", string> = {
-  bjj: "Position Readiness Score", bodybuilding: "Position Readiness Score", base: "Body score",
+  bjj: "Position Readiness Score", bodybuilding: "ROM Readiness Score", base: "Body score",
 };
 
 // P1-06 must-fix (b): the newest two FULL assessments. Quick re-checks (check_kind = 'quick') carry no full score and must not

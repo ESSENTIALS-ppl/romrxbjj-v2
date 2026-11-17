@@ -243,8 +243,11 @@ export function nextCheck(
   const date = localParts(new Date(t), tz).date;
   const days = Math.round((Date.parse(date + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86400000);
   if (!Number.isFinite(days)) return null;
-  const label = days <= 0
+  // Stacy eb37962d: due date itself = "today"; 1 or more local days past next_check_at = overdue.
+  const label = days === 0
     ? "Your next check is today."
+    : days < 0
+    ? "Your check is overdue. Take it today."
     : `Your next check is in ${days} ${days === 1 ? "day" : "days"}.`;
   return { date, label, days };
 }

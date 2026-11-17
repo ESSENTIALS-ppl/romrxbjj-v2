@@ -358,15 +358,16 @@ Deno.test("P1-15 digest: omit next-check line when the schedule table/row is abs
   const builtOne = buildEmail(one.due[0], BRANDS.base, { offKind: "https://x/k", offAll: "https://x/a", oneClick: "https://x/o" }, "ROMRx LLC");
   assert(builtOne.text.includes("Your next check is in 1 day."));
 
-  // next_check_at in the past: still next_check_at only (no fallback to next_retest_at). Label is "today."
+  // next_check_at in the past: still next_check_at only (no fallback to next_retest_at). Label is the overdue line (Stacy eb37962d).
   const past = planKind("digest", SUN_9_CST, [cand({
     session_dates: dates,
     schedule: { last_assessment_id: "a1", last_assessed_at: "2026-10-01T12:00:00Z", next_retest_at: "2026-11-12T12:00:00Z", next_check_at: "2026-11-01T12:00:00Z" },
   })], canaryAll);
   assertEquals(past.due[0].digest?.days_to_next_check, -7); // 11/08 vs next_check_at 11/01
-  assertEquals(past.due[0].next_check_line, "Your next check is today.");
+  assertEquals(past.due[0].next_check_line, "Your check is overdue. Take it today.");
   const builtPast = buildEmail(past.due[0], BRANDS.base, { offKind: "https://x/k", offAll: "https://x/a", oneClick: "https://x/o" }, "ROMRx LLC");
-  assert(builtPast.text.includes("Your next check is today."));
+  assert(builtPast.text.includes("Your check is overdue. Take it today."));
+  assertFalse(builtPast.text.includes("Your next check is today."));
   assertFalse(builtPast.text.includes("in 4 days"));
 });
 
@@ -385,10 +386,10 @@ Deno.test("W1: digest and lapsed give the same next-check answer on days 1, 8, 2
   // Same source, two wordings: digest uses the P1-15 sentences (8ce215ca); lapsed uses Stacy's P1-16 words (e1e0a602).
   const cases: { day: number; today: string; label: string; lapsed: string | null }[] = [
     { day: 1, today: "2026-11-02", label: "Your next check is in 6 days.", lapsed: "Your next check: Sunday, November 8" },
-    { day: 8, today: "2026-11-09", label: "Your next check is today.", lapsed: null },
-    { day: 20, today: "2026-11-21", label: "Your next check is today.", lapsed: null },
-    { day: 42, today: "2026-12-13", label: "Your next check is today.", lapsed: "Your retest is ready now." },
-    { day: 43, today: "2026-12-14", label: "Your next check is today.", lapsed: "Your retest is ready now." },
+    { day: 8, today: "2026-11-09", label: "Your check is overdue. Take it today.", lapsed: null }, // next_check_at local Nov 8 = 1 day overdue (eb37962d)
+    { day: 20, today: "2026-11-21", label: "Your check is overdue. Take it today.", lapsed: null },
+    { day: 42, today: "2026-12-13", label: "Your check is overdue. Take it today.", lapsed: "Your retest is ready now." },
+    { day: 43, today: "2026-12-14", label: "Your check is overdue. Take it today.", lapsed: "Your retest is ready now." },
   ];
   for (const { today, label, lapsed } of cases) {
     const n = nextCheck(schedule, today, tz);
@@ -405,7 +406,7 @@ Deno.test("W1: digest and lapsed give the same next-check answer on days 1, 8, 2
     };
     const digestText = buildEmail(digestDue, BRANDS.base, links, "ROMRx LLC").text;
     const lapsedText = buildEmail(lapsedDue, BRANDS.base, links, "ROMRx LLC").text;
-    const digestLine = digestText.split("\n").find((l) => l.startsWith("Your next check")) ?? null;
+    const digestLine = digestText.split("\n").find((l) => l.startsWith("Your next check") || l.startsWith("Your check is overdue")) ?? null;
     const lapsedLine = lapsedText.split("\n").find((l) => l.startsWith("Your next check") || l.startsWith("Your retest")) ?? null;
     assertEquals(digestLine, label, today);
     assertEquals(lapsedLine, lapsed, today);

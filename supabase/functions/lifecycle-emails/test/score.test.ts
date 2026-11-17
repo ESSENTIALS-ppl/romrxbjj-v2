@@ -39,7 +39,8 @@ Deno.test("score: hip flexion counts only for assessments at or after the cutove
 Deno.test("email number and label are exactly what the app shows (label per brand, delta vs previous assessment)", () => {
   const latest = row(0.8), prev = row(0.6, { assessed_at: "2026-11-01T00:00:00Z" });
   const s1 = appScore(latest, CUT), s0 = appScore(prev, CUT);
-  for (const [sport, brand, label] of [["bjj", "bjj", "Position Readiness Score"], ["bodybuilding", "bodybuilding", "Position Readiness Score"], [null, "base", "Body score"]] as const) {
+  // BB email label is "ROM Readiness Score" (Stacy eb37962d, BB only); BJJ keeps "Position Readiness Score".
+  for (const [sport, brand, label] of [["bjj", "bjj", "Position Readiness Score"], ["bodybuilding", "bodybuilding", "ROM Readiness Score"], [null, "base", "Body score"]] as const) {
     assertEquals(SCORE_LABEL[brand], label);
     const lines = COPY.digest.lines({ kind: "digest", user_id: "u", email: "a@b.co", first_name: "A", active_sport: sport, email_id: "x", local_date: "d",
       digest: { score: s1, delta: s1 - s0, streak: 0 } }).join(" ");
