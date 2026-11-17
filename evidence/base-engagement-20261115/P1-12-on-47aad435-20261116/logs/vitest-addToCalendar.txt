@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /workspace/p1-12-calendar-20261116/app
+
+ ✓ src/lib/addToCalendar.test.ts (3 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  20:18:49
+   Duration  387ms (transform 31ms, setup 0ms, collect 28ms, tests 6ms, environment 0ms, prepare 187ms)
+

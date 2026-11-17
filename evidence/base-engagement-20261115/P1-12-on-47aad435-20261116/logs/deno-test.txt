@@ -1,0 +1,14 @@
+Download https://registry.npmjs.org/ical.js
+Download https://registry.npmjs.org/ical.js/-/ical.js-2.2.1.tgz
+Check supabase/functions/calendar-ics/ics.test.ts
+running 7 tests from ./supabase/functions/calendar-ics/ics.test.ts
+P1-12 parseReminderTime ... ok (2ms)
+P1-12 ics has weekly protocol days, check and retest, no scores ... ok (41ms)
+P1-12 handler: 401 without auth, 200 ics with user, missing schedule still returns weekly events ... ok (14ms)
+P1-12 ics is valid for Google Calendar and Apple Calendar (RFC 5545 + ical.js) ... ok (7ms)
+P1-12 fold counts octets (multibyte), never splits a character, unfolds back exactly ... ok (431µs)
+P1-12 after the day-8 roll or a quick check (next_check_at = next_retest_at): retest only, no duplicate check-in ... ok (539µs)
+P1-12 missing or invalid timezone falls back to America/New_York (live P1-07 v4) ... ok (2ms)
+
+ok | 7 passed | 0 failed (80ms)
+

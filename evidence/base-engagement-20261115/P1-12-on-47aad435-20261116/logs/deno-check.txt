@@ -1,0 +1,3 @@
+Check supabase/functions/calendar-ics/ics.ts
+Check supabase/functions/calendar-ics/handler.ts
+Check supabase/functions/calendar-ics/index.ts

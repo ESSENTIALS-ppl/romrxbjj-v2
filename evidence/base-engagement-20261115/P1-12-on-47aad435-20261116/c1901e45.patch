@@ -1,0 +1,444 @@
+diff --git a/supabase/functions/calendar-ics/handler.ts b/supabase/functions/calendar-ics/handler.ts
+new file mode 100644
+index 0000000..916319d
+--- /dev/null
++++ b/supabase/functions/calendar-ics/handler.ts
+@@ -0,0 +1,52 @@
++// P1-12 calendar-ics handler. JWT required. RLS user client. Rebuilt on 47aad435. BRANCH ONLY, not deployed.
++import { buildIcs } from "./ics.ts";
++
++export interface Pref { reminder_time: string | null; timezone: string | null }
++export interface Schedule { next_check_at: string | null; next_retest_at: string | null }
++export interface Deps {
++  userId: (req: Request) => Promise<string | null>;
++  pref: (userId: string) => Promise<Pref | null>;
++  schedule: (userId: string) => Promise<Schedule | null>;
++  now: () => Date;
++  origins: (o: string | null) => Record<string, string>;
++}
++
++export const ALLOWED_ORIGINS = new Set(["https://romrx.io", "https://www.romrx.io"]);
++
++export function corsHeaders(origin: string | null): Record<string, string> {
++  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://romrx.io";
++  return {
++    "Access-Control-Allow-Origin": allow,
++    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
++    "Access-Control-Allow-Methods": "GET, OPTIONS",
++    "Vary": "Origin",
++  };
++}
++
++export async function handle(req: Request, d: Deps): Promise<Response> {
++  const cors = d.origins(req.headers.get("Origin"));
++  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
++  if (req.method !== "GET") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: { ...cors, "Content-Type": "application/json" } });
++  if (!req.headers.get("Authorization")) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
++  const uid = await d.userId(req);
++  if (!uid) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
++  const pref = await d.pref(uid);
++  let schedule: Schedule | null = null;
++  try { schedule = await d.schedule(uid); } catch { schedule = null; }
++  const body = buildIcs({
++    timezone: pref?.timezone ?? null,
++    reminder_time: pref?.reminder_time ?? null,
++    next_check_at: schedule?.next_check_at ?? null,
++    next_retest_at: schedule?.next_retest_at ?? null,
++    now: d.now(),
++  });
++  return new Response(body, {
++    status: 200,
++    headers: {
++      ...cors,
++      "Content-Type": "text/calendar; charset=utf-8",
++      "Content-Disposition": 'attachment; filename="romrx-base.ics"',
++      "Cache-Control": "no-store",
++    },
++  });
++}
+diff --git a/supabase/functions/calendar-ics/ics.test.ts b/supabase/functions/calendar-ics/ics.test.ts
+new file mode 100644
+index 0000000..f2c6d75
+--- /dev/null
++++ b/supabase/functions/calendar-ics/ics.test.ts
+@@ -0,0 +1,157 @@
++import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
++import { buildIcs, fold, parseReminderTime } from "./ics.ts";
++import { handle, type Deps } from "./handler.ts";
++
++Deno.test("P1-12 parseReminderTime", () => {
++  assertEquals(parseReminderTime("08:30"), { hour: 8, minute: 30 });
++  assertEquals(parseReminderTime("8:30 AM"), { hour: 8, minute: 30 });
++  assertEquals(parseReminderTime("7:00 PM"), { hour: 19, minute: 0 });
++  assertEquals(parseReminderTime("bad"), { hour: 9, minute: 0 });
++});
++
++Deno.test("P1-12 ics has weekly protocol days, check and retest, no scores", () => {
++  const ics = buildIcs({
++    timezone: "America/New_York",
++    reminder_time: "07:00",
++    next_check_at: "2026-11-22T12:00:00.000Z",
++    next_retest_at: "2026-12-27T12:00:00.000Z",
++    now: new Date("2026-11-15T18:00:00Z"),
++  });
++  assert(ics.startsWith("BEGIN:VCALENDAR"));
++  assert(ics.includes("RRULE:FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA"));
++  assert(ics.includes("DTSTART;TZID=America/New_York:20261115T070000"));
++  assert(ics.includes("SUMMARY:ROMRx protocol session"));
++  assert(ics.includes("SUMMARY:ROMRx check-in"));
++  assert(ics.includes("SUMMARY:ROMRx 6-week retest"));
++  assert(ics.includes("DTSTART;TZID=America/New_York:20261122T070000"));
++  assert(ics.includes("DTSTART;TZID=America/New_York:20261227T070000"));
++  assertFalse(/score|PRS|hip|shoulder|joint/i.test(ics));
++  assert(ics.includes("\r\n"));
++});
++
++Deno.test("P1-12 handler: 401 without auth, 200 ics with user, missing schedule still returns weekly events", async () => {
++  const U = "aaaaaaaa-0000-4000-8000-000000000001";
++  const d: Deps = {
++    origins: () => ({ "Access-Control-Allow-Origin": "https://romrx.io" }),
++    now: () => new Date("2026-11-15T18:00:00Z"),
++    userId: async (req) => req.headers.get("Authorization")?.includes("good") ? U : null,
++    pref: async () => ({ reminder_time: "09:00", timezone: "America/Chicago" }),
++    schedule: async () => { throw new Error("relation does not exist"); },
++  };
++  const noAuth = await handle(new Request("https://x/calendar-ics", { method: "GET" }), d);
++  assertEquals(noAuth.status, 401);
++  const ok = await handle(new Request("https://x/calendar-ics", { method: "GET", headers: { Authorization: "Bearer good" } }), d);
++  assertEquals(ok.status, 200);
++  assertEquals(ok.headers.get("Content-Type"), "text/calendar; charset=utf-8");
++  const body = await ok.text();
++  assert(body.includes("SUMMARY:ROMRx protocol session"));
++  assertFalse(body.includes("SUMMARY:ROMRx check-in"));
++});
++
++Deno.test("P1-12 ics is valid for Google Calendar and Apple Calendar (RFC 5545 + ical.js)", async () => {
++  const ics = buildIcs({
++    timezone: "America/New_York",
++    reminder_time: "07:00",
++    next_check_at: "2026-11-22T12:00:00.000Z",
++    next_retest_at: "2026-12-27T12:00:00.000Z",
++    now: new Date("2026-11-15T18:00:00Z"),
++  });
++
++  // CRLF line endings throughout; file ends with CRLF
++  assert(ics.includes("\r\n"));
++  assert(ics.endsWith("\r\n"));
++  assertFalse(/\n/.test(ics.replaceAll("\r\n", "")), "no bare LF");
++
++  const rawLines = ics.split("\r\n");
++  assertEquals(rawLines[rawLines.length - 1], ""); // trailing CRLF
++  const lines = rawLines.slice(0, -1);
++
++  // 75-octet folding: each line is at most 75 octets; continuation lines start with a space
++  for (const line of lines) {
++    const octets = new TextEncoder().encode(line).length;
++    assert(octets <= 75, `line exceeds 75 octets (${octets}): ${line.slice(0, 80)}`);
++  }
++  const long = "DESCRIPTION:" + "A".repeat(200);
++  const folded = fold(long);
++  assert(folded.includes("\r\n "));
++  for (const line of folded.split("\r\n")) {
++    assert(new TextEncoder().encode(line).length <= 75);
++  }
++  assert(folded.startsWith("DESCRIPTION:" + "A".repeat(75 - "DESCRIPTION:".length)));
++
++  // Required VCALENDAR / VEVENT properties
++  assertEquals(lines[0], "BEGIN:VCALENDAR");
++  assert(lines.includes("END:VCALENDAR"));
++  assert(lines.includes("VERSION:2.0"));
++  assert(lines.some((l) => l.startsWith("PRODID:")));
++  assert(lines.includes("BEGIN:VTIMEZONE"));
++  assert(lines.includes("END:VTIMEZONE"));
++  assert(lines.some((l) => l === "TZID:America/New_York" || l.startsWith("TZID:America/New_York")));
++  const events: string[][] = [];
++  let cur: string[] | null = null;
++  for (const line of lines) {
++    if (line === "BEGIN:VEVENT") cur = [];
++    else if (line === "END:VEVENT") { events.push(cur!); cur = null; }
++    else if (cur) cur.push(line);
++  }
++  assert(events.length >= 1);
++  for (const ev of events) {
++    assert(ev.some((l) => l.startsWith("UID:")), "VEVENT UID");
++    assert(ev.some((l) => l.startsWith("DTSTAMP:")), "VEVENT DTSTAMP");
++    assert(ev.some((l) => l.startsWith("DTSTART")), "VEVENT DTSTART");
++    const start = ev.find((l) => l.startsWith("DTSTART"))!;
++    // TZID present together with a VTIMEZONE, or UTC Z
++    const tzid = start.includes("TZID=") || start.endsWith("Z") || /DTSTART:\d{8}T\d{6}Z$/.test(start);
++    assert(tzid, `DTSTART must use TZID or UTC Z: ${start}`);
++    if (start.includes("TZID=")) assert(lines.includes("BEGIN:VTIMEZONE"));
++  }
++
++  // Parser check (ical.js): Google/Apple consume the same iCalendar object model
++  const ICAL = (await import("npm:ical.js@2.2.1")).default;
++  const jcal = ICAL.parse(ics);
++  const comp = new ICAL.Component(jcal);
++  assertEquals(comp.name, "vcalendar");
++  assertEquals(comp.getFirstPropertyValue("version"), "2.0");
++  assert(comp.getFirstPropertyValue("prodid"));
++  const vtz = comp.getFirstSubcomponent("vtimezone");
++  assert(vtz, "VTIMEZONE present");
++  assertEquals(vtz.getFirstPropertyValue("tzid"), "America/New_York");
++  const vevents = comp.getAllSubcomponents("vevent");
++  assertEquals(vevents.length, 3);
++  for (const ev of vevents) {
++    assert(ev.getFirstPropertyValue("uid"));
++    assert(ev.getFirstPropertyValue("dtstamp"));
++    const dt = ev.getFirstPropertyValue("dtstart");
++    assert(dt, "parsed DTSTART");
++  }
++});
++
++Deno.test("P1-12 fold counts octets (multibyte), never splits a character, unfolds back exactly", () => {
++  const line = "DESCRIPTION:" + "é".repeat(60) + "✓".repeat(20);
++  const folded = fold(line);
++  const enc = new TextEncoder();
++  for (const l of folded.split("\r\n")) assert(enc.encode(l).length <= 75, `octets ${enc.encode(l).length}`);
++  assertEquals(folded.replace(/\r\n /g, ""), line);
++  assertEquals(fold("SHORT:ascii"), "SHORT:ascii");
++});
++
++Deno.test("P1-12 after the day-8 roll or a quick check (next_check_at = next_retest_at): retest only, no duplicate check-in", () => {
++  const ics = buildIcs({
++    timezone: "America/New_York", reminder_time: "07:00",
++    next_check_at: "2026-12-13T12:00:00.000Z", next_retest_at: "2026-12-13T12:00:00.000Z",
++    now: new Date("2026-11-15T18:00:00Z"),
++  });
++  assertFalse(ics.includes("UID:romrx-check"));
++  assert(ics.includes("UID:romrx-retest"));
++  assertEquals(ics.split("BEGIN:VEVENT").length - 1, 2);
++});
++
++Deno.test("P1-12 missing or invalid timezone falls back to America/New_York (live P1-07 v4)", () => {
++  const now = new Date("2026-11-15T18:00:00Z");
++  const a = buildIcs({ timezone: null, reminder_time: "07:00", now });
++  const b = buildIcs({ timezone: "Not/A_Zone", reminder_time: "07:00", now });
++  assert(a.includes("TZID:America/New_York"));
++  assert(b.includes("TZID:America/New_York"));
++  assertFalse(a.includes("TZID:America/Chicago"));
++  assertFalse(b.includes("TZID:America/Chicago"));
++});
+diff --git a/supabase/functions/calendar-ics/ics.ts b/supabase/functions/calendar-ics/ics.ts
+new file mode 100644
+index 0000000..a6e2852
+--- /dev/null
++++ b/supabase/functions/calendar-ics/ics.ts
+@@ -0,0 +1,174 @@
++// P1-12: build a .ics calendar for protocol days and retests. Pure. No scores, no mailbox addresses, no secrets.
++// Rebuilt on live P1-07 47aad435. Default timezone fallback is America/New_York (not Chicago).
++// UIDs are not mailbox addresses (no @) so the branch stays within the address rule.
++export const DEFAULT_TZ = "America/New_York"; // same fallback as live P1-07 v4 / 47aad435
++export const DEFAULT_HOUR = 9;
++export const DEFAULT_MINUTE = 0;
++export const BYDAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
++
++export function validTz(tz: string | null | undefined): tz is string {
++  if (!tz || typeof tz !== "string" || tz.length > 64) return false;
++  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; }
++}
++
++/** reminder_time such as "08:30" or "8:30 AM". Unparseable = 09:00. */
++export function parseReminderTime(t: string | null | undefined): { hour: number; minute: number } {
++  if (!t) return { hour: DEFAULT_HOUR, minute: DEFAULT_MINUTE };
++  const m = /^\s*(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(t);
++  if (!m) return { hour: DEFAULT_HOUR, minute: DEFAULT_MINUTE };
++  let hour = parseInt(m[1], 10);
++  const minute = m[2] != null ? parseInt(m[2], 10) : 0;
++  const ap = m[3]?.toLowerCase();
++  if (ap) {
++    if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return { hour: DEFAULT_HOUR, minute: DEFAULT_MINUTE };
++    if (ap === "pm" && hour < 12) hour += 12;
++    if (ap === "am" && hour === 12) hour = 0;
++  }
++  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return { hour: DEFAULT_HOUR, minute: DEFAULT_MINUTE };
++  return { hour, minute };
++}
++
++export function pad(n: number): string { return String(n).padStart(2, "0"); }
++export function ymdUtc(iso: string, tz: string): string | null {
++  const t = Date.parse(iso);
++  if (!Number.isFinite(t)) return null;
++  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(t));
++  const g = (x: string) => parts.find((p) => p.type === x)?.value ?? "";
++  const y = g("year"), m = g("month"), d = g("day");
++  if (!y || !m || !d) return null;
++  return `${y}${m}${d}`;
++}
++export function stampUtc(d = new Date()): string {
++  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
++}
++/** RFC 5545 3.1: lines longer than 75 OCTETS are folded (CRLF + one space). Counts UTF-8 bytes and never splits a
++ *  character (Vera FYI 1: the old version counted UTF-16 code units). */
++const enc = new TextEncoder();
++export function fold(line: string): string {
++  if (enc.encode(line).length <= 75) return line;
++  const out: string[] = [];
++  let cur = "";
++  let curBytes = 0;
++  let limit = 75; // first line 75 octets; continuation lines 74 + the leading space
++  for (const ch of line) {
++    const b = enc.encode(ch).length;
++    if (curBytes + b > limit) {
++      out.push(out.length === 0 ? cur : " " + cur);
++      cur = "";
++      curBytes = 0;
++      limit = 74;
++    }
++    cur += ch;
++    curBytes += b;
++  }
++  out.push(out.length === 0 ? cur : " " + cur);
++  return out.join("\r\n");
++}
++
++
++/** US IANA zones used by Base. Google Calendar and Apple Calendar need VTIMEZONE when DTSTART uses TZID. */
++const US_DST: Record<string, { std: string; dst: string; stdName: string; dstName: string }> = {
++  "America/New_York": { std: "-0500", dst: "-0400", stdName: "EST", dstName: "EDT" },
++  "America/Chicago": { std: "-0600", dst: "-0500", stdName: "CST", dstName: "CDT" },
++  "America/Denver": { std: "-0700", dst: "-0600", stdName: "MST", dstName: "MDT" },
++  "America/Los_Angeles": { std: "-0800", dst: "-0700", stdName: "PST", dstName: "PDT" },
++  "America/Phoenix": { std: "-0700", dst: "-0700", stdName: "MST", dstName: "MST" },
++};
++
++export function vtimeZoneLines(tz: string): string[] {
++  const z = US_DST[tz];
++  if (!z) return [];
++  if (z.std === z.dst) {
++    return [
++      "BEGIN:VTIMEZONE",
++      `TZID:${tz}`,
++      "BEGIN:STANDARD",
++      `TZOFFSETFROM:${z.std}`,
++      `TZOFFSETTO:${z.std}`,
++      `TZNAME:${z.stdName}`,
++      "DTSTART:19700101T000000",
++      "END:STANDARD",
++      "END:VTIMEZONE",
++    ];
++  }
++  return [
++    "BEGIN:VTIMEZONE",
++    `TZID:${tz}`,
++    "BEGIN:DAYLIGHT",
++    `TZOFFSETFROM:${z.std}`,
++    `TZOFFSETTO:${z.dst}`,
++    `TZNAME:${z.dstName}`,
++    "DTSTART:19700308T020000",
++    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
++    "END:DAYLIGHT",
++    "BEGIN:STANDARD",
++    `TZOFFSETFROM:${z.dst}`,
++    `TZOFFSETTO:${z.std}`,
++    `TZNAME:${z.stdName}`,
++    "DTSTART:19701101T020000",
++    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
++    "END:STANDARD",
++    "END:VTIMEZONE",
++  ];
++}
++
++export interface CalendarInput {
++  timezone: string | null | undefined;
++  reminder_time: string | null | undefined;
++  next_check_at?: string | null;
++  next_retest_at?: string | null;
++  now?: Date;
++}
++
++export function buildIcs(input: CalendarInput): string {
++  const tz = validTz(input.timezone) ? input.timezone : DEFAULT_TZ;
++  const { hour, minute } = parseReminderTime(input.reminder_time);
++  const now = input.now ?? new Date();
++  const dtstamp = stampUtc(now);
++  const hm = `${pad(hour)}${pad(minute)}00`;
++  // DTSTART of the weekly rule: today's local date at reminder time (RRULE expands from there).
++  const todayParts = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
++  const g = (x: string) => todayParts.find((p) => p.type === x)?.value ?? "";
++  const startDay = `${g("year")}${g("month")}${g("day")}`;
++  const tzBlock = vtimeZoneLines(tz);
++  const lines: string[] = [
++    "BEGIN:VCALENDAR",
++    "VERSION:2.0",
++    "PRODID:-//ROMRx//Base//EN",
++    "CALSCALE:GREGORIAN",
++    "METHOD:PUBLISH",
++    ...tzBlock,
++    "BEGIN:VEVENT",
++    "UID:romrx-protocol-weekly",
++    `DTSTAMP:${dtstamp}`,
++    `DTSTART;TZID=${tz}:${startDay}T${hm}`,
++    "RRULE:FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA",
++    "SUMMARY:ROMRx protocol session",
++    "DESCRIPTION:Your ROMRx session for today.",
++    "END:VEVENT",
++  ];
++  const oneShot = (uid: string, iso: string | null | undefined, summary: string, description: string) => {
++    if (!iso) return;
++    const day = ymdUtc(iso, tz);
++    if (!day) return;
++    lines.push(
++      "BEGIN:VEVENT",
++      `UID:${uid}`,
++      `DTSTAMP:${dtstamp}`,
++      `DTSTART;TZID=${tz}:${day}T${hm}`,
++      `SUMMARY:${summary}`,
++      `DESCRIPTION:${description}`,
++      "END:VEVENT",
++    );
++  };
++  // P1-07 rules 2/3: after a quick check or the day-8 roll, next_check_at = next_retest_at. Then only the retest event is
++  // written (no duplicate check-in on the retest day).
++  const checkDay = input.next_check_at ? ymdUtc(input.next_check_at, tz) : null;
++  const retestDay = input.next_retest_at ? ymdUtc(input.next_retest_at, tz) : null;
++  if (!(checkDay && retestDay && checkDay >= retestDay)) {
++    oneShot("romrx-check", input.next_check_at, "ROMRx check-in", "A short ROMRx check-in is due.");
++  }
++  oneShot("romrx-retest", input.next_retest_at, "ROMRx 6-week retest", "Your 6-week ROMRx retest is due.");
++  lines.push("END:VCALENDAR");
++  return lines.map(fold).join("\r\n") + "\r\n";
++}
+diff --git a/supabase/functions/calendar-ics/index.ts b/supabase/functions/calendar-ics/index.ts
+new file mode 100644
+index 0000000..97ad334
+--- /dev/null
++++ b/supabase/functions/calendar-ics/index.ts
+@@ -0,0 +1,37 @@
++// calendar-ics (P1-12). Rebuilt on 47aad435. BRANCH ONLY, not deployed. JWT required. No secrets beyond the caller's token.
++// user_mobility_schedule is live as 20261116143732 (repo file on this parent is still named 030000). Handler fail-softs if the table is missing.
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { corsHeaders, handle } from "./handler.ts";
++
++function userClient(authHeader: string) {
++  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
++    global: { headers: { Authorization: authHeader } },
++    auth: { persistSession: false },
++  });
++}
++
++Deno.serve((req) => {
++  const auth = req.headers.get("Authorization") ?? "";
++  const sb = auth.startsWith("Bearer ") ? userClient(auth) : null;
++  return handle(req, {
++    origins: corsHeaders,
++    now: () => new Date(),
++    userId: async () => {
++      if (!sb) return null;
++      const { data: { user } } = await sb.auth.getUser();
++      return user?.id ?? null;
++    },
++    pref: async (uid) => {
++      if (!sb) return null;
++      const { data } = await sb.from("notification_preferences").select("reminder_time, timezone").eq("user_id", uid).maybeSingle();
++      return data as { reminder_time: string | null; timezone: string | null } | null;
++    },
++    schedule: async (uid) => {
++      if (!sb) return null;
++      const { data, error } = await sb.from("user_mobility_schedule").select("next_check_at, next_retest_at").eq("user_id", uid).maybeSingle();
++      if (error) return null; // fail-soft: weekly events only if the schedule row or table cannot be read
++      return data as { next_check_at: string | null; next_retest_at: string | null } | null;
++    },
++  });
++});

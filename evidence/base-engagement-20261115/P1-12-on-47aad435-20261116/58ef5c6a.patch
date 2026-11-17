@@ -1,0 +1,189 @@
+diff --git a/app/src/lib/addToCalendar.test.ts b/app/src/lib/addToCalendar.test.ts
+new file mode 100644
+index 0000000..d0422bd
+--- /dev/null
++++ b/app/src/lib/addToCalendar.test.ts
+@@ -0,0 +1,47 @@
++import { describe, it, expect } from 'vitest'
++import { ADD_TO_CALENDAR_COPY, calendarIcsUrl, fetchCalendarIcs } from './addToCalendar'
++
++describe('P1-12 addToCalendar (web download only)', () => {
++  it('builds the calendar-ics function URL and keeps the button words in one place', () => {
++    expect(calendarIcsUrl('https://example.supabase.co')).toBe('https://example.supabase.co/functions/v1/calendar-ics')
++    expect(calendarIcsUrl('https://example.supabase.co/')).toBe('https://example.supabase.co/functions/v1/calendar-ics')
++    expect(ADD_TO_CALENDAR_COPY.button).toBe('Add to my calendar')
++    expect(ADD_TO_CALENDAR_COPY.filename).toBe('romrx-base.ics')
++  })
++
++  it('downloads a valid .ics with the bearer token', async () => {
++    const ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n'
++    const res = await fetchCalendarIcs({
++      supabaseUrl: 'https://example.supabase.co',
++      anonKey: 'anon',
++      accessToken: 'tok',
++      fetchFn: async (url, init) => {
++        expect(url).toBe('https://example.supabase.co/functions/v1/calendar-ics')
++        expect(init.method).toBe('GET')
++        const h = init.headers as Record<string, string>
++        expect(h.Authorization).toBe('Bearer tok')
++        expect(h.apikey).toBe('anon')
++        return new Response(ics, { status: 200, headers: { 'Content-Type': 'text/calendar; charset=utf-8' } })
++      },
++    })
++    expect(res).toEqual({ ok: true, filename: 'romrx-base.ics', ics })
++  })
++
++  it('returns unauthorized on 401 and failed on a non-calendar body', async () => {
++    const unauth = await fetchCalendarIcs({
++      supabaseUrl: 'https://example.supabase.co',
++      anonKey: 'anon',
++      accessToken: 'tok',
++      fetchFn: async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
++    })
++    expect(unauth).toEqual({ ok: false, reason: 'unauthorized' })
++    const bad = await fetchCalendarIcs({
++      supabaseUrl: 'https://example.supabase.co',
++      anonKey: 'anon',
++      accessToken: 'tok',
++      fetchFn: async () => new Response('<!doctype html>', { status: 200 }),
++    })
++    expect(bad).toEqual({ ok: false, reason: 'failed' })
++  })
++
++})
+diff --git a/app/src/lib/addToCalendar.ts b/app/src/lib/addToCalendar.ts
+new file mode 100644
+index 0000000..306f6da
+--- /dev/null
++++ b/app/src/lib/addToCalendar.ts
+@@ -0,0 +1,56 @@
++// P1-12: web-only .ics download/link. No native calendar APIs.
++// Talks to the calendar-ics edge function (JWT). Not for deploy until that function is live
++// and Stacy has cleared the button words (open: same note as the .ics SUMMARY/DESCRIPTION strings).
++
++export const ADD_TO_CALENDAR_COPY = {
++  button: 'Add to my calendar',
++  help: 'Download a calendar file for your protocol days, check-in, and 6-week retest.',
++  error: 'The calendar file could not be downloaded.',
++  filename: 'romrx-base.ics',
++} as const
++
++export function calendarIcsUrl(supabaseUrl: string): string {
++  return `${supabaseUrl.replace(/\/$/, '')}/functions/v1/calendar-ics`
++}
++
++export type CalendarDownloadResult = { ok: true; filename: string; ics: string } | { ok: false; reason: 'unauthorized' | 'failed' }
++
++export type CalendarFetchFn = (input: string, init: RequestInit) => Promise<Response>
++
++/** GET calendar-ics with the signed-in user's token. Returns the .ics text or a reason. No native APIs. */
++export async function fetchCalendarIcs(opts: {
++  supabaseUrl: string
++  anonKey: string
++  accessToken: string
++  fetchFn?: CalendarFetchFn
++}): Promise<CalendarDownloadResult> {
++  const fetchFn = opts.fetchFn ?? fetch
++  try {
++    const res = await fetchFn(calendarIcsUrl(opts.supabaseUrl), {
++      method: 'GET',
++      headers: {
++        Authorization: `Bearer ${opts.accessToken}`,
++        apikey: opts.anonKey,
++      },
++    })
++    if (res.status === 401) return { ok: false, reason: 'unauthorized' }
++    if (!res.ok) return { ok: false, reason: 'failed' }
++    const ics = await res.text()
++    if (!ics.includes('BEGIN:VCALENDAR')) return { ok: false, reason: 'failed' }
++    return { ok: true, filename: ADD_TO_CALENDAR_COPY.filename, ics }
++  } catch {
++    return { ok: false, reason: 'failed' }
++  }
++}
++
++/** Browser-only: save the .ics as a file download (same pattern as export). Not a native calendar add. */
++export function saveIcsDownload(filename: string, ics: string): void {
++  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }))
++  const a = document.createElement('a')
++  a.href = url
++  a.download = filename
++  document.body.appendChild(a)
++  a.click()
++  a.remove()
++  URL.revokeObjectURL(url)
++}
+diff --git a/app/src/pages/Settings.tsx b/app/src/pages/Settings.tsx
+index 3a0edf8..0beb463 100644
+--- a/app/src/pages/Settings.tsx
++++ b/app/src/pages/Settings.tsx
+@@ -13,6 +13,7 @@ import { loadDeletionStatus, DELETION_STATUS_COPY, type DeletionStatus } from '.
+ import { requestMyDataExport, saveJsonDownload, exportErrorCopy, EXPORT_BUTTON_LABEL } from '../lib/exportMyData'
+ import { YOUR_DATA_COPY as YD, PLAN_LINE_INDEX, dialogLines } from '../lib/yourDataCopy'
+ import { enablePush } from '../lib/pushSubscribe'
++import { ADD_TO_CALENDAR_COPY as CAL, fetchCalendarIcs, saveIcsDownload } from '../lib/addToCalendar'
+ import { PageHeader } from '../components/PageHeader'
+ import { SectionCard } from '../components/SectionCard'
+ import { Spinner } from '../components/Spinner'
+@@ -32,7 +33,7 @@ import {
+ import { bandFull, formatScoreBand, mobilityScoreForAssessment, overallBandForAssessment, BAND_TONE, type BandScore } from '../lib/mobilityBands'
+ import {
+   Save, Loader2, ExternalLink, LogOut, Mail, HelpCircle, ChevronRight,
+-  ClipboardList, TrendingUp, Bell, KeyRound, Trash2, MessageSquarePlus,
++  ClipboardList, TrendingUp, Bell, Calendar, KeyRound, Trash2, MessageSquarePlus,
+   CheckCircle2, XCircle,
+ } from 'lucide-react'
+ import { AGE_BUCKETS, isAllowedAgeBucket } from '../lib/ageBuckets'
+@@ -135,6 +136,8 @@ export function Settings() {
+   const [emailReminders, setEmailReminders] = useState(false)
+   const [pushReminders, setPushReminders] = useState(false)
+   const [pushMsg, setPushMsg] = useState<string | null>(null)
++  const [calendarMsg, setCalendarMsg] = useState<string | null>(null)
++  const [calendarBusy, setCalendarBusy] = useState(false)
+   const [exportBusy, setExportBusy] = useState(false)
+   const [exportErr, setExportErr] = useState<string | null>(null)
+   const [exportDone, setExportDone] = useState(false) // P1-23: Stacy's success line after a download
+@@ -283,6 +286,21 @@ export function Settings() {
+     return () => { live = false }
+   }, [user?.id, deleteDone])
+ 
++  // ── P1-12: web-only .ics download (no native calendar). Ships with calendar-ics on 47aad435. ──
++  const handleAddToCalendar = async () => {
++    if (!session?.access_token) { setCalendarMsg(CAL.error); return }
++    setCalendarBusy(true)
++    setCalendarMsg(null)
++    const res = await fetchCalendarIcs({
++      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
++      anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
++      accessToken: session.access_token,
++    })
++    if (res.ok) saveIcsDownload(res.filename, res.ics)
++    else setCalendarMsg(CAL.error)
++    setCalendarBusy(false)
++  }
++
+   // ── Save notifications ─────────────────────────────────────────────────
+   const handleSaveNotifications = async () => {
+     if (!user) return
+@@ -672,6 +690,21 @@ export function Settings() {
+                   </div>
+                 )}
+ 
++                <div className="space-y-1 border-t border-slate-200 pt-4">
++                  <button
++                    type="button"
++                    onClick={handleAddToCalendar}
++                    disabled={calendarBusy || !session}
++                    className="w-full rounded-xl border border-cobalt/20 bg-white py-2.5 px-3 text-sm font-semibold text-cobalt-ink flex items-center justify-center gap-2 disabled:opacity-60"
++                    data-testid="add-to-calendar"
++                  >
++                    {calendarBusy ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />}
++                    {CAL.button}
++                  </button>
++                  <p className="text-xs text-slate-500 pl-1">{CAL.help}</p>
++                  {calendarMsg && <p className="text-xs text-red-700 bg-red-50 rounded-card px-3 py-2">{calendarMsg}</p>}
++                </div>
++
+                 {SHOW_PUSH && (
+                   <ToggleRow
+                     title="Push notifications"
