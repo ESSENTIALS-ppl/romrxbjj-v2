@@ -1,0 +1,16 @@
+# byte sizes of the 15 live v3 / v13 rollback files (same paths and order as SHA256SUMS-ROLLBACK-LIVE-v3)
+5841  rollback/live-lifecycle-emails-v3/source/index.ts
+5322  rollback/live-lifecycle-emails-v3/source/handler.ts
+17533  rollback/live-lifecycle-emails-v3/source/logic.ts
+8434  rollback/live-lifecycle-emails-v3/source/email.ts
+1889  rollback/live-lifecycle-emails-v3/source/score.ts
+37110  rollback/live-lifecycle-emails-v3/_shared/mobility/mobilityBands.ts
+1471  rollback/live-lifecycle-emails-v3/_shared/mobility/lumbarFlag.ts
+1216  rollback/live-lifecycle-emails-v3/_shared/email_footer.ts
+3443  rollback/live-lifecycle-emails-v3/_shared/unsub_token.ts
+1269  rollback/live-lifecycle-emails-v3/source/deletion.ts
+4507  rollback/live-unsubscribe-v13/source/index.ts
+4838  rollback/live-unsubscribe-v13/_shared/rate_limit.ts
+1285  rollback/live-unsubscribe-v13/_shared/events.ts
+5342  rollback/live-unsubscribe-v13/source/token_path.ts
+3443  rollback/live-unsubscribe-v13/_shared/unsub_token.ts
