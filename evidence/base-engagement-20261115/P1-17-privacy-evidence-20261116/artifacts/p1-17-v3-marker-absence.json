@@ -1,0 +1,198 @@
+{
+  "label": "P1-17 v3 marker-absence check. LOCAL artifacts only. Test markers, no live data.",
+  "verdict": "PASS: 0 hits per marker in every OpenAI body, note row, and Resend payload; every marker appears in the seed-row dump.",
+  "pass": true,
+  "markers": {
+    "age": "AGE_MARKER_ZXQ94_AGE_47",
+    "gender": "GENDER_MARKER_ZXQ94_NONBINARY",
+    "injury_notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+    "session_log": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999",
+    "session": "SESSION_MARKER_ZXQ94_DURATION_777"
+  },
+  "method": "Fixed-string occurrence count (grep -F -o MARKER FILE | wc -l), cross-checked with Python str.count. Counts are occurrences, not lines.",
+  "artifacts": [
+    {
+      "artifact_key": "openai_chat_completions",
+      "path": "artifacts/openai-chat-completions-request.json",
+      "label": "ai-chat OpenAI chat/completions request body",
+      "sha256": "5db7858d8b014bf0e01b64c656bbbf0127b04b07e1151d04073de21e9cbcdfa9",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "openai_embeddings",
+      "path": "artifacts/openai-embeddings-request.json",
+      "label": "ai-chat OpenAI embeddings request body",
+      "sha256": "e10f88896a5544261b559108c59c431342b3a57607650539f98d63e5778b37bb",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "note_v1_would_write",
+      "path": "artifacts/p1-17-would-write-note-row.json",
+      "label": "v1 would-write note row (Branch A)",
+      "sha256": "7010cb9eab7a3909358a7f4be511b6b342ea3d5985314f385ccf1e9e6fa54bca",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "resend_v1_would_build",
+      "path": "artifacts/p1-17-would-build-resend-payload.json",
+      "label": "v1 would-build Resend payload (Branch A)",
+      "sha256": "856f26f75025dcf28b7b707d810bbadbdc1d0c9ef3836c235f71ab0b911a7e1a",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "note_A_n0",
+      "path": "artifacts/p1-17-v2-A_n0-note-row.json",
+      "label": "v2 Branch A (n=0) note row",
+      "sha256": "7010cb9eab7a3909358a7f4be511b6b342ea3d5985314f385ccf1e9e6fa54bca",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "resend_A_n0",
+      "path": "artifacts/p1-17-v2-A_n0-resend-payload.json",
+      "label": "v2 Branch A (n=0) Resend payload",
+      "sha256": "e5dbe3e7184494362447326421c46d6482fc6da9e58c56bc3847ce7636b96dd3",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "note_B_n1",
+      "path": "artifacts/p1-17-v2-B_n1-note-row.json",
+      "label": "v2 Branch B (n=1) note row",
+      "sha256": "1d38be6b1ec315b065f96995b90012f6ee3bfc3778643d5cab28c5ea67097e4c",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "resend_B_n1",
+      "path": "artifacts/p1-17-v2-B_n1-resend-payload.json",
+      "label": "v2 Branch B (n=1) Resend payload",
+      "sha256": "20bb831385c990310320fe50cf19f97fd665c64a493aed8d772b28c29d87fb77",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "note_B_n2",
+      "path": "artifacts/p1-17-v2-B_n2-note-row.json",
+      "label": "v2 Branch B (n=2) note row",
+      "sha256": "4cd406466518febc9a6e5603ffc9406d22c9bcf15d5c49c7052745fd55acb04b",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "resend_B_n2",
+      "path": "artifacts/p1-17-v2-B_n2-resend-payload.json",
+      "label": "v2 Branch B (n=2) Resend payload",
+      "sha256": "d4b33bc61532cb174a719debb783156d8e7bbec362dd64f0e76a206f45f99e67",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "note_C_n3",
+      "path": "artifacts/p1-17-v2-C_n3-note-row.json",
+      "label": "v2 Branch C (n=3) note row",
+      "sha256": "da03657286a709f7751ea9d0588b091f0f8b988caf6796fc620fb01d158ce998",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    },
+    {
+      "artifact_key": "resend_C_n3",
+      "path": "artifacts/p1-17-v2-C_n3-resend-payload.json",
+      "label": "v2 Branch C (n=3) Resend payload",
+      "sha256": "c6fb4c017a50e064f1d9e694791ab8e38a1a4a8986ace611c5064357d26d2382",
+      "counts": {
+        "age": 0,
+        "gender": 0,
+        "injury_notes": 0,
+        "session_log": 0,
+        "session": 0
+      }
+    }
+  ],
+  "positive_control_seed_dump": {
+    "path": "artifacts/p1-17-v3-seed-rows.json",
+    "sha256": "f5f49885dd686db9bf1e18b496b503dfd3f6f1b5d705952329f1a5f5df2cf97c",
+    "counts": {
+      "age": 7,
+      "gender": 7,
+      "injury_notes": 17,
+      "session_log": 11,
+      "session": 3
+    },
+    "ok": true,
+    "counts_in_ai_chat_seed": {
+      "age": 6,
+      "gender": 6,
+      "injury_notes": 16,
+      "session_log": 10,
+      "session": 2
+    },
+    "counts_in_checkin_fixtures": {
+      "age": 0,
+      "gender": 0,
+      "injury_notes": 0,
+      "session_log": 0,
+      "session": 0
+    }
+  },
+  "output_hits_any": false
+}

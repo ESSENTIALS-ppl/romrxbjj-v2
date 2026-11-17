@@ -1,0 +1,739 @@
+{
+  "label": "LOCAL seed-row dump for P1-17 privacy evidence v3. Test data only. Emails are user@example.com. Account 7c71e421 and fixture 076ce453 were not used. No live rows.",
+  "written_for": "Vera WARN on receipt v1 b9472441 (verdict 7e9c270e): seeded age, gender, injury and session markers were named but not shown.",
+  "replay_bytes": {
+    "handler_js_sha256": "24f61509de9fc132a3da9b558fd13ecfc065455c014716153ba9b96cf0fc4554",
+    "handler_sha256_match_24f61509": true,
+    "rombot_checkin_commit": "11803fee4157f23435d0b97e6aaa08eddb020565",
+    "rombot_checkin_worktree": "/workspace/p1-17-wt",
+    "worktree_HEAD_match_11803fee": true,
+    "worktree_clean": true
+  },
+  "markers": {
+    "age": "AGE_MARKER_ZXQ94_AGE_47",
+    "gender": "GENDER_MARKER_ZXQ94_NONBINARY",
+    "injury_notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+    "session_log": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999",
+    "session": "SESSION_MARKER_ZXQ94_DURATION_777"
+  },
+  "ai_chat_v96_replay": {
+    "synthetic_user_id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+    "conversation_id": "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
+    "note": "These are the exact local mock rows the v96 handler.js replay was seeded with (replay-ai-chat-v96.mjs). The mock returns the full row, including marker fields, even when the handler selects a narrower column list, so a leak of the raw object would have appeared in the OpenAI bodies.",
+    "rows": {
+      "users": {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+        "portal_role": "athlete",
+        "full_name": "Alex Example",
+        "active_sport": "base",
+        "sports_enabled": [
+          "general"
+        ],
+        "email": "user@example.com",
+        "age": "AGE_MARKER_ZXQ94_AGE_47",
+        "age_bucket": "AGE_MARKER_ZXQ94_AGE_47",
+        "gender": "GENDER_MARKER_ZXQ94_NONBINARY",
+        "sex": "GENDER_MARKER_ZXQ94_NONBINARY",
+        "injury_notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+        "injury_flags": [
+          "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        ],
+        "notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+      },
+      "rombot_context": {
+        "user_id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+        "full_name": "Alex Example",
+        "latest_assessment_id": "cccccccc-cccc-4ccc-8ccc-000000000001",
+        "rom_total": 74,
+        "worst_joints": [
+          "hip_ir",
+          "shoulder_flex"
+        ],
+        "joint_scores": [
+          {
+            "joint_key": "hip_ir",
+            "score": 1,
+            "left_value": 22,
+            "right_value": 24,
+            "notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+            "injury": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+          },
+          {
+            "joint_key": "shoulder_flex",
+            "score": 2,
+            "left_value": 150,
+            "right_value": 148
+          }
+        ],
+        "technique_summary": {
+          "green": 2,
+          "yellow": 1,
+          "red": 0
+        },
+        "green_techniques": [
+          {
+            "name": "Hip opener",
+            "category": "mobility",
+            "limiting_joints": []
+          }
+        ],
+        "yellow_techniques": [
+          {
+            "name": "Shoulder reach",
+            "category": "mobility",
+            "limiting_joints": [
+              "shoulder_flex"
+            ]
+          }
+        ],
+        "red_techniques": [],
+        "protocol": [
+          {
+            "joint_key": "hip_ir",
+            "exercise": "Seated hip IR",
+            "sets": 2,
+            "reps": 8,
+            "cue": "slow and easy",
+            "user_note": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+          }
+        ],
+        "saved_game_plans": [
+          {
+            "name": "Week 1 hips",
+            "path_mode": "chain",
+            "description": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+            "techniques": [
+              {
+                "name": "Hip opener"
+              }
+            ]
+          }
+        ],
+        "age": "AGE_MARKER_ZXQ94_AGE_47",
+        "gender": "GENDER_MARKER_ZXQ94_NONBINARY",
+        "injury_notes": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+        "email": "user@example.com"
+      },
+      "sessions": [
+        {
+          "id": "sess-1",
+          "user_id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+          "duration": "SESSION_MARKER_ZXQ94_DURATION_777",
+          "logged_at": "2026-11-15T15:00:00Z",
+          "notes": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        }
+      ],
+      "session_logs": [
+        {
+          "id": "slog-1",
+          "user_id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+          "body": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999",
+          "set_count": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        }
+      ],
+      "protocol_sessions": [
+        {
+          "id": "slog-1",
+          "user_id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+          "body": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999",
+          "set_count": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        }
+      ],
+      "ai_messages_leading_checkin_note": [
+        {
+          "role": "assistant",
+          "content": "Hey Alex, ROMBot here. It's been 3 days since your assessment, and your plan is ready. Today's focus is your hips. It's short, and you can do it now. Want to start?\nIf something got in the way, tell me here and I'll help you find an easier way in.",
+          "created_at": "2026-11-16T12:30:05Z"
+        }
+      ],
+      "auth_mock_user": {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+        "email": "user@example.com"
+      },
+      "marker_field_locations": [
+        {
+          "path": "users.age",
+          "marker_name": "age",
+          "marker": "AGE_MARKER_ZXQ94_AGE_47"
+        },
+        {
+          "path": "users.age_bucket",
+          "marker_name": "age",
+          "marker": "AGE_MARKER_ZXQ94_AGE_47"
+        },
+        {
+          "path": "users.gender",
+          "marker_name": "gender",
+          "marker": "GENDER_MARKER_ZXQ94_NONBINARY"
+        },
+        {
+          "path": "users.sex",
+          "marker_name": "gender",
+          "marker": "GENDER_MARKER_ZXQ94_NONBINARY"
+        },
+        {
+          "path": "users.injury_notes",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "users.injury_flags[0]",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "users.notes",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "rombot_context.joint_scores[0].notes",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "rombot_context.joint_scores[0].injury",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "rombot_context.protocol[0].user_note",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "rombot_context.saved_game_plans[0].description",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "rombot_context.age",
+          "marker_name": "age",
+          "marker": "AGE_MARKER_ZXQ94_AGE_47"
+        },
+        {
+          "path": "rombot_context.gender",
+          "marker_name": "gender",
+          "marker": "GENDER_MARKER_ZXQ94_NONBINARY"
+        },
+        {
+          "path": "rombot_context.injury_notes",
+          "marker_name": "injury_notes",
+          "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL"
+        },
+        {
+          "path": "sessions[0].duration",
+          "marker_name": "session",
+          "marker": "SESSION_MARKER_ZXQ94_DURATION_777"
+        },
+        {
+          "path": "sessions[0].notes",
+          "marker_name": "session_log",
+          "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        },
+        {
+          "path": "session_logs[0].body",
+          "marker_name": "session_log",
+          "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        },
+        {
+          "path": "session_logs[0].set_count",
+          "marker_name": "session_log",
+          "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        },
+        {
+          "path": "protocol_sessions[0].body",
+          "marker_name": "session_log",
+          "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        },
+        {
+          "path": "protocol_sessions[0].set_count",
+          "marker_name": "session_log",
+          "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999"
+        }
+      ]
+    }
+  },
+  "checkin_11803fee_fixtures": {
+    "note": "These are the exact Candidate objects the 11803fee dry run passed to handle()/plan() for branches A, B (n=1 and n=2), and C (n=3). Session data is protocol_sessions.logged_at timestamps in sessions_since. Age, gender, and injury notes were not seeded on these fixtures because they are not Candidate fields. The ZXQ94 markers do not appear in these objects (see marker_hits_in_this_fixture, all empty).",
+    "cases": {
+      "A_n0": {
+        "label": "Branch A (0 sessions)",
+        "branch": "A",
+        "user_id": "11111111-1111-4111-8111-111111111111",
+        "email": "user@example.com",
+        "profile": {
+          "full_name": "Sam Lee",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "injury_notes": null,
+          "seeded_on_this_fixture": false,
+          "reason": "rombot-checkin Candidate has no age/gender/injury_notes columns; the 11803fee dry run did not seed them. The ZXQ94 markers were seeded only on the ai-chat v96 replay mock rows."
+        },
+        "session_rows": [],
+        "note_phase_candidate": {
+          "user_id": "11111111-1111-4111-8111-111111111111",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-000000000001",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": null,
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "_comment_missing_profile_fields": "Candidate (logic.ts:114-141) has no age, age_bucket, gender, sex, or injury_notes fields. Those keys were not passed to cand() and were not present on the object handle()/plan() received. They are shown here as null so the dump answers Vera's request directly."
+        },
+        "email_phase_candidate": {
+          "user_id": "11111111-1111-4111-8111-111111111111",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-000000000001",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": null,
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "note": {
+            "assessment_id": "aaaaaaaa-0000-4000-8000-000000000001",
+            "branch": "A",
+            "at": "2026-11-16T12:30:05Z"
+          },
+          "email_already": false,
+          "last_any_assessment_at": "2026-11-13T14:00:00Z"
+        },
+        "marker_hits_in_this_fixture": []
+      },
+      "B_n1": {
+        "label": "Branch B (1 session)",
+        "branch": "B",
+        "user_id": "22222222-2222-4222-8222-222222222221",
+        "email": "user@example.com",
+        "profile": {
+          "full_name": "Sam Lee",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "injury_notes": null,
+          "seeded_on_this_fixture": false,
+          "reason": "rombot-checkin Candidate has no age/gender/injury_notes columns; the 11803fee dry run did not seed them. The ZXQ94 markers were seeded only on the ai-chat v96 replay mock rows."
+        },
+        "session_rows": [
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "22222222-2222-4222-8222-222222222221",
+            "logged_at": "2026-11-14T18:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          }
+        ],
+        "note_phase_candidate": {
+          "user_id": "22222222-2222-4222-8222-222222222221",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000b1",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T18:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-14T18:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "_comment_missing_profile_fields": "Candidate (logic.ts:114-141) has no age, age_bucket, gender, sex, or injury_notes fields. Those keys were not passed to cand() and were not present on the object handle()/plan() received. They are shown here as null so the dump answers Vera's request directly."
+        },
+        "email_phase_candidate": {
+          "user_id": "22222222-2222-4222-8222-222222222221",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000b1",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T18:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-14T18:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "note": {
+            "assessment_id": "aaaaaaaa-0000-4000-8000-0000000000b1",
+            "branch": "B",
+            "at": "2026-11-16T12:30:05Z"
+          },
+          "email_already": false,
+          "last_any_assessment_at": "2026-11-13T14:00:00Z"
+        },
+        "marker_hits_in_this_fixture": []
+      },
+      "B_n2": {
+        "label": "Branch B (2 sessions)",
+        "branch": "B",
+        "user_id": "22222222-2222-4222-8222-222222222222",
+        "email": "user@example.com",
+        "profile": {
+          "full_name": "Sam Lee",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "injury_notes": null,
+          "seeded_on_this_fixture": false,
+          "reason": "rombot-checkin Candidate has no age/gender/injury_notes columns; the 11803fee dry run did not seed them. The ZXQ94 markers were seeded only on the ai-chat v96 replay mock rows."
+        },
+        "session_rows": [
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "22222222-2222-4222-8222-222222222222",
+            "logged_at": "2026-11-14T18:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          },
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "22222222-2222-4222-8222-222222222222",
+            "logged_at": "2026-11-15T18:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          }
+        ],
+        "note_phase_candidate": {
+          "user_id": "22222222-2222-4222-8222-222222222222",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000b2",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T18:00:00Z",
+            "2026-11-15T18:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-15T18:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "_comment_missing_profile_fields": "Candidate (logic.ts:114-141) has no age, age_bucket, gender, sex, or injury_notes fields. Those keys were not passed to cand() and were not present on the object handle()/plan() received. They are shown here as null so the dump answers Vera's request directly."
+        },
+        "email_phase_candidate": {
+          "user_id": "22222222-2222-4222-8222-222222222222",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000b2",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T18:00:00Z",
+            "2026-11-15T18:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-15T18:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "note": {
+            "assessment_id": "aaaaaaaa-0000-4000-8000-0000000000b2",
+            "branch": "B",
+            "at": "2026-11-16T12:30:05Z"
+          },
+          "email_already": false,
+          "last_any_assessment_at": "2026-11-13T14:00:00Z"
+        },
+        "marker_hits_in_this_fixture": []
+      },
+      "C_n3": {
+        "label": "Branch C (3 sessions)",
+        "branch": "C",
+        "user_id": "33333333-3333-4333-8333-333333333333",
+        "email": "user@example.com",
+        "profile": {
+          "full_name": "Sam Lee",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "injury_notes": null,
+          "seeded_on_this_fixture": false,
+          "reason": "rombot-checkin Candidate has no age/gender/injury_notes columns; the 11803fee dry run did not seed them. The ZXQ94 markers were seeded only on the ai-chat v96 replay mock rows."
+        },
+        "session_rows": [
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "33333333-3333-4333-8333-333333333333",
+            "logged_at": "2026-11-14T15:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          },
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "33333333-3333-4333-8333-333333333333",
+            "logged_at": "2026-11-15T15:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          },
+          {
+            "source": "Candidate.sessions_since (protocol_sessions.logged_at at or after the assessment)",
+            "user_id": "33333333-3333-4333-8333-333333333333",
+            "logged_at": "2026-11-15T20:00:00Z",
+            "duration": null,
+            "notes": null,
+            "body": null,
+            "set_count": null,
+            "markers_present": false
+          }
+        ],
+        "note_phase_candidate": {
+          "user_id": "33333333-3333-4333-8333-333333333333",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000c3",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T15:00:00Z",
+            "2026-11-15T15:00:00Z",
+            "2026-11-15T20:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-15T20:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "_comment_missing_profile_fields": "Candidate (logic.ts:114-141) has no age, age_bucket, gender, sex, or injury_notes fields. Those keys were not passed to cand() and were not present on the object handle()/plan() received. They are shown here as null so the dump answers Vera's request directly."
+        },
+        "email_phase_candidate": {
+          "user_id": "33333333-3333-4333-8333-333333333333",
+          "email": "user@example.com",
+          "full_name": "Sam Lee",
+          "active_sport": "base",
+          "base_status": "active",
+          "marketing_opt_out": false,
+          "is_test": false,
+          "deletion_requested": false,
+          "pref": {
+            "reminder_time": "07:00",
+            "timezone": "America/New_York",
+            "email_reminders": true,
+            "protocol_opt_in_at": "2026-11-13T15:00:00Z"
+          },
+          "full_assessments": [
+            {
+              "id": "aaaaaaaa-0000-4000-8000-0000000000c3",
+              "assessed_at": "2026-11-13T14:00:00Z",
+              "red_flag_triggered": false
+            }
+          ],
+          "ranked_joint_keys": [
+            "hip_ir",
+            "shoulder_flex",
+            "cervical_rot"
+          ],
+          "sessions_since": [
+            "2026-11-14T15:00:00Z",
+            "2026-11-15T15:00:00Z",
+            "2026-11-15T20:00:00Z"
+          ],
+          "last_user_message_at": null,
+          "next_check_at": "2026-11-20T14:00:00Z",
+          "last_session_at": "2026-11-15T20:00:00Z",
+          "age": null,
+          "age_bucket": null,
+          "gender": null,
+          "sex": null,
+          "injury_notes": null,
+          "note": {
+            "assessment_id": "aaaaaaaa-0000-4000-8000-0000000000c3",
+            "branch": "C",
+            "at": "2026-11-16T12:30:05Z"
+          },
+          "email_already": false,
+          "last_any_assessment_at": "2026-11-13T14:00:00Z"
+        },
+        "marker_hits_in_this_fixture": []
+      }
+    }
+  }
+}

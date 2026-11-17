@@ -1,0 +1,167 @@
+# Raw marker grep counts for P1-17 privacy evidence v3
+# Fixed-string occurrence count: grep -F -o MARKER FILE | wc -l
+# Working directory: /workspace/process/batches/base-engagement-20261115/P1-17-privacy-evidence-20261116
+# Date: 2026-11-16 19:27:07 
+
+## artifacts/openai-chat-completions-request.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/openai-chat-completions-request.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/openai-chat-completions-request.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/openai-chat-completions-request.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/openai-chat-completions-request.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/openai-chat-completions-request.json | wc -l
+0
+
+## artifacts/openai-embeddings-request.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/openai-embeddings-request.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/openai-embeddings-request.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/openai-embeddings-request.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/openai-embeddings-request.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/openai-embeddings-request.json | wc -l
+0
+
+## artifacts/p1-17-would-write-note-row.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-would-write-note-row.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-would-write-note-row.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-would-write-note-row.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-would-write-note-row.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-would-write-note-row.json | wc -l
+0
+
+## artifacts/p1-17-would-build-resend-payload.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-would-build-resend-payload.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-would-build-resend-payload.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-would-build-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-would-build-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-would-build-resend-payload.json | wc -l
+0
+
+## artifacts/p1-17-v2-A_n0-note-row.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-A_n0-note-row.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-A_n0-note-row.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-A_n0-note-row.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-A_n0-note-row.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-A_n0-note-row.json | wc -l
+0
+
+## artifacts/p1-17-v2-A_n0-resend-payload.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-A_n0-resend-payload.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-A_n0-resend-payload.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-A_n0-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-A_n0-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-A_n0-resend-payload.json | wc -l
+0
+
+## artifacts/p1-17-v2-B_n1-note-row.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-B_n1-note-row.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-B_n1-note-row.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-B_n1-note-row.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-B_n1-note-row.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-B_n1-note-row.json | wc -l
+0
+
+## artifacts/p1-17-v2-B_n1-resend-payload.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-B_n1-resend-payload.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-B_n1-resend-payload.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-B_n1-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-B_n1-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-B_n1-resend-payload.json | wc -l
+0
+
+## artifacts/p1-17-v2-B_n2-note-row.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-B_n2-note-row.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-B_n2-note-row.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-B_n2-note-row.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-B_n2-note-row.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-B_n2-note-row.json | wc -l
+0
+
+## artifacts/p1-17-v2-B_n2-resend-payload.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-B_n2-resend-payload.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-B_n2-resend-payload.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-B_n2-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-B_n2-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-B_n2-resend-payload.json | wc -l
+0
+
+## artifacts/p1-17-v2-C_n3-note-row.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-C_n3-note-row.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-C_n3-note-row.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-C_n3-note-row.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-C_n3-note-row.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-C_n3-note-row.json | wc -l
+0
+
+## artifacts/p1-17-v2-C_n3-resend-payload.json
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v2-C_n3-resend-payload.json | wc -l
+0
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v2-C_n3-resend-payload.json | wc -l
+0
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v2-C_n3-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v2-C_n3-resend-payload.json | wc -l
+0
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v2-C_n3-resend-payload.json | wc -l
+0
+
+## POSITIVE CONTROL artifacts/p1-17-v3-seed-rows.json (expect >0 for every marker)
+$ grep -F -o AGE_MARKER_ZXQ94_AGE_47 artifacts/p1-17-v3-seed-rows.json | wc -l
+7
+$ grep -F -o GENDER_MARKER_ZXQ94_NONBINARY artifacts/p1-17-v3-seed-rows.json | wc -l
+7
+$ grep -F -o INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL artifacts/p1-17-v3-seed-rows.json | wc -l
+17
+$ grep -F -o SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999 artifacts/p1-17-v3-seed-rows.json | wc -l
+11
+$ grep -F -o SESSION_MARKER_ZXQ94_DURATION_777 artifacts/p1-17-v3-seed-rows.json | wc -l
+3
+
+## Split counts (python str.count on JSON sections)
+ai_chat_v96_replay: {"age": 6, "gender": 6, "injury_notes": 16, "session_log": 10, "session": 2}
+checkin_11803fee_fixtures: {"age": 0, "gender": 0, "injury_notes": 0, "session_log": 0, "session": 0}
+
+## Verdict
+PASS: 0 hits per marker in every OpenAI body, note row, and Resend payload; every marker appears in the seed-row dump.
