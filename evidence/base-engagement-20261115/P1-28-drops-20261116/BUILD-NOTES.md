@@ -1,0 +1,35 @@
+# BUILD-NOTES: P1-28 one DROP file per backup table (L1112 / SUMS 4183afb9)
+
+Monday Nov 16, 2026, 8:06 PM ET (America/New_York). Avery. BUILD ONLY. No DROP was run. No live writes. Existing P1-28/ files pinned by L1112 (SHA256SUMS 4183afb9, restore-all.sql 16aebc1b, CSVs and restore_*.sql) were not overwritten. evidence/drop.sql (the old commented combined file, not in the 4183afb9 SUMS) was left in place.
+
+A previous run of this work was stopped by a rate limit. Checked first: L1112 SUMS still 4183afb9 and all 21 entries verify, live row counts still match the Nov 15 inventory, no per-table DROP files existed (only the combined commented evidence/drop.sql). Continued from that baseline. No romrxbjj-v2 branch: these files are not migrations and must not be placed under supabase/migrations.
+
+## Hunks (new files in P1-28-drops-20261116/ only)
+
+1. drop_rescore_backup_20261021_assessments.sql `@@ -0,0 +1,24 @@` sha256 3da6fb4372a313a67c542a3bbc530f5b557d1f022c1d5196c23af59196669260. Table public.rescore_backup_20261021_assessments. Names CSV rescore_backup_20261021_assessments.csv sha256 63308fc44f01fdaa76767fa73b71f73c0c01dab2c3c014411f90be85378fa9b3, restore restore_rescore_backup_20261021_assessments.sql sha256 bc58ff48a358f01ee44ee51e0965ce2bb3093a785059a49a94dba8ca5e729fb1, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 21, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.rescore_backup_20261021_assessments; no CASCADE.
+2. drop_rescore_backup_20261021_joint_scores.sql `@@ -0,0 +1,24 @@` sha256 d71974de0efdc4b22140284f5f8ea42dc9641b98114d0e0728ca03c86be948b0. Table public.rescore_backup_20261021_joint_scores. Names CSV rescore_backup_20261021_joint_scores.csv sha256 f78de7456573f78cdf20d9b2c3d27aa4dcc135f9f31cfa1dece6a143c0b1120f, restore restore_rescore_backup_20261021_joint_scores.sql sha256 fc789860e3fee6fec87eea7645609fb4e164780a5a2fb2d378881a30aa1725c3, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 185, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.rescore_backup_20261021_joint_scores; no CASCADE.
+3. drop_rescore_backup_20261021_protocols.sql `@@ -0,0 +1,24 @@` sha256 039a52d12f2379f9e2010c9a357cb5da1d4ccaaa1013853c77a1094f142d66c4. Table public.rescore_backup_20261021_protocols. Names CSV rescore_backup_20261021_protocols.csv sha256 16c1c63c8ff974b548850e64cc070a1c1aea89b8be5ce9b6aa24f5d23d3cdb56, restore restore_rescore_backup_20261021_protocols.sql sha256 10fe2ed462b4479b36ea626ba0f340d2202014b3a12ab13c0efd7eb8057e247a, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 154, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.rescore_backup_20261021_protocols; no CASCADE.
+4. drop_lumbar_null_backup_20261021_assessments.sql `@@ -0,0 +1,24 @@` sha256 735d08784dbe27ca1647dde87f62aa4beb09394522112fb96f407618c56c6846. Table public.lumbar_null_backup_20261021_assessments. Names CSV lumbar_null_backup_20261021_assessments.csv sha256 58cab2dce3b4873c4073424a46ed13b101f1f4d8a1e2252388dee9ad43233ed4, restore restore_lumbar_null_backup_20261021_assessments.sql sha256 219bee2b5c1b36e4c57cd0f07f8a52f839a2f8a0a7f543725891a29204f61792, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 15, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.lumbar_null_backup_20261021_assessments; no CASCADE.
+5. drop_lumbar_null_backup_20261021_joint_scores.sql `@@ -0,0 +1,24 @@` sha256 e8d1ec786652013b841ea385db7373c27b38734e1b293289d4c4072665765c3c. Table public.lumbar_null_backup_20261021_joint_scores. Names CSV lumbar_null_backup_20261021_joint_scores.csv sha256 fdb121f1cb19da49e79b440de975460726e22abd11443c7d21514549543cdee3, restore restore_lumbar_null_backup_20261021_joint_scores.sql sha256 f70167b083d108a0afb260bd762859204cfd3ec04ce3cbd8ffabf8d661805217, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 29, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.lumbar_null_backup_20261021_joint_scores; no CASCADE.
+6. drop_lumbar_null_backup_20261021_protocols.sql `@@ -0,0 +1,24 @@` sha256 1e6c74168b9783d362fcc951702e863e778fa91a2019ef1087a7ade4a7c05516. Table public.lumbar_null_backup_20261021_protocols. Names CSV lumbar_null_backup_20261021_protocols.csv sha256 b7fe143438845abe451a3ec56bad4de7a3bdffa52d6321ad22f3918eb52f7372, restore restore_lumbar_null_backup_20261021_protocols.sql sha256 a319c881d36bda0de66f4a078c6791ce0a9e6a9e03a736ebdc161361219f181d, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 0, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.lumbar_null_backup_20261021_protocols; no CASCADE.
+7. drop_fg36_rescore_backup.sql `@@ -0,0 +1,24 @@` sha256 50bd754bd4d0f81462d08a3da7555797e08e79c7f8c36a6facce7e9dbfe710a2. Table public.fg36_rescore_backup. Names CSV fg36_rescore_backup.csv sha256 523763913d58385a54dcb3843993467b666070a2bb9b2b1c17686b6bb1c46379, restore restore_fg36_rescore_backup.sql sha256 ad2ec93d9ba20cddd9da0d32245d042de2457f4f83aaebbf7010c828df9dd60d, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 19, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.fg36_rescore_backup; no CASCADE.
+8. drop_fg36_rescore_log.sql `@@ -0,0 +1,24 @@` sha256 2ba3ec1382eab0969e6cec9bc15ef3900e8b013e99be9e6fcc15dd927cd0c392. Table public.fg36_rescore_log. Names CSV fg36_rescore_log.csv sha256 63e2456aa39a1b9ce2c10fee5039c6dd92914ac7cda24d0871cf408c7ce299de, restore restore_fg36_rescore_log.sql sha256 be57122a37ce70187f5a192bb2d1fb03de5160a8418b884f113efefb1ddc358b, pack SUMS 4183afb9…, restore-all.sql 16aebc1b…. Live count 18, 0 incoming FKs. Single statement: DROP TABLE IF EXISTS public.fg36_rescore_log; no CASCADE.
+
+9. PINS.json @@ -0,0 +1,71 @@ sha256 98cc17878561e29d19b69a0b48f28b9bda2b7a9151072f7feb02e6b1c7fbb8e9. Machine-readable copy of the L1112 pins and live counts used by the test.
+10. test.mjs, package.json, results.json, test-output.txt — PGlite 0.5.16, 100/100 PASS (see receipt).
+11. CORRECTION-INVENTORY-FG36-CSV-SHA.md — inventory still lists the v1 fg36 CSV sha; DROPs use the L1112 pin 52376391….
+12. RECEIPT-P1-28-DROPS-20261116.md and SHA256SUMS for this pack. /workspace/SHA256SUMS was not touched.
+
+Rollback for each DROP is the already-pinned per-table restore_<t>.sql (L1112), not a new rollback file. restore-all.sql 16aebc1b is also pinned if several tables need to come back.
+
+## Tests
+
+PGlite 0.5.16, 100/100 ALL PASS: each file names the L1112 CSV, restore, SUMS, and restore-all shas; exactly one DROP TABLE IF EXISTS for that table; no CASCADE on the DROP line; an isolated drop removes only the target; restore (L1112 file) then drop then restore (after DISCARD TEMP, because a real rollback is a new psql session) restores the pinned row count (21/185/154/15/29/0/19/18).
+
+## Live read-only, 8:02 PM ET, project cqzvqzwwevnflinxgnpp
+
+All eight tables exist. Counts match the Nov 15 inventory. incoming_fks 0, RLS on, not forced, 0 policies, no primary key, owner postgres, relacl postgres + service_role ALL only.
+
+## Not changed
+
+No DROP on live. P1-28/SHA256SUMS, CSVs, restore SQL, and test/restore.test.mjs left untouched (still 4183afb9).

@@ -1,0 +1,24 @@
+-- P1-28 DROP. BUILD ONLY. DO NOT RUN AGAINST LIVE.
+-- One file, one table. Each DROP still needs its own gate line naming
+-- this table, its CSV sha, and its restore sha, plus Vera pre and post
+-- (L1047(3), L1112). Covered by L1031 as a set; this file is not applied.
+--
+-- Pinned restore pack (L1112):
+--   P1-28/SHA256SUMS sha256 4183afb9fdf98441ac413d9a09928a79bbbbeffe09aaa5d68b7caa3e59981cc2
+-- Table: public.rescore_backup_20261021_protocols
+-- CSV: rescore_backup_20261021_protocols.csv
+--   sha256 16c1c63c8ff974b548850e64cc070a1c1aea89b8be5ce9b6aa24f5d23d3cdb56
+-- Restore: restore_rescore_backup_20261021_protocols.sql
+--   sha256 10fe2ed462b4479b36ea626ba0f340d2202014b3a12ab13c0efd7eb8057e247a
+-- Also pinned: restore-all.sql
+--   sha256 16aebc1b99aff71710e47d3cb316a521687647d28b181cff961868012f54b203
+--
+-- Live read-only, Supabase MCP execute_sql, project cqzvqzwwevnflinxgnpp,
+-- Monday Nov 16, 2026, 8:02 PM ET (America/New_York):
+--   exists; row_count 154 (same as the Nov 15 inventory);
+--   incoming_fks 0; RLS enabled, not forced; 0 policies; no primary key;
+--   owner postgres; relacl postgres + service_role ALL only.
+-- Rollback is the pinned per-table restore file above (not run).
+-- No CASCADE (0 incoming foreign keys). This file drops only this table.
+
+DROP TABLE IF EXISTS public.rescore_backup_20261021_protocols;

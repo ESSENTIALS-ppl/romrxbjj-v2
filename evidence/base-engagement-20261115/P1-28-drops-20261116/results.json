@@ -1,0 +1,407 @@
+{
+  "passed": 100,
+  "total": 100,
+  "failed": [],
+  "results": {
+    "L1112 SHA256SUMS file sha": {
+      "pass": true,
+      "detail": "4183afb9fdf98441ac413d9a09928a79bbbbeffe09aaa5d68b7caa3e59981cc2"
+    },
+    "eight drop files": {
+      "pass": true,
+      "detail": "8"
+    },
+    "rescore_backup_20261021_assessments file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "rescore_backup_20261021_assessments DROP is IF EXISTS public.rescore_backup_20261021_assessments": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_assessments DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "rescore_backup_20261021_joint_scores DROP is IF EXISTS public.rescore_backup_20261021_joint_scores": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_joint_scores DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "rescore_backup_20261021_protocols DROP is IF EXISTS public.rescore_backup_20261021_protocols": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "rescore_backup_20261021_protocols DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "lumbar_null_backup_20261021_assessments DROP is IF EXISTS public.lumbar_null_backup_20261021_assessments": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_assessments DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "lumbar_null_backup_20261021_joint_scores DROP is IF EXISTS public.lumbar_null_backup_20261021_joint_scores": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_joint_scores DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "lumbar_null_backup_20261021_protocols DROP is IF EXISTS public.lumbar_null_backup_20261021_protocols": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "lumbar_null_backup_20261021_protocols DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "fg36_rescore_backup DROP is IF EXISTS public.fg36_rescore_backup": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_backup DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log file present": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log names CSV sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log names restore sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log names SUMS 4183afb9 pin": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log names restore-all sha": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log exactly one DROP": {
+      "pass": true,
+      "detail": "1"
+    },
+    "fg36_rescore_log DROP is IF EXISTS public.fg36_rescore_log": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log no CASCADE": {
+      "pass": true,
+      "detail": ""
+    },
+    "fg36_rescore_log DROP line names only this table": {
+      "pass": true,
+      "detail": ""
+    },
+    "isolated drop removes target": {
+      "pass": true,
+      "detail": ""
+    },
+    "isolated drop leaves the other seven": {
+      "pass": true,
+      "detail": ""
+    },
+    "restore-then-drop rescore_backup_20261021_assessments restored rows": {
+      "pass": true,
+      "detail": "got 21"
+    },
+    "restore-then-drop rescore_backup_20261021_assessments dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore rescore_backup_20261021_assessments rows": {
+      "pass": true,
+      "detail": "got 21"
+    },
+    "restore-then-drop rescore_backup_20261021_joint_scores restored rows": {
+      "pass": true,
+      "detail": "got 185"
+    },
+    "restore-then-drop rescore_backup_20261021_joint_scores dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore rescore_backup_20261021_joint_scores rows": {
+      "pass": true,
+      "detail": "got 185"
+    },
+    "restore-then-drop rescore_backup_20261021_protocols restored rows": {
+      "pass": true,
+      "detail": "got 154"
+    },
+    "restore-then-drop rescore_backup_20261021_protocols dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore rescore_backup_20261021_protocols rows": {
+      "pass": true,
+      "detail": "got 154"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_assessments restored rows": {
+      "pass": true,
+      "detail": "got 15"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_assessments dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore lumbar_null_backup_20261021_assessments rows": {
+      "pass": true,
+      "detail": "got 15"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_joint_scores restored rows": {
+      "pass": true,
+      "detail": "got 29"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_joint_scores dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore lumbar_null_backup_20261021_joint_scores rows": {
+      "pass": true,
+      "detail": "got 29"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_protocols restored rows": {
+      "pass": true,
+      "detail": "got 0"
+    },
+    "restore-then-drop lumbar_null_backup_20261021_protocols dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore lumbar_null_backup_20261021_protocols rows": {
+      "pass": true,
+      "detail": "got 0"
+    },
+    "restore-then-drop fg36_rescore_backup restored rows": {
+      "pass": true,
+      "detail": "got 19"
+    },
+    "restore-then-drop fg36_rescore_backup dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore fg36_rescore_backup rows": {
+      "pass": true,
+      "detail": "got 19"
+    },
+    "restore-then-drop fg36_rescore_log restored rows": {
+      "pass": true,
+      "detail": "got 18"
+    },
+    "restore-then-drop fg36_rescore_log dropped": {
+      "pass": true,
+      "detail": ""
+    },
+    "drop-then-restore fg36_rescore_log rows": {
+      "pass": true,
+      "detail": "got 18"
+    }
+  }
+}

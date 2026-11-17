@@ -1,0 +1,102 @@
+PASS L1112 SHA256SUMS file sha 4183afb9fdf98441ac413d9a09928a79bbbbeffe09aaa5d68b7caa3e59981cc2
+PASS eight drop files 8
+PASS rescore_backup_20261021_assessments file present
+PASS rescore_backup_20261021_assessments names CSV sha
+PASS rescore_backup_20261021_assessments names restore sha
+PASS rescore_backup_20261021_assessments names SUMS 4183afb9 pin
+PASS rescore_backup_20261021_assessments names restore-all sha
+PASS rescore_backup_20261021_assessments exactly one DROP 1
+PASS rescore_backup_20261021_assessments DROP is IF EXISTS public.rescore_backup_20261021_assessments
+PASS rescore_backup_20261021_assessments no CASCADE
+PASS rescore_backup_20261021_assessments DROP line names only this table
+PASS rescore_backup_20261021_joint_scores file present
+PASS rescore_backup_20261021_joint_scores names CSV sha
+PASS rescore_backup_20261021_joint_scores names restore sha
+PASS rescore_backup_20261021_joint_scores names SUMS 4183afb9 pin
+PASS rescore_backup_20261021_joint_scores names restore-all sha
+PASS rescore_backup_20261021_joint_scores exactly one DROP 1
+PASS rescore_backup_20261021_joint_scores DROP is IF EXISTS public.rescore_backup_20261021_joint_scores
+PASS rescore_backup_20261021_joint_scores no CASCADE
+PASS rescore_backup_20261021_joint_scores DROP line names only this table
+PASS rescore_backup_20261021_protocols file present
+PASS rescore_backup_20261021_protocols names CSV sha
+PASS rescore_backup_20261021_protocols names restore sha
+PASS rescore_backup_20261021_protocols names SUMS 4183afb9 pin
+PASS rescore_backup_20261021_protocols names restore-all sha
+PASS rescore_backup_20261021_protocols exactly one DROP 1
+PASS rescore_backup_20261021_protocols DROP is IF EXISTS public.rescore_backup_20261021_protocols
+PASS rescore_backup_20261021_protocols no CASCADE
+PASS rescore_backup_20261021_protocols DROP line names only this table
+PASS lumbar_null_backup_20261021_assessments file present
+PASS lumbar_null_backup_20261021_assessments names CSV sha
+PASS lumbar_null_backup_20261021_assessments names restore sha
+PASS lumbar_null_backup_20261021_assessments names SUMS 4183afb9 pin
+PASS lumbar_null_backup_20261021_assessments names restore-all sha
+PASS lumbar_null_backup_20261021_assessments exactly one DROP 1
+PASS lumbar_null_backup_20261021_assessments DROP is IF EXISTS public.lumbar_null_backup_20261021_assessments
+PASS lumbar_null_backup_20261021_assessments no CASCADE
+PASS lumbar_null_backup_20261021_assessments DROP line names only this table
+PASS lumbar_null_backup_20261021_joint_scores file present
+PASS lumbar_null_backup_20261021_joint_scores names CSV sha
+PASS lumbar_null_backup_20261021_joint_scores names restore sha
+PASS lumbar_null_backup_20261021_joint_scores names SUMS 4183afb9 pin
+PASS lumbar_null_backup_20261021_joint_scores names restore-all sha
+PASS lumbar_null_backup_20261021_joint_scores exactly one DROP 1
+PASS lumbar_null_backup_20261021_joint_scores DROP is IF EXISTS public.lumbar_null_backup_20261021_joint_scores
+PASS lumbar_null_backup_20261021_joint_scores no CASCADE
+PASS lumbar_null_backup_20261021_joint_scores DROP line names only this table
+PASS lumbar_null_backup_20261021_protocols file present
+PASS lumbar_null_backup_20261021_protocols names CSV sha
+PASS lumbar_null_backup_20261021_protocols names restore sha
+PASS lumbar_null_backup_20261021_protocols names SUMS 4183afb9 pin
+PASS lumbar_null_backup_20261021_protocols names restore-all sha
+PASS lumbar_null_backup_20261021_protocols exactly one DROP 1
+PASS lumbar_null_backup_20261021_protocols DROP is IF EXISTS public.lumbar_null_backup_20261021_protocols
+PASS lumbar_null_backup_20261021_protocols no CASCADE
+PASS lumbar_null_backup_20261021_protocols DROP line names only this table
+PASS fg36_rescore_backup file present
+PASS fg36_rescore_backup names CSV sha
+PASS fg36_rescore_backup names restore sha
+PASS fg36_rescore_backup names SUMS 4183afb9 pin
+PASS fg36_rescore_backup names restore-all sha
+PASS fg36_rescore_backup exactly one DROP 1
+PASS fg36_rescore_backup DROP is IF EXISTS public.fg36_rescore_backup
+PASS fg36_rescore_backup no CASCADE
+PASS fg36_rescore_backup DROP line names only this table
+PASS fg36_rescore_log file present
+PASS fg36_rescore_log names CSV sha
+PASS fg36_rescore_log names restore sha
+PASS fg36_rescore_log names SUMS 4183afb9 pin
+PASS fg36_rescore_log names restore-all sha
+PASS fg36_rescore_log exactly one DROP 1
+PASS fg36_rescore_log DROP is IF EXISTS public.fg36_rescore_log
+PASS fg36_rescore_log no CASCADE
+PASS fg36_rescore_log DROP line names only this table
+PASS isolated drop removes target
+PASS isolated drop leaves the other seven
+PASS restore-then-drop rescore_backup_20261021_assessments restored rows got 21
+PASS restore-then-drop rescore_backup_20261021_assessments dropped
+PASS drop-then-restore rescore_backup_20261021_assessments rows got 21
+PASS restore-then-drop rescore_backup_20261021_joint_scores restored rows got 185
+PASS restore-then-drop rescore_backup_20261021_joint_scores dropped
+PASS drop-then-restore rescore_backup_20261021_joint_scores rows got 185
+PASS restore-then-drop rescore_backup_20261021_protocols restored rows got 154
+PASS restore-then-drop rescore_backup_20261021_protocols dropped
+PASS drop-then-restore rescore_backup_20261021_protocols rows got 154
+PASS restore-then-drop lumbar_null_backup_20261021_assessments restored rows got 15
+PASS restore-then-drop lumbar_null_backup_20261021_assessments dropped
+PASS drop-then-restore lumbar_null_backup_20261021_assessments rows got 15
+PASS restore-then-drop lumbar_null_backup_20261021_joint_scores restored rows got 29
+PASS restore-then-drop lumbar_null_backup_20261021_joint_scores dropped
+PASS drop-then-restore lumbar_null_backup_20261021_joint_scores rows got 29
+PASS restore-then-drop lumbar_null_backup_20261021_protocols restored rows got 0
+PASS restore-then-drop lumbar_null_backup_20261021_protocols dropped
+PASS drop-then-restore lumbar_null_backup_20261021_protocols rows got 0
+PASS restore-then-drop fg36_rescore_backup restored rows got 19
+PASS restore-then-drop fg36_rescore_backup dropped
+PASS drop-then-restore fg36_rescore_backup rows got 19
+PASS restore-then-drop fg36_rescore_log restored rows got 18
+PASS restore-then-drop fg36_rescore_log dropped
+PASS drop-then-restore fg36_rescore_log rows got 18
+
+100/100 ALL PASS

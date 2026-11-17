@@ -1,0 +1,71 @@
+{
+  "sums": "4183afb9fdf98441ac413d9a09928a79bbbbeffe09aaa5d68b7caa3e59981cc2",
+  "restore_all": "16aebc1b99aff71710e47d3cb316a521687647d28b181cff961868012f54b203",
+  "tables": [
+    {
+      "name": "rescore_backup_20261021_assessments",
+      "rows": 21,
+      "csv": "rescore_backup_20261021_assessments.csv",
+      "csv_sha256": "63308fc44f01fdaa76767fa73b71f73c0c01dab2c3c014411f90be85378fa9b3",
+      "restore": "restore_rescore_backup_20261021_assessments.sql",
+      "restore_sha256": "bc58ff48a358f01ee44ee51e0965ce2bb3093a785059a49a94dba8ca5e729fb1"
+    },
+    {
+      "name": "rescore_backup_20261021_joint_scores",
+      "rows": 185,
+      "csv": "rescore_backup_20261021_joint_scores.csv",
+      "csv_sha256": "f78de7456573f78cdf20d9b2c3d27aa4dcc135f9f31cfa1dece6a143c0b1120f",
+      "restore": "restore_rescore_backup_20261021_joint_scores.sql",
+      "restore_sha256": "fc789860e3fee6fec87eea7645609fb4e164780a5a2fb2d378881a30aa1725c3"
+    },
+    {
+      "name": "rescore_backup_20261021_protocols",
+      "rows": 154,
+      "csv": "rescore_backup_20261021_protocols.csv",
+      "csv_sha256": "16c1c63c8ff974b548850e64cc070a1c1aea89b8be5ce9b6aa24f5d23d3cdb56",
+      "restore": "restore_rescore_backup_20261021_protocols.sql",
+      "restore_sha256": "10fe2ed462b4479b36ea626ba0f340d2202014b3a12ab13c0efd7eb8057e247a"
+    },
+    {
+      "name": "lumbar_null_backup_20261021_assessments",
+      "rows": 15,
+      "csv": "lumbar_null_backup_20261021_assessments.csv",
+      "csv_sha256": "58cab2dce3b4873c4073424a46ed13b101f1f4d8a1e2252388dee9ad43233ed4",
+      "restore": "restore_lumbar_null_backup_20261021_assessments.sql",
+      "restore_sha256": "219bee2b5c1b36e4c57cd0f07f8a52f839a2f8a0a7f543725891a29204f61792"
+    },
+    {
+      "name": "lumbar_null_backup_20261021_joint_scores",
+      "rows": 29,
+      "csv": "lumbar_null_backup_20261021_joint_scores.csv",
+      "csv_sha256": "fdb121f1cb19da49e79b440de975460726e22abd11443c7d21514549543cdee3",
+      "restore": "restore_lumbar_null_backup_20261021_joint_scores.sql",
+      "restore_sha256": "f70167b083d108a0afb260bd762859204cfd3ec04ce3cbd8ffabf8d661805217"
+    },
+    {
+      "name": "lumbar_null_backup_20261021_protocols",
+      "rows": 0,
+      "csv": "lumbar_null_backup_20261021_protocols.csv",
+      "csv_sha256": "b7fe143438845abe451a3ec56bad4de7a3bdffa52d6321ad22f3918eb52f7372",
+      "restore": "restore_lumbar_null_backup_20261021_protocols.sql",
+      "restore_sha256": "a319c881d36bda0de66f4a078c6791ce0a9e6a9e03a736ebdc161361219f181d"
+    },
+    {
+      "name": "fg36_rescore_backup",
+      "rows": 19,
+      "csv": "fg36_rescore_backup.csv",
+      "csv_sha256": "523763913d58385a54dcb3843993467b666070a2bb9b2b1c17686b6bb1c46379",
+      "restore": "restore_fg36_rescore_backup.sql",
+      "restore_sha256": "ad2ec93d9ba20cddd9da0d32245d042de2457f4f83aaebbf7010c828df9dd60d"
+    },
+    {
+      "name": "fg36_rescore_log",
+      "rows": 18,
+      "csv": "fg36_rescore_log.csv",
+      "csv_sha256": "63e2456aa39a1b9ce2c10fee5039c6dd92914ac7cda24d0871cf408c7ce299de",
+      "restore": "restore_fg36_rescore_log.sql",
+      "restore_sha256": "be57122a37ce70187f5a192bb2d1fb03de5160a8418b884f113efefb1ddc358b"
+    }
+  ],
+  "live_read_et": "2026-11-16 8:02 PM ET"
+}
