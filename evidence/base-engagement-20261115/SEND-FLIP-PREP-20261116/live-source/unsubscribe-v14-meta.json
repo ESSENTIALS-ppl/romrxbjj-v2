@@ -1,0 +1,65 @@
+{
+ "id": "d7eaa2d5-647f-4936-a879-e3ff25e8db2b",
+ "slug": "unsubscribe",
+ "name": "unsubscribe",
+ "status": "ACTIVE",
+ "version": 14,
+ "created_at": 1789499760840,
+ "updated_at": 1794875280360,
+ "verify_jwt": false,
+ "import_map": false,
+ "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_d7eaa2d5-647f-4936-a879-e3ff25e8db2b_14/source/source/index.ts",
+ "ezbr_sha256": "879abbfacde0fc1e812713205c4ed38aaa3c6f606d1cf37a3704e85293ff8622",
+ "updated_at_et": "2026-11-16 7:28:00 PM ET",
+ "files": [
+  {
+   "name": "source/index.ts",
+   "bytes": 4504,
+   "sha256": "37f5bf2f7cf22f7672befa89babafb2d3a8f8ab50667c1232a052bb9f61ae5d4",
+   "git_path": "supabase/functions/unsubscribe/source/index.ts",
+   "git_sha256": "37f5bf2f7cf22f7672befa89babafb2d3a8f8ab50667c1232a052bb9f61ae5d4",
+   "match": true
+  },
+  {
+   "name": "_shared/rate_limit.ts",
+   "bytes": 4838,
+   "sha256": "7bae6d34db82052977c138ea16c6e993d5afddc0e378f9b2df387241d27cf302",
+   "git_path": "supabase/functions/unsubscribe/_shared/rate_limit.ts",
+   "git_sha256": "7bae6d34db82052977c138ea16c6e993d5afddc0e378f9b2df387241d27cf302",
+   "match": true
+  },
+  {
+   "name": "_shared/events.ts",
+   "bytes": 1285,
+   "sha256": "49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21",
+   "git_path": "supabase/functions/unsubscribe/_shared/events.ts",
+   "git_sha256": "49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21",
+   "match": true
+  },
+  {
+   "name": "source/token_path.ts",
+   "bytes": 5350,
+   "sha256": "2c119d967ca83fa6d75e6c18621b92919334e45cbb22627724d26d261bdfb899",
+   "git_path": "supabase/functions/unsubscribe/source/token_path.ts",
+   "git_sha256": "2c119d967ca83fa6d75e6c18621b92919334e45cbb22627724d26d261bdfb899",
+   "match": true
+  },
+  {
+   "name": "_shared/unsub_token.ts",
+   "bytes": 3713,
+   "sha256": "96f0f2e3b9e123f632febe33d9911d8db95dbe014b09398dc46573fe1f1befd9",
+   "git_path": "supabase/functions/unsubscribe/_shared/unsub_token.ts",
+   "git_sha256": "96f0f2e3b9e123f632febe33d9911d8db95dbe014b09398dc46573fe1f1befd9",
+   "match": true
+  }
+ ],
+ "git_files_non_test": [
+  "_shared/events.ts",
+  "_shared/rate_limit.ts",
+  "_shared/unsub_token.ts",
+  "source/index.ts",
+  "source/token_path.ts"
+ ],
+ "file_set_equal": true,
+ "all_match": true
+}
