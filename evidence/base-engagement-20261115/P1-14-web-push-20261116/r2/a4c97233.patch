@@ -1,0 +1,480 @@
+diff --git a/supabase/functions/send-push-notification/handler.r2.test.ts b/supabase/functions/send-push-notification/handler.r2.test.ts
+new file mode 100644
+index 0000000..8c039bf
+--- /dev/null
++++ b/supabase/functions/send-push-notification/handler.r2.test.ts
+@@ -0,0 +1,257 @@
++// P1-14 r2 tests: cleared copy, is_test filter, quiet hours, dry-run no network, planted mutants.
++// Run: deno test --no-lock --node-modules-dir=none --allow-read --allow-write handler.r2.test.ts
++import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
++import * as H from "./handler.ts";
++import { handle, inQuietHours, localHourMinute, PUSH_COPY, sendEnabled, type Candidate, type Deps, type PushSub } from "./handler.ts";
++
++const here = new URL(".", import.meta.url);
++const FIXTURE = JSON.parse(await Deno.readTextFile(new URL("push_copy.cleared.json", here))) as {
++  source: { stacy: string; stacy_sha256: string; kai: string; kai_sha256: string };
++  title: { text: string; stacy_line: number; sha256: string };
++  kinds: Record<string, { title: string; body: string; body_sha256: string; stacy_line: number; kai_line: number; status: string }>;
++};
++const KINDS = ["protocol", "retest", "digest", "test"] as const;
++const SUB: PushSub = { endpoint: "https://example.com/push/device-1", p256dh: "B" + "x".repeat(40), auth: "a".repeat(16) };
++
++async function sha256(s: string): Promise<string> {
++  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
++  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
++}
++function cand(over: Partial<Candidate> = {}): Candidate {
++  return { userId: "00000000-0000-4000-8000-0000000000aa", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: SUB, timezone: "America/New_York", isTest: false, ...over };
++}
++type Spy = Deps & { sends: string[]; claims: string[] };
++function deps(mod: typeof H, over: Partial<Deps> = {}): Spy {
++  const sends: string[] = [];
++  const claims: string[] = [];
++  return {
++    cronCallerOk: async () => true,
++    webPushSend: "on",
++    vapidPublicKey: "pub-not-a-real-key",
++    vapidPrivateKey: "priv-not-a-real-key",
++    vapidSubject: "mailto:hello@romrx.io",
++    now: () => new Date("2026-11-16T19:45:00Z"), // 2:45 PM ET
++    listDue: async () => [cand()],
++    claim: async (u, k) => { claims.push(`${u}:${k}`); return true; },
++    send: async (_s, payload) => { sends.push(payload); return { ok: true }; },
++    markSuccess: async () => {},
++    markFailure: async () => {},
++    ...over,
++    sends,
++    claims,
++  } as Spy;
++}
++const post = () => new Request("https://x/send-push-notification", { method: "POST", headers: { "x-cron-secret": "s".repeat(40) }, body: "{}" });
++async function run(mod: typeof H, over: Partial<Deps> = {}) {
++  const d = deps(mod, over);
++  const r = await mod.handle(post(), d);
++  return { d, body: await r.json() as Record<string, number | boolean> };
++}
++
++// ---------- 1. copy ----------
++Deno.test("r2 copy: PUSH_COPY equals Stacy-cleared fixture byte for byte, 4 kinds, sha256 per body", async () => {
++  assertEquals(Object.keys(PUSH_COPY), [...KINDS]);
++  for (const k of KINDS) {
++    assertEquals(PUSH_COPY[k].title, FIXTURE.kinds[k].title);
++    assertEquals(PUSH_COPY[k].body, FIXTURE.kinds[k].body);
++    assertEquals(await sha256(PUSH_COPY[k].body), FIXTURE.kinds[k].body_sha256);
++  }
++});
++
++Deno.test("r2 title: every kind's title is exactly 'ROMRx Base' (Stacy 219378b5 'Title for all kinds')", async () => {
++  for (const k of KINDS) assertEquals(PUSH_COPY[k].title, "ROMRx Base");
++  assertEquals(FIXTURE.title.text, "ROMRx Base");
++  assertEquals(await sha256("ROMRx Base"), FIXTURE.title.sha256);
++});
++
++const stacyPresent = await Deno.stat(FIXTURE.source.stacy).then(() => true, () => false);
++Deno.test({
++  name: "r2 copy: each string is verbatim at its recorded line in Stacy 219378b5 (and Kai 481a2e9d for digest)",
++  ignore: !stacyPresent,
++  fn: async () => {
++    const sRaw = await Deno.readTextFile(FIXTURE.source.stacy);
++    assertEquals(await sha256(sRaw), FIXTURE.source.stacy_sha256);
++    const S = sRaw.split("\n");
++    assertEquals(S[FIXTURE.title.stacy_line - 1], `Title for all kinds: ${FIXTURE.title.text}. CLEAR.`);
++    for (const k of KINDS) {
++      const line = S[FIXTURE.kinds[k].stacy_line - 1];
++      assert(line.includes(PUSH_COPY[k].body), `${k} not at Stacy line ${FIXTURE.kinds[k].stacy_line}`);
++    }
++    const kRaw = await Deno.readTextFile(FIXTURE.source.kai);
++    assertEquals(await sha256(kRaw), FIXTURE.source.kai_sha256);
++    assert(kRaw.split("\n")[FIXTURE.kinds.digest.kai_line - 1].includes(PUSH_COPY.digest.body));
++  },
++});
++
++Deno.test("r2 copy: payload sent is the cleared title and body, no score/band/body words", async () => {
++  const { d } = await run(H);
++  assertEquals(d.sends.length, 1);
++  assertEquals(JSON.parse(d.sends[0]), { title: "ROMRx Base", body: FIXTURE.kinds.protocol.body });
++  for (const k of KINDS) assertFalse(/score|band|hip|shoulder|knee|mood|pain|injur/i.test(PUSH_COPY[k].body));
++});
++
++// ---------- 2. is_test ----------
++Deno.test("r2 is_test: test users are skipped (no claim, no send), non-test users are sent", async () => {
++  const a = await run(H, { listDue: async () => [cand({ isTest: true })] });
++  assertEquals([a.d.sends.length, a.d.claims.length, a.body.skipped_test, a.body.sent], [0, 0, 1, 0]);
++  const b = await run(H, { listDue: async () => [cand({ isTest: false })] });
++  assertEquals([b.d.sends.length, b.d.claims.length, b.body.skipped_test, b.body.sent], [1, 1, 0, 1]);
++});
++
++Deno.test("r2 is_test: unknown flag fails closed (treated as test)", async () => {
++  const a = await run(H, { listDue: async () => [cand({ isTest: undefined as unknown as boolean })] });
++  assertEquals([a.d.sends.length, a.body.skipped_test], [0, 1]);
++});
++
++Deno.test("r2 is_test: no user id is special-cased in the function source (grep proof)", async () => {
++  const id = ["7c71", "e421"].join("");
++  for (const f of ["handler.ts", "index.ts"]) {
++    const src = await Deno.readTextFile(new URL(f, here));
++    assertFalse(src.includes(id), `${f} mentions ${id}`);
++    assertFalse(/internal_accounts/.test(src), `${f} reads ops.internal_accounts`);
++  }
++  const idx = await Deno.readTextFile(new URL("index.ts", here));
++  assert(idx.includes(`sb.rpc("is_test_account", { p_email: u.email })`));
++  assert(idx.includes("const isTest = flags.get(p.user_id) ?? true;"));
++  // the same user id with isTest false is sent like anyone else
++  const r = await run(H, { listDue: async () => [cand({ userId: `${id}-0000-4000-8000-000000000000`, isTest: false })] });
++  assertEquals(r.body.sent, 1);
++});
++
++// ---------- 3. quiet hours ----------
++const NY = "America/New_York";
++const at = (iso: string) => new Date(iso);
++Deno.test("r2 quiet: boundaries in America/New_York (start 21:00, end 08:00)", () => {
++  assertFalse(inQuietHours(at("2026-11-17T01:59:00Z"), NY)); // 20:59 EST
++  assert(inQuietHours(at("2026-11-17T02:00:00Z"), NY)); //       21:00 EST
++  assert(inQuietHours(at("2026-11-17T12:59:00Z"), NY)); //       07:59 EST
++  assertFalse(inQuietHours(at("2026-11-17T13:00:00Z"), NY)); // 08:00 EST
++});
++Deno.test("r2 quiet: midnight wrap", () => {
++  assert(inQuietHours(at("2026-11-17T04:30:00Z"), NY)); // 23:30
++  assert(inQuietHours(at("2026-11-17T05:00:00Z"), NY)); // 00:00
++  assert(inQuietHours(at("2026-11-17T05:01:00Z"), NY)); // 00:01
++  assert(inQuietHours(at("2026-11-17T08:00:00Z"), NY)); // 03:00
++  assertFalse(inQuietHours(at("2026-11-17T17:00:00Z"), NY)); // 12:00
++});
++Deno.test("r2 quiet: DST fall back (Sun Nov 1 2026) and spring forward (Sun Mar 14 2027) use real local time", () => {
++  // Nov 1 2026: after 06:00Z New York is UTC-5. 12:00Z = 07:00 EST (quiet). A fixed UTC-4 offset would say 08:00.
++  assert(inQuietHours(at("2026-11-01T12:00:00Z"), NY));
++  assertFalse(inQuietHours(at("2026-11-01T13:00:00Z"), NY)); // 08:00 EST
++  assert(inQuietHours(at("2026-11-01T05:30:00Z"), NY)); // 01:30 EDT (first)
++  assert(inQuietHours(at("2026-11-01T06:30:00Z"), NY)); // 01:30 EST (repeat)
++  // Mar 14 2027: after 07:00Z New York is UTC-4. 12:00Z = 08:00 EDT (send). A fixed UTC-5 offset would say 07:00.
++  assertFalse(inQuietHours(at("2027-03-14T12:00:00Z"), NY));
++  assert(inQuietHours(at("2027-03-14T11:59:00Z"), NY)); // 07:59 EDT
++  assertEquals(localHourMinute(at("2027-03-14T07:00:00Z"), NY).hour, 3); // 02:00 does not exist; 03:00 EDT
++});
++Deno.test("r2 quiet: user timezone is used; null or invalid falls back to America/New_York", () => {
++  const t = at("2026-11-17T05:00:00Z"); // 00:00 New York, 21:00 Los Angeles, 06:00 Paris
++  assert(inQuietHours(t, "America/Los_Angeles"));
++  assert(inQuietHours(t, "Europe/Paris")); // 06:00 Paris
++  assert(inQuietHours(t, null)); // 00:00 New York
++  assertEquals(localHourMinute(t, "Europe/Paris").hour, 6);
++  assertEquals(localHourMinute(t, null).zone, NY);
++  assertEquals(localHourMinute(t, "Not/AZone").zone, NY);
++  assertEquals(localHourMinute(t, "x".repeat(65)).zone, NY);
++  const day = at("2026-11-17T20:00:00Z"); // 15:00 New York, 12:00 Los Angeles
++  assertFalse(inQuietHours(day, "America/Los_Angeles"));
++});
++Deno.test("r2 quiet: in-window candidate is skipped, not claimed, not sent; reported as skipped_quiet", async () => {
++  const r = await run(H, { now: () => at("2026-11-17T03:00:00Z") }); // 22:00 EST
++  assertEquals([r.d.sends.length, r.d.claims.length, r.body.skipped_quiet, r.body.sent], [0, 0, 1, 0]);
++});
++
++// ---------- 4. dry-run ----------
++Deno.test("r2 dry-run: no network push, no claim, and it reports skip counts", async () => {
++  const realFetch = globalThis.fetch;
++  let fetches = 0;
++  globalThis.fetch = (() => { fetches += 1; throw new Error("network in dry-run"); }) as typeof fetch;
++  try {
++    const due = [
++      cand({ userId: "u-test", isTest: true }),
++      cand({ userId: "u-quiet", timezone: "Asia/Tokyo" }), // 04:45 Tokyo at 19:45Z
++      cand({ userId: "u-ok-1" }),
++      cand({ userId: "u-ok-2", timezone: "America/Los_Angeles" }), // 11:45 LA
++    ];
++    for (const flag of [undefined, "", "ON", "true", "1"]) {
++      const r = await run(H, { webPushSend: flag, listDue: async () => due });
++      assertEquals(r.body.dry_run, true);
++      assertEquals([r.body.due, r.body.skipped_test, r.body.skipped_quiet, r.body.would_send, r.body.claimed, r.body.sent], [4, 1, 1, 2, 0, 0]);
++      assertEquals([r.d.sends.length, r.d.claims.length], [0, 0]);
++    }
++    assertEquals(fetches, 0);
++  } finally {
++    globalThis.fetch = realFetch;
++  }
++});
++
++Deno.test("r2 gate: WEB_PUSH_SEND exact-'on' gate unchanged", async () => {
++  assertEquals(sendEnabled("on"), true);
++  for (const v of ["ON", "On", "true", "1", " on", "on ", "", undefined]) assertEquals(sendEnabled(v), false);
++  const src = await Deno.readTextFile(new URL("handler.ts", here));
++  assert(src.includes(`export function sendEnabled(value: string | undefined): boolean {\n  return value === "on";\n}`));
++});
++
++// ---------- 5. planted mutants ----------
++const SRC = await Deno.readTextFile(new URL("handler.ts", here));
++async function load(src: string): Promise<typeof H> {
++  const dir = await Deno.makeTempDir({ prefix: "p1-14-r2-mutant-" });
++  const f = `${dir}/handler.ts`;
++  await Deno.writeTextFile(f, src);
++  return await import(`file://${f}`) as typeof H;
++}
++async function copyOk(m: typeof H) {
++  for (const k of KINDS) {
++    if (m.PUSH_COPY[k].title !== FIXTURE.kinds[k].title || m.PUSH_COPY[k].body !== FIXTURE.kinds[k].body) return false;
++    if (m.PUSH_COPY[k].title !== "ROMRx Base") return false;
++  }
++  return true;
++}
++async function filtersOk(m: typeof H) {
++  const t = await run(m, { listDue: async () => [cand({ isTest: true })] });
++  if (t.d.sends.length !== 0 || t.body.skipped_test !== 1) return false;
++  const u = await run(m, { listDue: async () => [cand({ isTest: undefined as unknown as boolean })] });
++  if (u.d.sends.length !== 0) return false;
++  const q = await run(m, { now: () => at("2026-11-17T02:00:00Z") }); // 21:00 EST
++  if (q.d.sends.length !== 0) return false;
++  const ok = await run(m);
++  return ok.d.sends.length === 1;
++}
++function quietOk(m: typeof H) {
++  return m.inQuietHours(at("2026-11-17T02:00:00Z"), NY) && !m.inQuietHours(at("2026-11-17T01:59:00Z"), NY) &&
++    m.inQuietHours(at("2026-11-17T05:00:00Z"), NY) && m.inQuietHours(at("2026-11-17T12:59:00Z"), NY) &&
++    !m.inQuietHours(at("2026-11-17T13:00:00Z"), NY) && m.inQuietHours(at("2026-11-01T12:00:00Z"), NY) &&
++    !m.inQuietHours(at("2027-03-14T12:00:00Z"), NY);
++}
++async function dryOk(m: typeof H) {
++  const r = await run(m, { webPushSend: undefined });
++  return r.d.sends.length === 0 && r.d.claims.length === 0 && m.sendEnabled("ON") === false && m.sendEnabled("true") === false;
++}
++async function allOk(m: typeof H) {
++  return (await copyOk(m)) && (await filtersOk(m)) && quietOk(m) && (await dryOk(m));
++}
++const MUTANTS: [string, string, string][] = [
++  ["title not ROMRx Base", 'protocol: { title: "ROMRx Base"', 'protocol: { title: "ROMRx"'],
++  ["one body character changed", "Your retest is due today.", "Your retest is due today!"],
++  ["Kai's uncleared protocol line", "Time for today's session. Open ROMRx Base to see your plan.", "Today's plan is ready. It's built from your own assessment."],
++  ["is_test filter removed", "    if (c.isTest !== false) { skippedTest += 1; continue; }\n", ""],
++  ["is_test fail-open (only explicit true skipped)", "if (c.isTest !== false)", "if (c.isTest === true)"],
++  ["quiet filter removed", "    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }\n", ""],
++  ["quiet start off by one (>)", "hour >= QUIET_START_HOUR", "hour > QUIET_START_HOUR"],
++  ["quiet end off by one (<=)", "hour < QUIET_END_HOUR", "hour <= QUIET_END_HOUR"],
++  ["no midnight wrap (&&)", "hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR", "hour >= QUIET_START_HOUR && hour < QUIET_END_HOUR"],
++  ["fixed UTC-5 offset instead of the zone", 'new Intl.DateTimeFormat("en-US", { timeZone: zone, hour:', 'new Intl.DateTimeFormat("en-US", { timeZone: "Etc/GMT+5", hour:'],
++  ["send gate loosened", 'return value === "on";', "return !!value;"],
++  ["dry-run claims and sends", "    if (live) {\n      const okClaim", "    if (true) {\n      const okClaim"],
++];
++Deno.test("r2 mutants: unmutated source passes the same checks", async () => {
++  assert(await allOk(await load(SRC)));
++});
++for (const [name, from, to] of MUTANTS) {
++  Deno.test(`r2 mutant caught: ${name}`, async () => {
++    assertEquals(SRC.split(from).length - 1, 1, `mutation anchor not unique: ${name}`);
++    const m = await load(SRC.replace(from, to));
++    assertFalse(await allOk(m), `mutant survived: ${name}`);
++  });
++}
+diff --git a/supabase/functions/send-push-notification/handler.test.ts b/supabase/functions/send-push-notification/handler.test.ts
+index 8ffe4b1..f63fe4f 100644
+--- a/supabase/functions/send-push-notification/handler.test.ts
++++ b/supabase/functions/send-push-notification/handler.test.ts
+@@ -4,7 +4,7 @@ import { dedupeKey, handle, sendEnabled, vapidReady, vapidSubjectOk, type Candid
+ const FAKE_SUB: PushSub = { endpoint: "https://example.com/push/device-1", p256dh: "B" + "x".repeat(40), auth: "a".repeat(16) };
+ 
+ function cand(over: Partial<Candidate> = {}): Candidate {
+-  return { userId: "00000000-0000-4000-8000-000000000001", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: FAKE_SUB, ...over };
++  return { userId: "00000000-0000-4000-8000-000000000001", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: FAKE_SUB, timezone: "America/New_York", isTest: false, ...over };
+ }
+ 
+ function base(over: Partial<Deps> = {}): Deps {
+diff --git a/supabase/functions/send-push-notification/handler.ts b/supabase/functions/send-push-notification/handler.ts
+index 066ff21..d40b242 100644
+--- a/supabase/functions/send-push-notification/handler.ts
++++ b/supabase/functions/send-push-notification/handler.ts
+@@ -2,13 +2,14 @@
+ // Replaces the 2026-10-01 410 stub. Fail-closed x-cron-secret gate (same pattern as
+ // send-conversion-drip / cron_call_edge). Sends only when WEB_PUSH_SEND is exactly "on".
+ // No mailbox addresses, no VAPID values, and no subscription endpoints are logged or returned.
+-// Lock-screen strings are placeholders and need Jim / Stacy wording before WEB_PUSH_SEND is flipped.
++// r2: lock-screen copy is Stacy 219378b5 section A (with Kai 481a2e9d for the CLEAR digest line), extracted by
++// script; see push_copy.cleared.json. Jim's wording yes is still needed before WEB_PUSH_SEND is flipped.
+ 
+ export const PUSH_COPY = {
+-  protocol: { title: "ROMRx", body: "Your protocol session is due." },
+-  retest: { title: "ROMRx", body: "Your 6-week retest is due." },
+-  digest: { title: "ROMRx", body: "Your weekly progress is ready." },
+-  test: { title: "ROMRx", body: "This is a test notification." },
++  protocol: { title: "ROMRx Base", body: "Time for today's session. Open ROMRx Base to see your plan." },
++  retest: { title: "ROMRx Base", body: "Your retest is due today. Time to check your 10 joints again." },
++  digest: { title: "ROMRx Base", body: "Your weekly summary is ready. See this week's sessions." },
++  test: { title: "ROMRx Base", body: "Notifications are on. We'll send your daily reminder at your reminder time." },
+ } as const;
+ 
+ export type Kind = keyof typeof PUSH_COPY;
+@@ -26,6 +27,40 @@ export interface Candidate {
+   dedupeKey: string;
+   localDate: string; // YYYY-MM-DD
+   sub: PushSub;
++  // r2: from notification_preferences.timezone (null or invalid -> America/New_York).
++  timezone: string | null;
++  // r2: public.is_test_account(email) as used live by rombot-checkin v1. Unknown is true (fail closed).
++  isTest: boolean;
++}
++
++// r2 quiet hours (Vera 7420bcd9 WARN: "no separate quiet-hours window"). Her note gives no hours, so the
++// window is a constant here: local 21:00 up to 08:00 the next morning, in the user's timezone. Sends inside
++// the window are skipped and not claimed, so a retest due that day goes out on the first run at or after 08:00.
++export const QUIET_START_HOUR = 21;
++export const QUIET_END_HOUR = 8;
++export const DEFAULT_TZ = "America/New_York";
++
++export function zoneOrDefault(tz: string | null | undefined): string {
++  if (!tz || tz.length > 64) return DEFAULT_TZ;
++  try {
++    new Intl.DateTimeFormat("en-US", { timeZone: tz });
++    return tz;
++  } catch {
++    return DEFAULT_TZ;
++  }
++}
++
++export function localHourMinute(now: Date, tz: string | null | undefined): { zone: string; hour: number; minute: number } {
++  const zone = zoneOrDefault(tz);
++  const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
++  const g = (t: string) => parseInt(parts.find((p) => p.type === t)?.value ?? "0", 10);
++  return { zone, hour: g("hour"), minute: g("minute") };
++}
++
++export function inQuietHours(now: Date, tz: string | null | undefined): boolean {
++  const { hour } = localHourMinute(now, tz);
++  // Window wraps midnight: [21:00, 24:00) and [00:00, 08:00).
++  return hour >= QUIET_START_HOUR || hour < QUIET_END_HOUR;
+ }
+ 
+ export interface Deps {
+@@ -85,7 +120,13 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+   let sent = 0;
+   let failed = 0;
+   let skipped = 0;
++  let skippedTest = 0;
++  let skippedQuiet = 0;
++  const now = d.now();
+   for (const c of due) {
++    // r2 filters run before claim and before any send, in dry-run and live alike.
++    if (c.isTest !== false) { skippedTest += 1; continue; }
++    if (inQuietHours(now, c.timezone)) { skippedQuiet += 1; continue; }
+     const key = c.dedupeKey || dedupeKey(c.kind, c.localDate);
+     if (live) {
+       const okClaim = await d.claim(c.userId, key);
+@@ -114,5 +155,8 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
+     sent: live ? sent : 0,
+     failed: live ? failed : 0,
+     skipped,
++    would_send: live ? 0 : skipped,
++    skipped_test: skippedTest,
++    skipped_quiet: skippedQuiet,
+   }), { status: 200, headers: { "Content-Type": "application/json" } });
+ }
+diff --git a/supabase/functions/send-push-notification/index.ts b/supabase/functions/send-push-notification/index.ts
+index a43ce8c..d69598f 100644
+--- a/supabase/functions/send-push-notification/index.ts
++++ b/supabase/functions/send-push-notification/index.ts
+@@ -65,6 +65,26 @@ function subFromJson(raw: unknown): PushSub | null {
+   return { endpoint: o.endpoint, p256dh, auth };
+ }
+ 
++// r2 is_test: same live flag as rombot-checkin v1 (public.is_test_account(p_email), SECURITY DEFINER, service_role
++// EXECUTE). No user id is special-cased here. Any read error or missing email counts as test (fail closed, no push).
++// Emails are read only to call the RPC; they are never logged or returned.
++async function testFlags(sb: ReturnType<typeof admin>, ids: string[]): Promise<Map<string, boolean>> {
++  const out = new Map<string, boolean>();
++  if (!ids.length) return out;
++  const { data: users, error } = await sb.from("users").select("id, email").in("id", ids);
++  if (error || !users) return out;
++  for (const u of users as { id: string; email: string | null }[]) {
++    if (!u.email) { out.set(u.id, true); continue; }
++    try {
++      const { data, error: e } = await sb.rpc("is_test_account", { p_email: u.email });
++      out.set(u.id, e ? true : data !== false);
++    } catch {
++      out.set(u.id, true);
++    }
++  }
++  return out;
++}
++
+ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
+   const sb = admin();
+   const out: Candidate[] = [];
+@@ -98,8 +118,11 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
+       }
+     }
+ 
++    const flags = await testFlags(sb, [...subsByUser.keys()]);
++
+     for (const p of prefs as { user_id: string; timezone: string | null; reminder_time: string | null }[]) {
+       const subs = subsByUser.get(p.user_id) ?? [];
++      const isTest = flags.get(p.user_id) ?? true;
+       if (!subs.length) continue;
+       const local = localDateAndHour(now, p.timezone);
+       if (kinds.includes("protocol") && reminderHour(p.reminder_time) === local.hour) {
+@@ -107,7 +130,7 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
+           const k = `protocol:${p.user_id}:${s.sub.endpoint}`;
+           if (seen.has(k)) continue;
+           seen.add(k);
+-          out.push({ userId: p.user_id, subscriptionId: s.id, kind: "protocol", dedupeKey: dedupeKey("protocol", local.date), localDate: local.date, sub: s.sub });
++          out.push({ userId: p.user_id, subscriptionId: s.id, kind: "protocol", dedupeKey: dedupeKey("protocol", local.date), localDate: local.date, sub: s.sub, timezone: p.timezone, isTest });
+         }
+       }
+       if (kinds.includes("retest")) {
+@@ -119,7 +142,7 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
+               const k = `retest:${p.user_id}:${s.sub.endpoint}`;
+               if (seen.has(k)) continue;
+               seen.add(k);
+-              out.push({ userId: p.user_id, subscriptionId: s.id, kind: "retest", dedupeKey: dedupeKey("retest", local.date), localDate: local.date, sub: s.sub });
++              out.push({ userId: p.user_id, subscriptionId: s.id, kind: "retest", dedupeKey: dedupeKey("retest", local.date), localDate: local.date, sub: s.sub, timezone: p.timezone, isTest });
+             }
+           }
+         }
+diff --git a/supabase/functions/send-push-notification/push_copy.cleared.json b/supabase/functions/send-push-notification/push_copy.cleared.json
+new file mode 100644
+index 0000000..6a26b4b
+--- /dev/null
++++ b/supabase/functions/send-push-notification/push_copy.cleared.json
+@@ -0,0 +1,49 @@
++{
++ "source": {
++  "stacy": "/workspace/process/evidence/STACY-P1-14-PUSH-AND-P1-31-TITLES-20261116-2029.md",
++  "stacy_sha256": "219378b5cb0b58935c2f85fdb7d151c3a4147c49a7d771ce9441a47d0c37904d",
++  "kai": "/workspace/research/p1-14/kai-p1-14-push-copy.md",
++  "kai_sha256": "481a2e9d82c925a356ede650d808756fb76450da33d03a220795f4353d449a3f",
++  "section_A_lines": "6-21"
++ },
++ "title": {
++  "text": "ROMRx Base",
++  "stacy_line": 9,
++  "sha256": "336e46476ca8f17b07379a2350f3180b6fc66a312a69afbec5a12a52236d14b5"
++ },
++ "kinds": {
++  "protocol": {
++   "title": "ROMRx Base",
++   "body": "Time for today's session. Open ROMRx Base to see your plan.",
++   "body_sha256": "83b942119e79a131bcf859676a9d51366607fa7e05edcd75008e2e14f6cc4b39",
++   "status": "EDIT",
++   "stacy_line": 12,
++   "kai_line": 27
++  },
++  "retest": {
++   "title": "ROMRx Base",
++   "body": "Your retest is due today. Time to check your 10 joints again.",
++   "body_sha256": "c9b45496d589be0c4e24acba72d57066b332f075e4edcaa8c2582b767d61a577",
++   "status": "EDIT",
++   "stacy_line": 15,
++   "kai_line": 28
++  },
++  "digest": {
++   "title": "ROMRx Base",
++   "body": "Your weekly summary is ready. See this week's sessions.",
++   "body_sha256": "3c1ff8038e642670e4a05a48c0a3839ac45253d55985d091d0053db1f73fd8f2",
++   "status": "CLEAR",
++   "stacy_line": 16,
++   "kai_line": 29
++  },
++  "test": {
++   "title": "ROMRx Base",
++   "body": "Notifications are on. We'll send your daily reminder at your reminder time.",
++   "body_sha256": "0c48cd9f3e1edc1b009f343bc603b61ce101ba106dd7760661d89ae9ac2b17e6",
++   "status": "EDIT",
++   "stacy_line": 18,
++   "kai_line": 30
++  }
++ },
++ "push_copy_ts_sha256": "63423625d0226966445a8234bb21d04070696dec6260ebc410a901fb205398f2"
++}

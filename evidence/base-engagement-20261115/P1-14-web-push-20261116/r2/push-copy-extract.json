@@ -1,0 +1,58 @@
+{
+ "source": {
+  "stacy": "/workspace/process/evidence/STACY-P1-14-PUSH-AND-P1-31-TITLES-20261116-2029.md",
+  "stacy_sha256": "219378b5cb0b58935c2f85fdb7d151c3a4147c49a7d771ce9441a47d0c37904d",
+  "kai": "/workspace/research/p1-14/kai-p1-14-push-copy.md",
+  "kai_sha256": "481a2e9d82c925a356ede650d808756fb76450da33d03a220795f4353d449a3f",
+  "section_A_lines": "6-21"
+ },
+ "kinds": {
+  "protocol": {
+   "status": "EDIT",
+   "body": "Time for today's session. Open ROMRx Base to see your plan.",
+   "stacy_line": 12,
+   "stacy_header_line": 11,
+   "kai_original": "Today's plan is ready. It's built from your own assessment.",
+   "kai_line": 27,
+   "title": "ROMRx Base",
+   "body_sha256": "83b942119e79a131bcf859676a9d51366607fa7e05edcd75008e2e14f6cc4b39"
+  },
+  "retest": {
+   "status": "EDIT",
+   "body": "Your retest is due today. Time to check your 10 joints again.",
+   "stacy_line": 15,
+   "stacy_header_line": 14,
+   "kai_original": "It's been 6 weeks. Time to check your 10 joints again.",
+   "kai_line": 28,
+   "title": "ROMRx Base",
+   "body_sha256": "c9b45496d589be0c4e24acba72d57066b332f075e4edcaa8c2582b767d61a577"
+  },
+  "digest": {
+   "status": "CLEAR",
+   "body": "Your weekly summary is ready. See this week's sessions.",
+   "stacy_line": 16,
+   "kai_original": "Your weekly summary is ready. See this week's sessions.",
+   "kai_line": 29,
+   "condition": "the caller sends it only when a weekly summary exists to open.",
+   "title": "ROMRx Base",
+   "body_sha256": "3c1ff8038e642670e4a05a48c0a3839ac45253d55985d091d0053db1f73fd8f2"
+  },
+  "test": {
+   "status": "EDIT",
+   "body": "Notifications are on. We'll send your daily reminder at your reminder time.",
+   "stacy_line": 18,
+   "stacy_header_line": 17,
+   "kai_original": "Notifications are on. We'll remind you when your plan is ready.",
+   "kai_line": 30,
+   "title": "ROMRx Base",
+   "body_sha256": "0c48cd9f3e1edc1b009f343bc603b61ce101ba106dd7760661d89ae9ac2b17e6"
+  }
+ },
+ "title": {
+  "text": "ROMRx Base",
+  "stacy_line": 9,
+  "sha256": "336e46476ca8f17b07379a2350f3180b6fc66a312a69afbec5a12a52236d14b5"
+ },
+ "push_copy_ts": "export const PUSH_COPY = {\n  protocol: { title: \"ROMRx Base\", body: \"Time for today's session. Open ROMRx Base to see your plan.\" },\n  retest: { title: \"ROMRx Base\", body: \"Your retest is due today. Time to check your 10 joints again.\" },\n  digest: { title: \"ROMRx Base\", body: \"Your weekly summary is ready. See this week's sessions.\" },\n  test: { title: \"ROMRx Base\", body: \"Notifications are on. We'll send your daily reminder at your reminder time.\" },\n} as const;\n",
+ "push_copy_ts_sha256": "63423625d0226966445a8234bb21d04070696dec6260ebc410a901fb205398f2"
+}
