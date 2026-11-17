@@ -1,4 +1,4 @@
--- 20261117010000_p1_25_purge_deleted_accounts (UNAPPLIED; BUILD ONLY). v3.
+-- 20261117010000_p1_25_purge_deleted_accounts (UNAPPLIED; BUILD ONLY). v4 (v3 plus the day-90 email sweep sources and the other-account email guard).
 -- P1-25 / L1004. Jim, verbatim, 2026-11-03 7:07 PM ET: "Purge deleted accounts after 90 days."
 -- Adds public.purge_deleted_accounts(p_mode text default 'dry_run', p_retention interval default interval '90 days')
 -- returns jsonb. Default dry_run: counts and lists user ids, writes nothing. count / count_only: counts only.
@@ -213,6 +213,58 @@ BEGIN
     WHERE c.class = 'qualifying'
       AND u.email IS NOT NULL AND btrim(u.email::text) <> ''
     ON CONFLICT DO NOTHING;
+  END IF;
+
+  -- v4 day-90 sweep: any email still recoverable for a qualifying account, from rows still linked
+  -- by user id (each source skipped if the table or column is absent). Normally the completion hook
+  -- (20261117010100_p1_25_completion_cleanup.sql) already cleared the 5 lists at completion and these
+  -- sources were removed with auth.users; this catches anything left behind.
+  --   auth.identities.email (user_id), public.athletes.email (user_id), public.clients.email (user_id),
+  --   public.leads.email (converted_user_id).
+  FOR r IN
+    SELECT * FROM (VALUES
+      ('auth', 'identities', 'user_id'),
+      ('public', 'athletes', 'user_id'),
+      ('public', 'clients', 'user_id'),
+      ('public', 'leads', 'converted_user_id')
+    ) AS s(nsp, rel, col)
+  LOOP
+    IF to_regclass(format('%I.%I', r.nsp, r.rel)) IS NOT NULL
+       AND (SELECT count(*) FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = r.nsp AND c.relname = r.rel AND a.attname IN (r.col, 'email')
+              AND a.attnum > 0 AND NOT a.attisdropped) = 2 THEN
+      EXECUTE format(
+        'INSERT INTO _qual_emails (user_id, email_norm)
+         SELECT t.%I, lower(btrim(t.email::text)) FROM %I.%I t
+         WHERE t.%I IN (SELECT user_id FROM _classed WHERE class = %L)
+           AND t.email IS NOT NULL AND btrim(t.email::text) <> %L
+         ON CONFLICT DO NOTHING',
+        r.col, r.nsp, r.rel, r.col, 'qualifying', ''
+      );
+    END IF;
+  END LOOP;
+
+  -- v4 guard: never match an email that still belongs to another account (any auth.users or
+  -- public.users row whose id is not qualifying, which includes 7c71e421, internal accounts and fixtures).
+  IF to_regclass('auth.users') IS NOT NULL THEN
+    DELETE FROM _qual_emails q
+    USING auth.users u
+    WHERE u.email IS NOT NULL AND lower(btrim(u.email::text)) = q.email_norm
+      AND u.id NOT IN (SELECT user_id FROM _classed WHERE class = 'qualifying');
+  END IF;
+  IF to_regclass('public.users') IS NOT NULL AND exists (
+    SELECT 1 FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'users' AND a.attname = 'email'
+      AND a.attnum > 0 AND NOT a.attisdropped
+  ) THEN
+    DELETE FROM _qual_emails q
+    USING public.users u
+    WHERE u.email IS NOT NULL AND lower(btrim(u.email::text)) = q.email_norm
+      AND u.id NOT IN (SELECT user_id FROM _classed WHERE class = 'qualifying');
   END IF;
 
   -- Tables this function may back up and delete (skip if absent or if the named column is absent).

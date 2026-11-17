@@ -106,7 +106,7 @@
     "T13 apply reports written=true, count=1, and a backup schema": {
       "pass": true,
       "info": {
-        "schema": "zz_bak_p1_25_20261117003104",
+        "schema": "zz_bak_p1_25_20261117004853",
         "n": 1,
         "dropped": [
           "zz_bak_p1_25_20260101000000",
@@ -138,7 +138,7 @@
     "T21 backup schema has manifest of 1 id, copied assessments, and _p1_25_backup_meta": {
       "pass": true,
       "info": {
-        "schema": "zz_bak_p1_25_20261117003104"
+        "schema": "zz_bak_p1_25_20261117004853"
       }
     },
     "T27 apply dropped backup schemas older than 7 days (meta and name-only)": {
@@ -153,7 +153,7 @@
     "T28 apply kept a backup younger than 7 days": {
       "pass": true,
       "info": {
-        "young": "zz_bak_p1_25_20261115003104"
+        "young": "zz_bak_p1_25_20261115004853"
       }
     },
     "T29 leads: purged when matched by user id (converted_user_id)": {
@@ -259,9 +259,9 @@
       "pass": true,
       "info": {
         "dropped2": [
-          "zz_bak_p1_25_20261117003104"
+          "zz_bak_p1_25_20261117004853"
         ],
-        "newSchema": "zz_bak_p1_25_20261117003105"
+        "newSchema": "zz_bak_p1_25_20261117004855"
       }
     },
     "T23 function rollback drops purge_deleted_accounts": {
