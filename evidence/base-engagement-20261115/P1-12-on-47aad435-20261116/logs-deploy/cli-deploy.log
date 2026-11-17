@@ -1,0 +1,10 @@
+Warning: --project-ref is deprecated and will be removed in v4. Use --remote=<ref> instead
+Target: project cqzvqzwwevnflinxgnpp
+Confirmed by --yes: Deploy 1 Function on project cqzvqzwwevnflinxgnpp
+WARNING: Docker is not running
+Uploading asset (calendar-ics): supabase/functions/calendar-ics/index.ts
+Uploading asset (calendar-ics): supabase/functions/calendar-ics/handler.ts
+Uploading asset (calendar-ics): supabase/functions/calendar-ics/ics.ts
+{"project_ref":"cqzvqzwwevnflinxgnpp","functions":["calendar-ics"],"dashboard_url":"https://supabase.com/dashboard/project/cqzvqzwwevnflinxgnpp/functions","message":"Deployed Functions.","target":{"kind":"linked","project_ref":"cqzvqzwwevnflinxgnpp","environment":"unverified"}}
+A new version of Supabase CLI is available: v3.2.0 (currently installed v3.0.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

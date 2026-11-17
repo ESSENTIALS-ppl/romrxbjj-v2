@@ -1,0 +1,2 @@
+GET no-auth -> 401
+OPTIONS no-auth -> 204
