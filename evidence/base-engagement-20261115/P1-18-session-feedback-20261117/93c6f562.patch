@@ -1,0 +1,1075 @@
+diff --git a/scripts/p1-18-session-feedback-test/package.json b/scripts/p1-18-session-feedback-test/package.json
+new file mode 100644
+index 0000000..ea4939d
+--- /dev/null
++++ b/scripts/p1-18-session-feedback-test/package.json
+@@ -0,0 +1 @@
++{ "name": "p1-18-session-feedback-test", "private": true, "type": "module", "dependencies": { "@electric-sql/pglite": "0.5.16" } }
+diff --git a/scripts/p1-18-session-feedback-test/results.json b/scripts/p1-18-session-feedback-test/results.json
+new file mode 100644
+index 0000000..21ba3b3
+--- /dev/null
++++ b/scripts/p1-18-session-feedback-test/results.json
+@@ -0,0 +1,176 @@
++{
++  "totals": {
++    "pass": 33,
++    "fail": 0,
++    "total": 33
++  },
++  "results": {
++    "T_existing objects unchanged after both applies (protocol_sessions, assessments, users, product_events, client_feedback, log_product_event)": {
++      "pass": true
++    },
++    "T_session_feedback columns": {
++      "pass": true,
++      "info": {
++        "cols": "id:uuid,user_id:uuid,session_id:uuid,session_date:date,feel:text,clear:text,length_fit:text,note:text,sport:text,source:text,created_at:timestamp with time zone"
++      }
++    },
++    "T_assessment_feedback columns (no free-text note)": {
++      "pass": true,
++      "info": {
++        "cols": "id:uuid,user_id:uuid,assessment_id:uuid,ease:text,results_clear:text,check_again:text,survey_version:text,sport:text,source:text,created_at:timestamp with time zone"
++      }
++    },
++    "T_sf own insert OK": {
++      "pass": true
++    },
++    "T_sf own select OK": {
++      "pass": true
++    },
++    "T_sf other user's rows denied (select)": {
++      "pass": true
++    },
++    "T_sf other user cannot insert onto someone else's session": {
++      "pass": true
++    },
++    "T_sf user2 can insert their own row": {
++      "pass": true
++    },
++    "T_sf anon denied": {
++      "pass": true
++    },
++    "T_sf event payload is ids + timestamps + event name only (no answers, no note)": {
++      "pass": true,
++      "info": {
++        "propKeys": [
++          "created_at",
++          "id",
++          "session_id"
++        ]
++      }
++    },
++    "T_af own insert on FULL assessment OK": {
++      "pass": true
++    },
++    "T_af own select OK": {
++      "pass": true
++    },
++    "T_af other user's rows denied (select)": {
++      "pass": true
++    },
++    "T_af other user's FULL assessment rejected": {
++      "pass": true
++    },
++    "T_af other user cannot insert a row for user1's FULL assessment": {
++      "pass": true
++    },
++    "T_af own QUICK assessment rejected": {
++      "pass": true
++    },
++    "T_af own PARTIAL assessment rejected": {
++      "pass": true
++    },
++    "T_af anon denied": {
++      "pass": true
++    },
++    "T_af user2 can insert on their own FULL assessment": {
++      "pass": true
++    },
++    "T_af user1 still sees only their own row": {
++      "pass": true
++    },
++    "T_af event payload is ids + timestamps + event name only (no answers)": {
++      "pass": true,
++      "info": {
++        "propKeys": [
++          "assessment_id",
++          "created_at",
++          "id"
++        ]
++      }
++    },
++    "T_both tables are write-once (no update/delete for the owner)": {
++      "pass": true
++    },
++    "T_deleting the account removes both session_feedback and assessment_feedback rows (ON DELETE CASCADE); other user kept": {
++      "pass": true,
++      "info": {
++        "sfBefore": 1,
++        "afBefore": 1,
++        "sfAfter": 0,
++        "afAfter": 0,
++        "sfOther": 1,
++        "afOther": 1
++      }
++    },
++    "T_combined rollback is exact: both tables and trigger functions dropped; existing objects restored to pre-apply": {
++      "pass": true
++    },
++    "T_re-apply both after combined rollback is clean": {
++      "pass": true
++    },
++    "T_export-my-data TABLES includes session_feedback with all columns, keyed on user_id": {
++      "pass": true
++    },
++    "T_export-my-data TABLES includes assessment_feedback with all columns, keyed on user_id": {
++      "pass": true
++    },
++    "T_EXPORT_MY_DATA stays off (flagOn still exact \"on\"; index.ts still reads the env flag)": {
++      "pass": true
++    },
++    "T_grep: session_feedback and assessment_feedback do not appear in ai-chat, embed-knowledge, rombot_context, search_rombot_knowledge, or rombot-checkin": {
++      "pass": true,
++      "info": {
++        "scanned": 24,
++        "leakHits": []
++      }
++    },
++    "T_grep: on-branch ai-chat .from() tables are a fixed allow-list (no generic pull, no feedback tables)": {
++      "pass": true,
++      "info": {
++        "aiFrom": [
++          "ai_conversations",
++          "ai_messages",
++          "athletes",
++          "coaches",
++          "rombot_context",
++          "user_ai_preferences",
++          "users"
++        ]
++      }
++    },
++    "T_grep: embed-knowledge only reads/writes rombot_knowledge": {
++      "pass": true,
++      "info": {
++        "embedFrom": [
++          "rombot_knowledge"
++        ]
++      }
++    },
++    "T_grep: rombot_context migrations do not reference session_feedback, assessment_feedback, or client_feedback": {
++      "pass": true,
++      "info": {
++        "files": [
++          "20260430000002_rombot_context_view.sql"
++        ]
++      }
++    },
++    "T_grep: rombot-checkin (11803fee tree) has no session_feedback or assessment_feedback in .from() list": {
++      "pass": true,
++      "info": {
++        "cFrom": [
++          "account_deletion_requests",
++          "ai_conversations",
++          "ai_messages",
++          "assessments",
++          "client_feedback",
++          "email_sends",
++          "notification_preferences",
++          "protocol_sessions",
++          "protocols",
++          "user_mobility_schedule",
++          "users"
++        ]
++      }
++    }
++  }
++}
+diff --git a/scripts/p1-18-session-feedback-test/test.mjs b/scripts/p1-18-session-feedback-test/test.mjs
+new file mode 100644
+index 0000000..84730b2
+--- /dev/null
++++ b/scripts/p1-18-session-feedback-test/test.mjs
+@@ -0,0 +1,348 @@
++// PGlite + source-grep tests for P1-18 session_feedback (20261117120000) and
++// P1-18b assessment_feedback (20261117120100). BUILD ONLY, not applied.
++// Run: npm i && node test.mjs
++import { PGlite } from '@electric-sql/pglite';
++import fs from 'fs';
++import path from 'path';
++
++const R = new URL('../../', import.meta.url).pathname;
++const MIG_S = fs.readFileSync(R + 'supabase/migrations-unapplied/20261117120000_p1_18_session_feedback.sql', 'utf8');
++const MIG_A = fs.readFileSync(R + 'supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback.sql', 'utf8');
++const RB_BOTH = fs.readFileSync(R + 'supabase/migrations-unapplied/20261117120100_p1_18_feedback_tables_rollback.sql', 'utf8');
++const HANDLER = fs.readFileSync(R + 'supabase/functions/export-my-data/handler.ts', 'utf8');
++const INDEX = fs.readFileSync(R + 'supabase/functions/export-my-data/index.ts', 'utf8');
++
++const results = {}; let fails = 0;
++const ok = (n, c, info) => { results[n] = { pass: !!c, ...(info ? { info } : {}) }; if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'} ${n}${info ? ' ' + JSON.stringify(info) : ''}`); };
++const U = (n) => `00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
++const S = (n) => `10000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
++const A = (n) => `20000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`;
++
++async function mk() {
++  const db = new PGlite();
++  await db.exec(`
++create role anon nologin;
++create role authenticated nologin;
++create role service_role nologin bypassrls;
++create schema auth;
++create table auth.users (id uuid primary key, email text);
++create table public.users (id uuid primary key references auth.users(id) on delete cascade);
++create or replace function auth.uid() returns uuid language sql stable as $$
++  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
++$$;
++create table public.protocol_sessions (
++  id uuid primary key default gen_random_uuid(),
++  user_id uuid not null references auth.users(id) on delete cascade,
++  session_date date not null,
++  protocol_day text default '' not null,
++  logged_at timestamptz default now() not null,
++  sport text default 'base' not null,
++  unique (user_id, session_date)
++);
++-- Stub check_kind has no 'full'|'quick' check, so the test can also insert a 'partial' kind.
++-- Live 031000 (20261116143905) only allows 'full' and 'quick'; the policy requires = 'full' either way.
++create table public.assessments (
++  id uuid primary key default gen_random_uuid(),
++  user_id uuid not null references public.users(id) on delete cascade,
++  assessed_at timestamptz default now() not null,
++  check_kind text not null default 'full'
++);
++create table public.product_events (
++  id bigserial primary key,
++  user_id uuid,
++  anon_id text,
++  session_id text,
++  event text not null,
++  props jsonb not null default '{}'::jsonb,
++  sport text,
++  source text default 'server' not null,
++  path text,
++  created_at timestamptz not null default now()
++);
++create or replace function public.log_product_event(
++  p_user_id uuid, p_event text, p_props jsonb default '{}'::jsonb,
++  p_sport text default null, p_source text default 'server'
++) returns void language plpgsql security definer set search_path to 'public', 'pg_temp' as $$
++begin
++  insert into public.product_events (user_id, event, props, sport, source)
++  values (p_user_id, p_event, coalesce(p_props, '{}'::jsonb), p_sport, p_source);
++exception when others then
++  raise warning 'log_product_event(%) failed: %', p_event, sqlerrm;
++end;
++$$;
++create table public.client_feedback (
++  id uuid primary key default gen_random_uuid(),
++  user_id uuid,
++  message text,
++  created_at timestamptz default now()
++);
++grant usage on schema public to anon, authenticated, service_role;
++grant select on public.protocol_sessions to authenticated, service_role;
++grant select on public.assessments to authenticated, service_role;
++grant select, insert on public.product_events to service_role;
++`);
++  return db;
++}
++
++const objMd5 = async (db, rel) => {
++  const r = await db.query(`
++    select md5(coalesce(pg_get_viewdef(c.oid, true), '')) as vmd5,
++           (select string_agg(attname||':'||format_type(atttypid,atttypmod), ',' order by attnum)
++              from pg_attribute where attrelid=c.oid and attnum>0 and not attisdropped) as cols,
++           c.relkind,
++           pg_get_userbyid(c.relowner) as owner,
++           c.relacl::text as acl
++    from pg_class c join pg_namespace n on n.oid=c.relnamespace
++    where (n.nspname||'.'||c.relname) = $1 or c.oid = to_regclass($1)`, [rel]);
++  return r.rows[0] || null;
++};
++const fnSrc = async (db, name) => {
++  const r = await db.query(`select pg_get_functiondef(p.oid) as def from pg_proc p
++    join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname=$1`, [name]);
++  return r.rows[0]?.def || null;
++};
++const snap = async (db) => ({
++  ps: await objMd5(db, 'public.protocol_sessions'),
++  pe: await objMd5(db, 'public.product_events'),
++  cf: await objMd5(db, 'public.client_feedback'),
++  us: await objMd5(db, 'public.users'),
++  asmt: await objMd5(db, 'public.assessments'),
++  log: await fnSrc(db, 'log_product_event'),
++});
++const sameSnap = (a, b) => JSON.stringify(a) === JSON.stringify(b);
++const asUser = async (db, uid, sql, params=[]) => {
++  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${uid}', false);`);
++  try { return await db.query(sql, params); }
++  finally { await db.exec('reset role; select set_config(\'request.jwt.claim.sub\', \'\', false);'); }
++};
++const asAnon = async (db, sql, params=[]) => {
++  await db.exec('set role anon;');
++  try { return await db.query(sql, params); }
++  finally { await db.exec('reset role;'); }
++};
++const denied = async (fn) => { try { await fn(); return false; } catch { return true; } };
++const has = async (db, rel) => (await db.query(`select to_regclass($1) is not null as ok`, [rel])).rows[0].ok;
++const fnExists = async (db, name) => (await db.query(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace
++  where n.nspname='public' and p.proname=$1`, [name])).rows[0].n > 0;
++
++const db = await mk();
++const pre = await snap(db);
++await db.query(`insert into auth.users(id, email) values ($1,'user@example.com'), ($2,'user@example.com')`, [U(1), U(2)]);
++await db.query(`insert into public.users(id) values ($1), ($2)`, [U(1), U(2)]);
++await db.query(`insert into public.protocol_sessions(id, user_id, session_date) values ($1,$2,'2026-11-16'), ($3,$4,'2026-11-16')`, [S(1), U(1), S(2), U(2)]);
++// A1 full own, A2 other user's full, A3 own quick, A4 own partial
++await db.query(`insert into public.assessments(id, user_id, check_kind) values
++  ($1,$2,'full'), ($3,$4,'full'), ($5,$2,'quick'), ($6,$2,'partial')`,
++  [A(1), U(1), A(2), U(2), A(3), A(4)]);
++
++await db.exec(MIG_S);
++await db.exec(MIG_A);
++const post = await snap(db);
++ok('T_existing objects unchanged after both applies (protocol_sessions, assessments, users, product_events, client_feedback, log_product_event)',
++  sameSnap(pre, post));
++
++const sfCols = (await objMd5(db, 'public.session_feedback'))?.cols || '';
++const afCols = (await objMd5(db, 'public.assessment_feedback'))?.cols || '';
++ok('T_session_feedback columns', sfCols.includes('session_id:uuid') && sfCols.includes('note:text') && sfCols.includes('feel:text'), { cols: sfCols });
++ok('T_assessment_feedback columns (no free-text note)', afCols.includes('assessment_id:uuid') && afCols.includes('ease:text') && afCols.includes('survey_version:text') && !afCols.includes('note:'), { cols: afCols });
++
++// ---------- session_feedback: own insert/select, other denied, anon denied ----------
++const NOTE = 'felt steady on the third move';
++let ownSf;
++try {
++  ownSf = await asUser(db, U(1),
++    `insert into public.session_feedback (user_id, session_id, session_date, feel, clear, length_fit, note)
++     values ($1,$2,'2026-11-16','about_right','yes','about_right',$3) returning id, note, feel`,
++    [U(1), S(1), NOTE]);
++  ok('T_sf own insert OK', ownSf.rows.length===1 && ownSf.rows[0].note===NOTE);
++} catch (e) { ok('T_sf own insert OK', false, { err: String(e.message||e) }); }
++const ownSfId = ownSf?.rows?.[0]?.id;
++const sfSel = await asUser(db, U(1), `select id, note from public.session_feedback`);
++ok('T_sf own select OK', sfSel.rows.length===1 && sfSel.rows[0].id===ownSfId && sfSel.rows[0].note===NOTE);
++ok("T_sf other user's rows denied (select)", (await asUser(db, U(2), `select id from public.session_feedback`)).rows.length===0);
++ok("T_sf other user cannot insert onto someone else's session",
++  await denied(() => asUser(db, U(2), `insert into public.session_feedback (user_id, session_id, session_date, feel) values ($1,$2,'2026-11-16','easy')`, [U(1), S(1)])));
++ok('T_sf user2 can insert their own row',
++  (await asUser(db, U(2), `insert into public.session_feedback (user_id, session_id, session_date, feel, note) values ($1,$2,'2026-11-16','hard',$3) returning id`, [U(2), S(2), 'other note must not leak'])).rows.length===1);
++ok('T_sf anon denied',
++  await denied(() => asAnon(db, `select id, note from public.session_feedback`))
++  && await denied(() => asAnon(db, `insert into public.session_feedback (user_id, session_id, session_date, feel) values ($1,$2,'2026-11-16','easy')`, [U(1), S(1)])));
++
++const sfEv = (await db.query(`select event, props, user_id::text as uid from public.product_events where event='session_feedback_submitted' and user_id=$1`, [U(1)])).rows;
++const sfProps = sfEv[0]?.props || {};
++ok('T_sf event payload is ids + timestamps + event name only (no answers, no note)',
++  sfEv.length===1 && sfEv[0].event==='session_feedback_submitted' && sfEv[0].uid===U(1)
++  && Object.keys(sfProps).sort().join(',')==='created_at,id,session_id'
++  && !('feel' in sfProps) && !('note' in sfProps) && !('has_survey' in sfProps)
++  && !JSON.stringify(sfEv[0]).includes(NOTE) && sfProps.id===ownSfId && sfProps.session_id===S(1),
++  { propKeys: Object.keys(sfProps).sort() });
++
++// ---------- assessment_feedback: own FULL insert/select ----------
++const VER = 'p1-18b-card1-2026-11-16';
++let ownAf;
++try {
++  ownAf = await asUser(db, U(1),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'okay','mostly','yes',$3) returning id, ease, assessment_id`,
++    [U(1), A(1), VER]);
++  ok('T_af own insert on FULL assessment OK', ownAf.rows.length===1 && ownAf.rows[0].ease==='okay' && ownAf.rows[0].assessment_id===A(1));
++} catch (e) { ok('T_af own insert on FULL assessment OK', false, { err: String(e.message||e) }); }
++const ownAfId = ownAf?.rows?.[0]?.id;
++ok('T_af own select OK', (await asUser(db, U(1), `select id, ease from public.assessment_feedback`)).rows.length===1
++  && (await asUser(db, U(1), `select id from public.assessment_feedback`)).rows[0].id===ownAfId);
++
++ok("T_af other user's rows denied (select)", (await asUser(db, U(2), `select id from public.assessment_feedback`)).rows.length===0);
++ok("T_af other user's FULL assessment rejected",
++  await denied(() => asUser(db, U(1),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'easy','yes','no',$3)`, [U(1), A(2), VER])));
++ok("T_af other user cannot insert a row for user1's FULL assessment",
++  await denied(() => asUser(db, U(2),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'easy','yes','no',$3)`, [U(1), A(1), VER])));
++ok('T_af own QUICK assessment rejected',
++  await denied(() => asUser(db, U(1),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'easy','yes','no',$3)`, [U(1), A(3), VER])));
++ok('T_af own PARTIAL assessment rejected',
++  await denied(() => asUser(db, U(1),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'easy','yes','no',$3)`, [U(1), A(4), VER])));
++ok('T_af anon denied',
++  await denied(() => asAnon(db, `select id from public.assessment_feedback`))
++  && await denied(() => asAnon(db, `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version) values ($1,$2,'easy','yes','no',$3)`, [U(1), A(1), VER])));
++
++// user2 can insert on their own full assessment (isolation)
++ok('T_af user2 can insert on their own FULL assessment',
++  (await asUser(db, U(2),
++    `insert into public.assessment_feedback (user_id, assessment_id, ease, results_clear, check_again, survey_version)
++     values ($1,$2,'hard','no','maybe',$3) returning id`, [U(2), A(2), VER])).rows.length===1);
++ok('T_af user1 still sees only their own row',
++  (await asUser(db, U(1), `select assessment_id from public.assessment_feedback`)).rows.length===1
++  && (await asUser(db, U(1), `select assessment_id from public.assessment_feedback`)).rows[0].assessment_id===A(1));
++
++const afEv = (await db.query(`select event, props, user_id::text as uid from public.product_events where event='assessment_feedback_submitted' and user_id=$1`, [U(1)])).rows;
++const afProps = afEv[0]?.props || {};
++const afBlob = JSON.stringify(afEv[0] || {});
++ok('T_af event payload is ids + timestamps + event name only (no answers)',
++  afEv.length===1 && afEv[0].event==='assessment_feedback_submitted' && afEv[0].uid===U(1)
++  && Object.keys(afProps).sort().join(',')==='assessment_id,created_at,id'
++  && !('ease' in afProps) && !('results_clear' in afProps) && !('check_again' in afProps) && !('survey_version' in afProps)
++  && !afBlob.includes('okay') && !afBlob.includes(VER) && afProps.id===ownAfId && afProps.assessment_id===A(1),
++  { propKeys: Object.keys(afProps).sort() });
++
++// write-once
++let sfUpd=false, sfDel=false, afUpd=false, afDel=false;
++try { await asUser(db, U(1), `update public.session_feedback set note='x' where id=$1`, [ownSfId]); } catch { sfUpd=true; }
++try { await asUser(db, U(1), `delete from public.session_feedback where id=$1`, [ownSfId]); } catch { sfDel=true; }
++try { await asUser(db, U(1), `update public.assessment_feedback set ease='hard' where id=$1`, [ownAfId]); } catch { afUpd=true; }
++try { await asUser(db, U(1), `delete from public.assessment_feedback where id=$1`, [ownAfId]); } catch { afDel=true; }
++const sfNote = (await db.query(`select note from public.session_feedback where id=$1`, [ownSfId])).rows[0]?.note;
++const afEase = (await db.query(`select ease from public.assessment_feedback where id=$1`, [ownAfId])).rows[0]?.ease;
++ok('T_both tables are write-once (no update/delete for the owner)',
++  sfUpd && sfDel && afUpd && afDel && sfNote===NOTE && afEase==='okay');
++
++// ---------- cascade: deleting the account (auth.users) removes both tables' rows; other user kept ----------
++const sfBefore = (await db.query(`select count(*)::int n from public.session_feedback where user_id=$1`, [U(1)])).rows[0].n;
++const afBefore = (await db.query(`select count(*)::int n from public.assessment_feedback where user_id=$1`, [U(1)])).rows[0].n;
++await db.query(`delete from auth.users where id=$1`, [U(1)]);
++const sfAfter = (await db.query(`select count(*)::int n from public.session_feedback where user_id=$1`, [U(1)])).rows[0].n;
++const afAfter = (await db.query(`select count(*)::int n from public.assessment_feedback where user_id=$1`, [U(1)])).rows[0].n;
++const sfOther = (await db.query(`select count(*)::int n from public.session_feedback where user_id=$1`, [U(2)])).rows[0].n;
++const afOther = (await db.query(`select count(*)::int n from public.assessment_feedback where user_id=$1`, [U(2)])).rows[0].n;
++ok('T_deleting the account removes both session_feedback and assessment_feedback rows (ON DELETE CASCADE); other user kept',
++  sfBefore>=1 && afBefore>=1 && sfAfter===0 && afAfter===0 && sfOther===1 && afOther===1,
++  { sfBefore, afBefore, sfAfter, afAfter, sfOther, afOther });
++
++// ---------- combined rollback is exact restore ----------
++const mid = await snap(db);
++await db.exec(RB_BOTH);
++ok('T_combined rollback is exact: both tables and trigger functions dropped; existing objects restored to pre-apply',
++  !(await has(db, 'public.session_feedback')) && !(await has(db, 'public.assessment_feedback'))
++  && !(await fnExists(db, 'tg_pe_session_feedback')) && !(await fnExists(db, 'tg_pe_assessment_feedback'))
++  && sameSnap(await snap(db), pre) && sameSnap(mid, pre));
++
++await db.exec(MIG_S);
++await db.exec(MIG_A);
++ok('T_re-apply both after combined rollback is clean',
++  (await has(db, 'public.session_feedback')) && (await has(db, 'public.assessment_feedback')));
++
++// ---------- export-my-data coverage; flag stays off ----------
++ok('T_export-my-data TABLES includes session_feedback with all columns, keyed on user_id',
++  /key:\s*"session_feedback"[\s\S]*?cols:\s*"id, user_id, session_id, session_date, feel, clear, length_fit, note, sport, source, created_at"/.test(HANDLER));
++ok('T_export-my-data TABLES includes assessment_feedback with all columns, keyed on user_id',
++  /key:\s*"assessment_feedback"[\s\S]*?cols:\s*"id, user_id, assessment_id, ease, results_clear, check_again, survey_version, sport, source, created_at"/.test(HANDLER));
++ok('T_EXPORT_MY_DATA stays off (flagOn still exact "on"; index.ts still reads the env flag)',
++  /flagOn\s*=\s*\([^)]*\)\s*:\s*boolean\s*=>\s*v\s*===\s*"on"/.test(HANDLER)
++  && INDEX.includes('flagOn(Deno.env.get("EXPORT_MY_DATA"))'));
++
++// ---------- Stacy (1): grep proof for BOTH tables ----------
++function walk(dir, acc=[]) {
++  if (!fs.existsSync(dir)) return acc;
++  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
++    const p = path.join(dir, ent.name);
++    if (ent.isDirectory()) {
++      if (ent.name==='node_modules' || ent.name==='.git' || ent.name==='dist') continue;
++      walk(p, acc);
++    } else if (/\.(ts|js|mjs|sql|tsx)$/.test(ent.name)) acc.push(p);
++  }
++  return acc;
++}
++const repoScan = [
++  ...walk(path.join(R, 'supabase/functions/ai-chat')),
++  ...walk(path.join(R, 'supabase/functions/embed-knowledge')),
++  ...walk(path.join(R, 'supabase/functions/embed-general-once')),
++  ...fs.readdirSync(path.join(R, 'supabase/migrations')).filter((f) => /rombot_context|search_rombot_knowledge|sport_aware_rag/.test(f))
++      .map((f) => path.join(R, 'supabase/migrations', f)),
++];
++const extraScan = walk('/workspace/p1-17-wt/supabase/functions/rombot-checkin');
++const allScan = [...repoScan, ...extraScan];
++const leakHits = [];
++for (const f of allScan) {
++  const text = fs.readFileSync(f, 'utf8');
++  if (/session_feedback|assessment_feedback/i.test(text)) leakHits.push(path.relative(R, f) || f);
++}
++ok('T_grep: session_feedback and assessment_feedback do not appear in ai-chat, embed-knowledge, rombot_context, search_rombot_knowledge, or rombot-checkin',
++  leakHits.length===0, { scanned: allScan.length, leakHits });
++
++const fromRe = /\.from\(\s*["']([^"']+)["']\s*\)/g;
++const aiFrom = new Set();
++for (const f of walk(path.join(R, 'supabase/functions/ai-chat'))) {
++  const text = fs.readFileSync(f, 'utf8');
++  let m; while ((m = fromRe.exec(text))) aiFrom.add(m[1]);
++}
++const aiAllowed = new Set(['user_ai_preferences','users','coaches','athletes','rombot_context','ai_messages','ai_conversations','assessments']);
++ok('T_grep: on-branch ai-chat .from() tables are a fixed allow-list (no generic pull, no feedback tables)',
++  [...aiFrom].every((t) => aiAllowed.has(t)) && !aiFrom.has('session_feedback') && !aiFrom.has('assessment_feedback'),
++  { aiFrom: [...aiFrom].sort() });
++
++const embedFrom = new Set();
++for (const f of walk(path.join(R, 'supabase/functions/embed-knowledge'))) {
++  const text = fs.readFileSync(f, 'utf8');
++  let m; while ((m = fromRe.exec(text))) embedFrom.add(m[1]);
++}
++ok('T_grep: embed-knowledge only reads/writes rombot_knowledge',
++  [...embedFrom].every((t) => t==='rombot_knowledge'), { embedFrom: [...embedFrom] });
++
++const rcFiles = fs.readdirSync(path.join(R, 'supabase/migrations')).filter((f) => /rombot_context/.test(f))
++  .map((f) => path.join(R, 'supabase/migrations', f));
++ok('T_grep: rombot_context migrations do not reference session_feedback, assessment_feedback, or client_feedback',
++  !rcFiles.some((f) => /session_feedback|assessment_feedback|client_feedback/.test(fs.readFileSync(f, 'utf8'))),
++  { files: rcFiles.map((f)=>path.basename(f)) });
++
++const checkinDir = '/workspace/p1-17-wt/supabase/functions/rombot-checkin';
++if (fs.existsSync(checkinDir)) {
++  const cFrom = new Set();
++  for (const f of walk(checkinDir)) {
++    const text = fs.readFileSync(f, 'utf8');
++    let m; while ((m = fromRe.exec(text))) cFrom.add(m[1]);
++  }
++  ok('T_grep: rombot-checkin (11803fee tree) has no session_feedback or assessment_feedback in .from() list',
++    !cFrom.has('session_feedback') && !cFrom.has('assessment_feedback'), { cFrom: [...cFrom].sort() });
++} else {
++  ok('T_grep: rombot-checkin tree not present on disk (skipped)', true, { skipped: true });
++}
++
++fs.writeFileSync(new URL('./results.json', import.meta.url), JSON.stringify({ totals: { pass: Object.keys(results).length - fails, fail: fails, total: Object.keys(results).length }, results }, null, 2) + '\n');
++console.log(`\n${fails === 0 ? 'ALL PASS' : 'FAIL'} ${Object.keys(results).length - fails}/${Object.keys(results).length}`);
++process.exit(fails === 0 ? 0 : 1);
+diff --git a/supabase/functions/export-my-data/handler.ts b/supabase/functions/export-my-data/handler.ts
+new file mode 100644
+index 0000000..a407605
+--- /dev/null
++++ b/supabase/functions/export-my-data/handler.ts
+@@ -0,0 +1,237 @@
++// export-my-data v1 (FG-13 "Export my data", STAGED, not deployed, flag OFF).
++// A signed-in user downloads their OWN data as one JSON document, STREAMED (built on demand, table by table, page by page, never written to
++// storage or a table; nothing is held in memory beyond one page; no server-side copy of mood, Stacy B3). Read-only. No service role.
++// Reads use the CALLER's JWT client, so RLS applies, AND every query filters the owner column explicitly
++// (game_plans has a public-select policy, so the explicit filter matters).
++// Stacy 6:44 PM hardening (staged): (1) CORS is ALWAYS the allowlist, never "*" and not behind any flag; (2) a per-user rate limit (3 per hour, 429, fails CLOSED);
++// (3) a sign-in within the last 15 minutes is required (401 reauth_required); (4) Grant 7:04 PM: the export is PAGED so it is always complete (1,000 rows per query, one page in hand, no per-table 5,000 cap).
++// Only a high BACKSTOP remains (BACKSTOP_ROWS per table, BACKSTOP_MS of wall clock): if it is ever hit, the table is marked truncated, the document says
++// complete:false and the client shows the incomplete error instead of offering a partial file; (5) the six 20261021 backup tables
++// (lumbar_null_backup_*, rescore_backup_*) are included through the security-definer RPC export_my_backup_page (they have RLS on and no policy,
++// so the caller's JWT cannot read them directly). Nothing is dropped. The flag stays OFF.
++// Flag EXPORT_MY_DATA: ON only when exactly "on". OFF returns 503 {"error":"export_disabled"} and reads nothing.
++// Nothing is logged or stored (no export log table). Explicit column lists only, never select("*").
++// Status is always 200 once streaming starts; a table that fails is marked {error:true} in the trailing "tables" object.
++// Scope (Grant 6:32 PM): everything keyed to the user id: profile, assessments, joint_scores (via the user's own assessment ids), protocols,
++// chats, mood with opt-in state, preferences, eligibility, plus the rest of SPECS. Excluded columns per table are listed in the manifest.
++// EXCLUDED on purpose: user_ai_preferences.api_key_enc (secret), notification_preferences.push_subscription (device keys),
++// Stripe ids, email_sends, product_events/consent_events (analytics, anon hashes),
++// coach-authored rows about the athlete (coach_assignments, attendance, coach_video_feedback, coach_competitors).
++// The scope list is a Stacy/Jim decision (see NEEDS JIM WORDING), staged as the conservative set.
++export const ALLOWED_ORIGINS = [
++  "https://romrx.io", "https://www.romrx.io", "https://app.romrx.io",
++  "https://romrxbjj.com", "https://www.romrxbjj.com",
++  "https://romrxbodybuilding.com", "https://www.romrxbodybuilding.com",
++];
++export const flagOn = (v: string | undefined | null): boolean => v === "on";
++export function corsFor(req: Request): Record<string, string> {
++  const base = { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", Vary: "Origin" };
++  const o = req.headers.get("Origin") ?? "";
++  return ALLOWED_ORIGINS.includes(o) ? { ...base, "Access-Control-Allow-Origin": o } : base;
++}
++
++/** Newest sign-in time (Unix seconds) in the JWT's amr claim. Token refreshes do NOT count (they only renew the access token).
++ * Returns 0 when the claim is missing or in an unexpected shape, which the caller treats as "not recent" (fails closed).
++ * The signature is checked by auth.getUser() before this is used; this only reads the claim. */
++export function lastSignInSeconds(authHeader: string): number {
++  try {
++    const tok = authHeader.replace(/^bearer\s+/i, "").trim();
++    const part = tok.split(".")[1];
++    if (!part) return 0;
++    const json = new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=")), (c) => c.charCodeAt(0)));
++    const amr = (JSON.parse(json) as { amr?: unknown }).amr;
++    if (!Array.isArray(amr)) return 0;
++    let best = 0;
++    for (const e of amr) {
++      const m = e as { method?: unknown; timestamp?: unknown };
++      if (m && typeof m === "object" && m.method !== "token_refresh" && typeof m.timestamp === "number" && Number.isFinite(m.timestamp)) best = Math.max(best, m.timestamp);
++    }
++    return best;
++  } catch { return 0; }
++}
++export const REAUTH_WINDOW_SECONDS = 15 * 60;
++export const EXPORT_LIMIT = { limit: 3, windowMs: 3600000 }; // per user; enforced inside the RPC export_my_data_gate()
++
++/** The six 20261021 safety copies. Read through public.export_my_backup_page(p_key, p_offset, p_limit); the RPC filters to auth.uid(). */
++export const BACKUP_KEYS = [
++  "lumbar_null_backup_20261021_assessments", "lumbar_null_backup_20261021_joint_scores", "lumbar_null_backup_20261021_protocols",
++  "rescore_backup_20261021_assessments", "rescore_backup_20261021_joint_scores", "rescore_backup_20261021_protocols",
++] as const;
++
++/** Stacy 7:24 PM: the two FG-36 rescore safety tables (exist only after the rescore runs; empty section once dropped). Same RPC, same paging. */
++export const FG36_KEYS = ["fg36_rescore_backup", "fg36_rescore_log"] as const;
++/** The six 20261021 copies are deleted by this date (Jim go needed for the drop). */
++export const BACKUP_DELETE_BY = "November 5, 2026";
++/** The two fg36 copies: the date is PROPOSED (Thu Nov 12, 2026, Avery) and Jim has not set it. Ledger L939: that date must NOT appear in user-facing export text until Jim sets it,
++ *  so this stays "" (undated wording) until then. When Jim gives the date, set it here (for example "November 12, 2026") and redeploy; the dated wording is tested. */
++export const FG36_DELETE_BY = "";
++export function rescoreNote(by: string): string {
++  return "The fg36_rescore_* sections are safety copies from the hip flexion score update. They are empty unless that update has run for you. "
++    + (by ? `They are scheduled to be deleted by ${by}, after the update has been checked.` : "They will be deleted once the update has been checked.")
++    + " If a section is empty, there are none for you or they have already been deleted.";
++}
++
++export interface Spec { key: string; table: string; owner: string; cols: string; order: string }
++export const SPECS: Spec[] = [
++  { key: "profile", table: "users", owner: "id", order: "created_at",
++    cols: "id, email, full_name, school_id, coach_id, portal_role, active_sport, sports_enabled, platforms, belt, gender, age_bucket, height_bucket, weight_bucket, marketing_opt_out, signup_source, subscription_status, subscription_tier, subscription_expiry, base_status, base_expiry, created_at, updated_at" },
++  { key: "assessments", table: "assessments", owner: "user_id", order: "assessed_at",
++    cols: "id, assessed_at, sport, rom_total, rom_percentile, worst_joints, red_flag_triggered, red_flag_reasons, hip_er_l, hip_er_r, hip_ir_l, hip_ir_r, hip_abd_l, hip_abd_r, hip_flex_l, hip_flex_r, hip_ext_l, hip_ext_r, shoulder_er_l, shoulder_er_r, shoulder_flex_l, shoulder_flex_r, ankle_df_l, ankle_df_r, cervical_rot_l, cervical_rot_r, cervical_lat_l, cervical_lat_r, cervical_flex, cervical_ext, lumbar_flex, lumbar_ext, thoracic_rot, thoracic_rot_l, thoracic_rot_r, balance_l, balance_r, created_at" },
++  { key: "ai_preferences", table: "user_ai_preferences", owner: "user_id", order: "created_at", cols: "provider, model, created_at, updated_at" },
++  { key: "technique_eligibility", table: "technique_eligibility", owner: "user_id", order: "computed_at",
++    cols: "id, assessment_id, technique_code, tier, limiting_joints, flag, sport, computed_at" },
++  { key: "protocols", table: "protocols", owner: "user_id", order: "created_at", cols: "id, assessment_id, exercise_id, joint_key, priority_rank, created_at" },
++  { key: "protocol_sessions", table: "protocol_sessions", owner: "user_id", order: "logged_at", cols: "id, session_date, protocol_day, sport, logged_at" },
++  { key: "protocol_completions", table: "protocol_completions", owner: "user_id", order: "completed_at",
++    cols: "id, assessment_id, exercise_id, joint, completed_at, sets_completed, reps_completed, difficulty_rating, pain_rating, notes" },
++  { key: "game_plans", table: "game_plans", owner: "user_id", order: "created_at", cols: "id, name, description, sport, path_mode, techniques, branches, is_public, created_at, updated_at" },
++  { key: "drill_sessions", table: "drill_sessions", owner: "user_id", order: "drilled_at", cols: "id, game_plan_id, technique_name, category, notes, sport, drilled_at" },
++  { key: "technique_competency", table: "user_technique_competency", owner: "user_id", order: "updated_at", cols: "id, technique_id, state, last_touched, updated_at" },
++  { key: "workouts", table: "workouts", owner: "user_id", order: "created_at", cols: "id, sport, tier, name, description, day_label, split_type, is_template, notes, created_at, updated_at" },
++  { key: "workout_sets", table: "workout_sets", owner: "user_id", order: "performed_at",
++    cols: "id, workout_id, exercise_name, set_index, set_type, weight_kg, reps, rpe, rir, is_warmup, notes, performed_at" },
++  { key: "pr_records", table: "pr_records", owner: "user_id", order: "achieved_at", cols: "id, exercise_name, pr_type, weight_kg, reps, estimated_1rm_kg, achieved_at" },
++  { key: "mesocycles", table: "mesocycles", owner: "user_id", order: "created_at", cols: "id, name, sport, weeks, current_week, status, created_at" },
++  { key: "body_metrics", table: "body_metrics", owner: "user_id", order: "measured_at",
++    cols: "id, measured_at, weight_kg, body_fat_pct, neck_cm, chest_cm, waist_cm, hip_cm, arm_l_cm, arm_r_cm, thigh_l_cm, thigh_r_cm, calf_l_cm, calf_r_cm, notes" },
++  { key: "fuel_logs", table: "fuel_logs", owner: "user_id", order: "created_at", cols: "id, logged_on, kind, inputs, outputs, created_at" },
++  { key: "progress_photos", table: "progress_photos", owner: "user_id", order: "taken_at", cols: "id, taken_at, pose, notes, created_at" },
++  { key: "mood_entries", table: "mood_entries", owner: "user_id", order: "created_at", cols: "id, created_at, energy, pleasantness, word, quadrant, context, opted_in, opted_in_at" },
++  { key: "mood_settings", table: "mood_settings", owner: "user_id", order: "updated_at", cols: "saving_on, opted_in_at, turned_off_at, updated_at, consent_version" },
++  { key: "surveys", table: "surveys", owner: "user_id", order: "created_at", cols: "id, survey_key, responses, score, status, created_at, completed_at" },
++  { key: "ai_conversations", table: "ai_conversations", owner: "user_id", order: "created_at", cols: "id, sport, title, message_count, created_at, updated_at" },
++  { key: "ai_messages", table: "ai_messages", owner: "user_id", order: "created_at", cols: "id, conversation_id, role, content, created_at" },
++  { key: "notification_preferences", table: "notification_preferences", owner: "user_id", order: "created_at",
++    cols: "email_reminders, push_reminders, reminder_time, timezone, retest_reminders, weekly_digest, created_at, updated_at" },
++  { key: "consents", table: "consents", owner: "user_id", order: "signed_at", cols: "id, terms_version, medical_waiver_version, signed_name, signed_at, consent_text_version, source, ip_address, user_agent" },
++  { key: "sport_entitlements", table: "sport_entitlements", owner: "user_id", order: "granted_at", cols: "id, sport, status, granted_at, expires_at, cancel_at_period_end, cancel_at, canceled_at" },
++  { key: "client_feedback", table: "client_feedback", owner: "user_id", order: "created_at", cols: "id, sport, category, message, created_at" },
++  { key: "session_feedback", table: "session_feedback", owner: "user_id", order: "created_at", cols: "id, user_id, session_id, session_date, feel, clear, length_fit, note, sport, source, created_at" },
++  { key: "assessment_feedback", table: "assessment_feedback", owner: "user_id", order: "created_at", cols: "id, user_id, assessment_id, ease, results_clear, check_again, survey_version, sport, source, created_at" },
++  { key: "ads_consent", table: "user_ads_consent", owner: "user_id", order: "updated_at", cols: "state, updated_at, declined_at" },
++];
++// BACKSTOP ONLY (Grant: page it so the export is always complete). Normal users never get near these; a user who does gets the incomplete error, never a silent partial file.
++export const BACKSTOP_ROWS = 250_000; // per table
++export const BACKSTOP_MS = 120_000; // wall clock for the whole export
++export const PAGE = 1000;
++export const IN_CHUNK = 100;
++export const JOINT_SCORES_COLS = "id, assessment_id, joint_key, score, left_value, right_value, asymmetry_pct, asymmetry_flag, created_at";
++
++// deno-lint-ignore no-explicit-any
++type Db = any;
++export interface Deps { userClient: (authHeader: string) => Db; exportOn: boolean; now?: () => Date; backstopRows?: number; backstopMs?: number; nowMs?: () => number }
++type Status = { rows: number; truncated: boolean } | { error: true };
++
++export async function handle(req: Request, deps: Deps): Promise<Response> {
++  const cors = corsFor(req);
++  const out = (status: number, body: unknown) =>
++    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
++  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
++  if (req.method !== "POST") return out(405, { error: "POST only" });
++  if (!deps.exportOn) return out(503, { error: "export_disabled" });
++  const authHeader = req.headers.get("Authorization") ?? "";
++  if (!authHeader.toLowerCase().startsWith("bearer ")) return out(401, { error: "Unauthorized" });
++  const db = deps.userClient(authHeader);
++  const { data: { user } = { user: null }, error: aErr } = await db.auth.getUser();
++  if (aErr || !user?.id) return out(401, { error: "Unauthorized" });
++  const uid: string = user.id;
++  const nowDate = (deps.now ?? (() => new Date()))();
++  // Recent sign-in required (15 minutes). Checked before the rate limit so a refused request never uses up an export.
++  if (nowDate.getTime() / 1000 - lastSignInSeconds(authHeader) > REAUTH_WINDOW_SECONDS) return out(401, { error: "reauth_required" });
++  // Per-user rate limit, fails CLOSED: any RPC error or odd answer refuses the export.
++  try {
++    const { data: gate, error: gErr } = await db.rpc("export_my_data_gate");
++    if (gErr || !gate || typeof gate.allowed !== "boolean") return out(503, { error: "export_unavailable" });
++    if (!gate.allowed) {
++      const wait = typeof gate.reset_at === "number" ? Math.max(1, Math.ceil((gate.reset_at - nowDate.getTime()) / 1000)) : 3600;
++      return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": String(wait) } });
++    }
++  } catch { return out(503, { error: "export_unavailable" }); }
++  const generatedAt = nowDate.toISOString();
++  const enc = new TextEncoder();
++  const status: Record<string, Status> = {};
++  const rowCap = deps.backstopRows ?? BACKSTOP_ROWS;
++  const clock = deps.nowMs ?? (() => Date.now());
++  const deadline = clock() + (deps.backstopMs ?? BACKSTOP_MS);
++
++  // Pages one source. `page(from,to)` returns that slice. Emits at most budget.left rows in total; one row beyond the cap proves truncation.
++  type Page = (from: number, to: number) => Promise<{ data: unknown; error: unknown }>;
++  async function pump(page: Page, emit: (row: unknown) => void, budget: { left: number; truncated: boolean } = { left: rowCap, truncated: false }): Promise<Status> {
++    let n = 0;
++    for (let from = 0; ; from += PAGE) {
++      if (clock() > deadline) { budget.truncated = true; return { rows: n, truncated: true }; } // time backstop
++      const { data: rows, error } = await page(from, from + PAGE - 1);
++      if (error) return { error: true };
++      const r = (rows ?? []) as unknown[];
++      for (const row of r) {
++        if (budget.left <= 0) { budget.truncated = true; return { rows: n, truncated: true }; }
++        emit(row); n++; budget.left--;
++      }
++      if (r.length < PAGE) return { rows: n, truncated: false };
++    }
++  }
++  const tablePage = (table: string, cols: string, order: string, apply: (q: Db) => Db): Page => (from, to) => {
++    let q = apply(db.from(table).select(cols)).order(order, { ascending: true });
++    if (order !== "id" && /(^|, )id(,|$)/.test(cols)) q = q.order("id", { ascending: true }); // stable paging when the order column has ties
++    return q.range(from, to);
++  };
++
++  const stream = new ReadableStream<Uint8Array>({
++    async start(c) {
++      const w = (t: string) => c.enqueue(enc.encode(t));
++      try {
++        w(`{"export_version":2,"time_zone":"UTC","generated_at":${JSON.stringify(generatedAt)},"user_id":${JSON.stringify(uid)},"data":{`);
++        let firstTable = true;
++        const assessmentIds: string[] = [];
++        const section = async (key: string, run: (emit: (row: unknown) => void) => Promise<Status>) => {
++          w(`${firstTable ? "" : ","}${JSON.stringify(key)}:[`); firstTable = false;
++          let first = true;
++          status[key] = await run((row) => { w(`${first ? "" : ","}${JSON.stringify(row)}`); first = false; });
++          w("]");
++        };
++        for (const s of SPECS) {
++          await section(s.key, (emit) => pump(tablePage(s.table, s.cols, s.order, (q) => q.eq(s.owner, uid)), (row) => {
++            if (s.table === "assessments") assessmentIds.push((row as { id: string }).id);
++            emit(row);
++          }));
++          // joint_scores has no user column: it is read by the user's OWN assessment ids, right after assessments
++          if (s.table === "assessments") {
++            await section("joint_scores", async (emit) => {
++              let rows = 0, err = false;
++              const budget = { left: rowCap, truncated: false };
++              for (let i = 0; i < assessmentIds.length && !err && !budget.truncated; i += IN_CHUNK) {
++                const ids = assessmentIds.slice(i, i + IN_CHUNK);
++                const st = await pump(tablePage("joint_scores", JOINT_SCORES_COLS, "created_at", (q) => q.in("assessment_id", ids)), (row) => { rows++; emit(row); }, budget);
++                if ("error" in st) err = true;
++              }
++              return err ? { error: true } : { rows, truncated: budget.truncated };
++            });
++          }
++        }
++        // The six 20261021 safety copies, through the security-definer RPC (filters to the caller). Paged the same way, same backstop and error marking.
++        for (const k of [...BACKUP_KEYS, ...FG36_KEYS]) {
++          await section(k, (emit) => pump((from, to) => db.rpc("export_my_backup_page", { p_key: k, p_offset: from, p_limit: to - from + 1 }), emit));
++        }
++        const moodEmpty = !status.mood_entries || ("rows" in status.mood_entries && status.mood_entries.rows === 0);
++        const notes: Record<string, string> = {
++          timestamps: "All timestamps are UTC.",
++          excluded: "Not included: password hash, payment-processor ids (Stripe holds billing), device push keys, API secrets, internal security and analytics fields, and other people's data.",
++        };
++        if (moodEmpty) notes.mood = "No mood check-ins saved.";
++        notes.backups = `The backup_* sections are safety copies taken on 2026-10-21 before scores were recalculated. They are scheduled to be deleted by ${BACKUP_DELETE_BY} and are included here until then. If a section is empty, those copies have already been deleted.`;
++        notes.rescore = rescoreNote(FG36_DELETE_BY);
++        const complete = Object.values(status).every((x) => "rows" in x && !x.truncated);
++        if (!complete) notes.incomplete = `This export is NOT complete: a table failed or the safety limit (${rowCap} rows per table, ${Math.round((deps.backstopMs ?? BACKSTOP_MS) / 1000)} seconds) was reached. See "tables". Do not treat this file as your full record.`;
++        w(`},"complete":${complete},"tables":${JSON.stringify(status)},"notes":${JSON.stringify(notes)}}`);
++        c.close();
++      } catch (_e) {
++        // never leak the error text; the document is cut short, which is invalid JSON on purpose
++        c.error(new Error("export_failed"));
++      }
++    },
++  });
++  return new Response(stream, {
++    status: 200,
++    headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store", "Content-Disposition": `attachment; filename="romrx-my-data-${generatedAt.slice(0, 10)}.json"` },
++  });
++}
+diff --git a/supabase/functions/export-my-data/index.ts b/supabase/functions/export-my-data/index.ts
+new file mode 100644
+index 0000000..164d2b4
+--- /dev/null
++++ b/supabase/functions/export-my-data/index.ts
+@@ -0,0 +1,12 @@
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { handle, flagOn } from "./handler.ts";
++
++Deno.serve((req: Request) =>
++  handle(req, {
++    exportOn: flagOn(Deno.env.get("EXPORT_MY_DATA")),
++    // The caller's own JWT: RLS applies. No service-role key is read by this function.
++    userClient: (authHeader: string) =>
++      createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } }),
++  })
++);
+diff --git a/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback.sql b/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback.sql
+new file mode 100644
+index 0000000..669d778
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback.sql
+@@ -0,0 +1,104 @@
++-- 20261117120000_p1_18_session_feedback (UNAPPLIED; build only). P1-18, L1031.
++-- Creates public.session_feedback exactly per JULES-P1-18-SESSION-FEEDBACK-SPEC-20261116.md
++-- (sha256 272c95a3b7a57586e2c17412223b5acb39724bd514c610405b62064dcebceeec).
++-- Stacy privacy conditions (Grant steering, 7:12 PM ET Nov 16):
++--   (1) rows, including the note, never reach OpenAI or ROMBot/ai-chat context;
++--   (2) nothing goes to Meta (Pixel or CAPI) beyond a no-answers event, and no third-party
++--       other than Notion gets the data (this build adds no Notion webhook; feedback-to-notion
++--       stays on client_feedback only);
++--   (3) rows are deleted with the account: user_id REFERENCES auth.users(id) ON DELETE CASCADE
++--       (same as public.protocol_sessions.user_id);
++--   (4) the AFTER INSERT event trigger writes product_events event session_feedback_submitted
++--       with props holding only ids and timestamps (id, session_id, created_at). It does NOT
++--       copy feel, clear, length_fit, has_survey, or the note text. This is stricter than the
++--       Jules spec's props { feel, has_survey }; the table itself matches the spec exactly.
++-- No data backfill. Apply via MCP apply_migration only, after its own gate. EXPORT_MY_DATA stays off.
++-- Rollback: 20261117120000_p1_18_session_feedback_rollback.sql.
++
++CREATE TABLE public.session_feedback (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
++  session_id uuid NOT NULL REFERENCES public.protocol_sessions(id) ON DELETE CASCADE,
++  session_date date NOT NULL,
++  feel text NOT NULL,
++  clear text,
++  length_fit text,
++  note text,
++  sport text NOT NULL DEFAULT 'base',
++  source text NOT NULL DEFAULT 'web',
++  created_at timestamptz NOT NULL DEFAULT now(),
++  CONSTRAINT session_feedback_session_id_key UNIQUE (session_id),
++  CONSTRAINT session_feedback_feel_check CHECK (feel IN ('easy', 'about_right', 'hard')),
++  CONSTRAINT session_feedback_clear_check CHECK (clear IS NULL OR clear IN ('yes', 'somewhat', 'no')),
++  CONSTRAINT session_feedback_length_fit_check CHECK (length_fit IS NULL OR length_fit IN ('too_short', 'about_right', 'too_long')),
++  CONSTRAINT session_feedback_note_check CHECK (note IS NULL OR char_length(note) BETWEEN 1 AND 500),
++  CONSTRAINT session_feedback_sport_check CHECK (sport = 'base'),
++  CONSTRAINT session_feedback_source_check CHECK (source = 'web')
++);
++
++CREATE INDEX session_feedback_user_created_idx
++  ON public.session_feedback (user_id, created_at DESC);
++
++COMMENT ON TABLE public.session_feedback IS
++  'P1-18 (20261117120000, unapplied). One row per protocol session (unique session_id). Write-once from the signed-in user. The note and answers stay on this table; they are not copied to product_events, ai-chat, or ROMBot context, and this table has no Notion/Meta webhook.';
++
++COMMENT ON COLUMN public.session_feedback.note IS
++  'Optional free text, 1 to 500 characters. Never copied to product_events, OpenAI, ROMBot, Meta, or Notion.';
++
++ALTER TABLE public.session_feedback ENABLE ROW LEVEL SECURITY;
++
++CREATE POLICY session_feedback_insert_own
++  ON public.session_feedback
++  FOR INSERT
++  TO authenticated
++  WITH CHECK (
++    (SELECT auth.uid()) = user_id
++    AND EXISTS (
++      SELECT 1
++      FROM public.protocol_sessions ps
++      WHERE ps.id = session_id
++        AND ps.user_id = (SELECT auth.uid())
++        AND ps.session_date = session_feedback.session_date
++    )
++  );
++
++CREATE POLICY session_feedback_select_own
++  ON public.session_feedback
++  FOR SELECT
++  TO authenticated
++  USING ((SELECT auth.uid()) = user_id);
++
++REVOKE ALL ON TABLE public.session_feedback FROM PUBLIC, anon, authenticated;
++GRANT SELECT, INSERT ON TABLE public.session_feedback TO authenticated;
++-- service_role keeps default full access (BYPASSRLS). No UPDATE or DELETE policy: write-once from the client.
++
++CREATE OR REPLACE FUNCTION public.tg_pe_session_feedback()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path TO 'public', 'pg_temp'
++AS $$
++BEGIN
++  -- Stacy (4): payload holds only ids, timestamps, and the event name. No answers, no note.
++  PERFORM public.log_product_event(
++    NEW.user_id,
++    'session_feedback_submitted',
++    jsonb_build_object(
++      'id', NEW.id,
++      'session_id', NEW.session_id,
++      'created_at', NEW.created_at
++    )
++  );
++  RETURN NEW;
++END;
++$$;
++
++COMMENT ON FUNCTION public.tg_pe_session_feedback() IS
++  'P1-18. AFTER INSERT on session_feedback: product_events session_feedback_submitted with props id, session_id, created_at only. Never copies feel, clear, length_fit, has_survey, or note.';
++
++REVOKE ALL ON FUNCTION public.tg_pe_session_feedback() FROM PUBLIC, anon, authenticated;
++
++CREATE TRIGGER trg_pe_session_feedback
++  AFTER INSERT ON public.session_feedback
++  FOR EACH ROW
++  EXECUTE FUNCTION public.tg_pe_session_feedback();
+diff --git a/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback_rollback.sql b/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback_rollback.sql
+new file mode 100644
+index 0000000..5f7990f
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117120000_p1_18_session_feedback_rollback.sql
+@@ -0,0 +1,9 @@
++-- ROLLBACK for 20261117120000_p1_18_session_feedback (UNAPPLIED companion).
++-- Drops the P1-18 trigger, function, and table (policies and indexes go with the table).
++-- Does not change public.protocol_sessions, public.product_events, public.log_product_event,
++-- public.client_feedback, or any webhook. Does not delete already-written product_events rows
++-- (none exist until this is applied and a row is inserted). No data in session_feedback until apply.
++
++DROP TRIGGER IF EXISTS trg_pe_session_feedback ON public.session_feedback;
++DROP FUNCTION IF EXISTS public.tg_pe_session_feedback();
++DROP TABLE IF EXISTS public.session_feedback;
+diff --git a/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback.sql b/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback.sql
+new file mode 100644
+index 0000000..b040c51
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback.sql
+@@ -0,0 +1,105 @@
++-- 20261117120100_p1_18_assessment_feedback (UNAPPLIED; build only). P1-18b, L1031.
++-- Creates public.assessment_feedback exactly per JULES-P1-18B-ASSESSMENT-FEEDBACK-SPEC-20261116.md
++-- (sha256 7b42dd84b0f2549b7dfbf248f22721503279d8f3df6c6f49f0146a1efb36bbff), with two tightenings:
++--   1) INSERT is allowed only when the assessment is the caller's own AND check_kind = 'full'.
++--      The Jules draft used "check_kind IS DISTINCT FROM 'quick'" (NULL would count as full).
++--      After live L1134 031000 (20261116143905) the column is NOT NULL and is only 'full' or 'quick'.
++--      Grant/Stacy require FULL only, and that partial or quick rows and other users' assessments are
++--      rejected, so the policy requires equality to 'full'. A non-full kind (quick, or a 'partial'
++--      kind if one were ever added) cannot get a row.
++--   2) The event trigger writes product_events event assessment_feedback_submitted with props holding
++--      only ids and timestamps (id, assessment_id, created_at). It does NOT copy ease, results_clear,
++--      check_again, or survey_version (Jules asked for those four as props; Stacy: no answers, and
++--      there is no free-text column on this table anyway).
++-- Ordered after the session_feedback unapplied file 20261117120000, and after live 031000
++-- (20261116143905 assessment_check_kind). This SQL reads assessments.check_kind; do not apply before 031000.
++-- Stacy privacy (same as session_feedback): rows never reach OpenAI or ROMBot/ai-chat; nothing to Meta
++-- beyond a no-answers event (this build adds no Meta or Notion hook); deleted with the account
++-- (user_id REFERENCES public.users(id) ON DELETE CASCADE, matching assessments.user_id; public.users.id
++-- itself references auth.users(id) ON DELETE CASCADE); export-my-data coverage, flag stays off.
++-- Apply via MCP apply_migration only, after its own gate, and only after 031000 and (if applying both)
++-- after 20261117120000 is live or this is applied as a later id. Combined rollback:
++-- 20261117120100_p1_18_feedback_tables_rollback.sql (drops this table, then session_feedback).
++
++CREATE TABLE public.assessment_feedback (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
++  assessment_id uuid NOT NULL REFERENCES public.assessments(id) ON DELETE CASCADE,
++  ease text NOT NULL,
++  results_clear text NOT NULL,
++  check_again text NOT NULL,
++  survey_version text NOT NULL,
++  sport text NOT NULL DEFAULT 'base',
++  source text NOT NULL DEFAULT 'web',
++  created_at timestamptz NOT NULL DEFAULT now(),
++  CONSTRAINT assessment_feedback_assessment_id_key UNIQUE (assessment_id),
++  CONSTRAINT assessment_feedback_ease_check CHECK (ease IN ('easy', 'okay', 'hard')),
++  CONSTRAINT assessment_feedback_results_clear_check CHECK (results_clear IN ('yes', 'mostly', 'no')),
++  CONSTRAINT assessment_feedback_check_again_check CHECK (check_again IN ('yes', 'maybe', 'no')),
++  CONSTRAINT assessment_feedback_survey_version_check CHECK (survey_version = 'p1-18b-card1-2026-11-16'),
++  CONSTRAINT assessment_feedback_sport_check CHECK (sport = 'base'),
++  CONSTRAINT assessment_feedback_source_check CHECK (source = 'web')
++);
++
++CREATE INDEX assessment_feedback_user_created_idx
++  ON public.assessment_feedback (user_id, created_at DESC);
++
++COMMENT ON TABLE public.assessment_feedback IS
++  'P1-18b (20261117120100, unapplied). One row per full assessment (unique assessment_id). Write-once from the signed-in user. No free-text column. INSERT is allowed only for the caller''s own assessments with check_kind = ''full'' (quick and any non-full kind, including partial, are rejected). Answers are not copied to product_events, ai-chat, ROMBot, Meta, or Notion.';
++
++ALTER TABLE public.assessment_feedback ENABLE ROW LEVEL SECURITY;
++
++CREATE POLICY assessment_feedback_insert_own
++  ON public.assessment_feedback
++  FOR INSERT
++  TO authenticated
++  WITH CHECK (
++    (SELECT auth.uid()) = user_id
++    AND EXISTS (
++      SELECT 1
++      FROM public.assessments a
++      WHERE a.id = assessment_id
++        AND a.user_id = (SELECT auth.uid())
++        AND a.check_kind = 'full'
++    )
++  );
++
++CREATE POLICY assessment_feedback_select_own
++  ON public.assessment_feedback
++  FOR SELECT
++  TO authenticated
++  USING ((SELECT auth.uid()) = user_id);
++
++REVOKE ALL ON TABLE public.assessment_feedback FROM PUBLIC, anon, authenticated;
++GRANT SELECT, INSERT ON TABLE public.assessment_feedback TO authenticated;
++
++CREATE OR REPLACE FUNCTION public.tg_pe_assessment_feedback()
++RETURNS trigger
++LANGUAGE plpgsql
++SECURITY DEFINER
++SET search_path TO 'public', 'pg_temp'
++AS $$
++BEGIN
++  -- Stacy: payload holds only ids, timestamps, and the event name. No answers.
++  PERFORM public.log_product_event(
++    NEW.user_id,
++    'assessment_feedback_submitted',
++    jsonb_build_object(
++      'id', NEW.id,
++      'assessment_id', NEW.assessment_id,
++      'created_at', NEW.created_at
++    )
++  );
++  RETURN NEW;
++END;
++$$;
++
++COMMENT ON FUNCTION public.tg_pe_assessment_feedback() IS
++  'P1-18b. AFTER INSERT on assessment_feedback: product_events assessment_feedback_submitted with props id, assessment_id, created_at only. Never copies ease, results_clear, check_again, or survey_version.';
++
++REVOKE ALL ON FUNCTION public.tg_pe_assessment_feedback() FROM PUBLIC, anon, authenticated;
++
++CREATE TRIGGER trg_pe_assessment_feedback
++  AFTER INSERT ON public.assessment_feedback
++  FOR EACH ROW
++  EXECUTE FUNCTION public.tg_pe_assessment_feedback();
+diff --git a/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback_rollback.sql b/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback_rollback.sql
+new file mode 100644
+index 0000000..432bfcf
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117120100_p1_18_assessment_feedback_rollback.sql
+@@ -0,0 +1,9 @@
++-- ROLLBACK for 20261117120100_p1_18_assessment_feedback only (UNAPPLIED companion).
++-- Drops the P1-18b trigger, function, and table (policies and indexes go with the table).
++-- Does not drop session_feedback. For both tables, use
++-- 20261117120100_p1_18_feedback_tables_rollback.sql instead.
++-- Does not change public.assessments, public.users, public.product_events, or any webhook.
++
++DROP TRIGGER IF EXISTS trg_pe_assessment_feedback ON public.assessment_feedback;
++DROP FUNCTION IF EXISTS public.tg_pe_assessment_feedback();
++DROP TABLE IF EXISTS public.assessment_feedback;
+diff --git a/supabase/migrations-unapplied/20261117120100_p1_18_feedback_tables_rollback.sql b/supabase/migrations-unapplied/20261117120100_p1_18_feedback_tables_rollback.sql
+new file mode 100644
+index 0000000..5da69d1
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117120100_p1_18_feedback_tables_rollback.sql
+@@ -0,0 +1,14 @@
++-- COMBINED ROLLBACK for P1-18 session_feedback (20261117120000) and
++-- P1-18b assessment_feedback (20261117120100). UNAPPLIED companion. Exact restore of both.
++-- Order: drop assessment_feedback first, then session_feedback.
++-- Does not change public.protocol_sessions, public.assessments, public.users, public.product_events,
++-- public.log_product_event, public.client_feedback, or any webhook.
++-- Does not delete already-written product_events rows (none exist until apply + insert).
++
++DROP TRIGGER IF EXISTS trg_pe_assessment_feedback ON public.assessment_feedback;
++DROP FUNCTION IF EXISTS public.tg_pe_assessment_feedback();
++DROP TABLE IF EXISTS public.assessment_feedback;
++
++DROP TRIGGER IF EXISTS trg_pe_session_feedback ON public.session_feedback;
++DROP FUNCTION IF EXISTS public.tg_pe_session_feedback();
++DROP TABLE IF EXISTS public.session_feedback;

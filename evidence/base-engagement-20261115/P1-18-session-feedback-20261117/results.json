@@ -1,0 +1,176 @@
+{
+  "totals": {
+    "pass": 33,
+    "fail": 0,
+    "total": 33
+  },
+  "results": {
+    "T_existing objects unchanged after both applies (protocol_sessions, assessments, users, product_events, client_feedback, log_product_event)": {
+      "pass": true
+    },
+    "T_session_feedback columns": {
+      "pass": true,
+      "info": {
+        "cols": "id:uuid,user_id:uuid,session_id:uuid,session_date:date,feel:text,clear:text,length_fit:text,note:text,sport:text,source:text,created_at:timestamp with time zone"
+      }
+    },
+    "T_assessment_feedback columns (no free-text note)": {
+      "pass": true,
+      "info": {
+        "cols": "id:uuid,user_id:uuid,assessment_id:uuid,ease:text,results_clear:text,check_again:text,survey_version:text,sport:text,source:text,created_at:timestamp with time zone"
+      }
+    },
+    "T_sf own insert OK": {
+      "pass": true
+    },
+    "T_sf own select OK": {
+      "pass": true
+    },
+    "T_sf other user's rows denied (select)": {
+      "pass": true
+    },
+    "T_sf other user cannot insert onto someone else's session": {
+      "pass": true
+    },
+    "T_sf user2 can insert their own row": {
+      "pass": true
+    },
+    "T_sf anon denied": {
+      "pass": true
+    },
+    "T_sf event payload is ids + timestamps + event name only (no answers, no note)": {
+      "pass": true,
+      "info": {
+        "propKeys": [
+          "created_at",
+          "id",
+          "session_id"
+        ]
+      }
+    },
+    "T_af own insert on FULL assessment OK": {
+      "pass": true
+    },
+    "T_af own select OK": {
+      "pass": true
+    },
+    "T_af other user's rows denied (select)": {
+      "pass": true
+    },
+    "T_af other user's FULL assessment rejected": {
+      "pass": true
+    },
+    "T_af other user cannot insert a row for user1's FULL assessment": {
+      "pass": true
+    },
+    "T_af own QUICK assessment rejected": {
+      "pass": true
+    },
+    "T_af own PARTIAL assessment rejected": {
+      "pass": true
+    },
+    "T_af anon denied": {
+      "pass": true
+    },
+    "T_af user2 can insert on their own FULL assessment": {
+      "pass": true
+    },
+    "T_af user1 still sees only their own row": {
+      "pass": true
+    },
+    "T_af event payload is ids + timestamps + event name only (no answers)": {
+      "pass": true,
+      "info": {
+        "propKeys": [
+          "assessment_id",
+          "created_at",
+          "id"
+        ]
+      }
+    },
+    "T_both tables are write-once (no update/delete for the owner)": {
+      "pass": true
+    },
+    "T_deleting the account removes both session_feedback and assessment_feedback rows (ON DELETE CASCADE); other user kept": {
+      "pass": true,
+      "info": {
+        "sfBefore": 1,
+        "afBefore": 1,
+        "sfAfter": 0,
+        "afAfter": 0,
+        "sfOther": 1,
+        "afOther": 1
+      }
+    },
+    "T_combined rollback is exact: both tables and trigger functions dropped; existing objects restored to pre-apply": {
+      "pass": true
+    },
+    "T_re-apply both after combined rollback is clean": {
+      "pass": true
+    },
+    "T_export-my-data TABLES includes session_feedback with all columns, keyed on user_id": {
+      "pass": true
+    },
+    "T_export-my-data TABLES includes assessment_feedback with all columns, keyed on user_id": {
+      "pass": true
+    },
+    "T_EXPORT_MY_DATA stays off (flagOn still exact \"on\"; index.ts still reads the env flag)": {
+      "pass": true
+    },
+    "T_grep: session_feedback and assessment_feedback do not appear in ai-chat, embed-knowledge, rombot_context, search_rombot_knowledge, or rombot-checkin": {
+      "pass": true,
+      "info": {
+        "scanned": 24,
+        "leakHits": []
+      }
+    },
+    "T_grep: on-branch ai-chat .from() tables are a fixed allow-list (no generic pull, no feedback tables)": {
+      "pass": true,
+      "info": {
+        "aiFrom": [
+          "ai_conversations",
+          "ai_messages",
+          "athletes",
+          "coaches",
+          "rombot_context",
+          "user_ai_preferences",
+          "users"
+        ]
+      }
+    },
+    "T_grep: embed-knowledge only reads/writes rombot_knowledge": {
+      "pass": true,
+      "info": {
+        "embedFrom": [
+          "rombot_knowledge"
+        ]
+      }
+    },
+    "T_grep: rombot_context migrations do not reference session_feedback, assessment_feedback, or client_feedback": {
+      "pass": true,
+      "info": {
+        "files": [
+          "20260430000002_rombot_context_view.sql"
+        ]
+      }
+    },
+    "T_grep: rombot-checkin (11803fee tree) has no session_feedback or assessment_feedback in .from() list": {
+      "pass": true,
+      "info": {
+        "cFrom": [
+          "account_deletion_requests",
+          "ai_conversations",
+          "ai_messages",
+          "assessments",
+          "client_feedback",
+          "email_sends",
+          "notification_preferences",
+          "protocol_sessions",
+          "protocols",
+          "user_mobility_schedule",
+          "users"
+        ]
+      }
+    }
+  }
+}
