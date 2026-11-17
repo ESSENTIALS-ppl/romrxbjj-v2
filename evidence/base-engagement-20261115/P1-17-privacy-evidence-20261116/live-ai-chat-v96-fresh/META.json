@@ -1,0 +1,13 @@
+{
+  "id": "30e659d6-5d8b-418b-ae69-0a9cdd17eae0",
+  "slug": "ai-chat",
+  "name": "ai-chat",
+  "status": "ACTIVE",
+  "version": 96,
+  "created_at": 1777562809529,
+  "updated_at": 1794791677539,
+  "verify_jwt": true,
+  "import_map": false,
+  "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_30e659d6-5d8b-418b-ae69-0a9cdd17eae0_96/source/source/index.ts",
+  "ezbr_sha256": "2db1a2de38f0e57c86ea3e43e2644c0f572787fc5830774ef73c53e51466dff7"
+}

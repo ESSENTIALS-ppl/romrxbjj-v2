@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://api.openai.com/v1/embeddings",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer [REDACTED]",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "text-embedding-ada-002",
+      "input": "Got it, I'll start today's plan."
+    }
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "label": "Client request body as built by romrx-io-web live 8bf3d601 app/src/pages/ROMBot.tsx:90-97. Not a live submit.",
+  "commit": "8bf3d601674fe9bd6ff2252e71409d29a71df662",
+  "file": "app/src/pages/ROMBot.tsx",
+  "lines": "90-97",
+  "body_shape": {
+    "message": "<user text>",
+    "conversation_id": "<convId or undefined>",
+    "sport": "base"
+  },
+  "body_used_in_this_replay": {
+    "message": "Got it, I'll start today's plan.",
+    "conversation_id": "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
+    "sport": "base"
+  }
+}

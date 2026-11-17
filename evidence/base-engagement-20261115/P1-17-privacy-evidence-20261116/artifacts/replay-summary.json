@@ -1,0 +1,91 @@
+{
+  "label": "LOCAL REPLAY of deployed ai-chat v96 bytes. NOT a live capture. Live ai-chat request: NOT TESTED. Real Resend send: NOT TESTED.",
+  "handler_sha256": "24f61509de9fc132a3da9b558fd13ecfc065455c014716153ba9b96cf0fc4554",
+  "handler_sha256_match_24f61509": true,
+  "live_list_edge_functions": {
+    "slug": "ai-chat",
+    "version": 96,
+    "ezbr_sha256": "2db1a2de38f0e57c86ea3e43e2644c0f572787fc5830774ef73c53e51466dff7",
+    "verify_jwt": true
+  },
+  "flags_in_replay": {
+    "ROMBOT_HISTORY": null,
+    "ROMBOT_PACK_DATA": null,
+    "ROMBOT_CHECKIN_SEND": null,
+    "note": "unset = fail-safe off; live secrets were not read"
+  },
+  "http_status": 200,
+  "response": {
+    "reply": "LOCAL MOCK REPLY: your plan is ready whenever you are.",
+    "conversation_id": "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
+    "provider": "rombot",
+    "sport": "base"
+  },
+  "client_body": {
+    "message": "Got it, I'll start today's plan.",
+    "conversation_id": "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
+    "sport": "base"
+  },
+  "embeddings_calls": 1,
+  "chat_completions_calls": 1,
+  "other_openai_calls": 0,
+  "resend_calls": 0,
+  "tables_queried": [
+    "users",
+    "rombot_context",
+    "ai_conversations",
+    "ai_messages"
+  ],
+  "selects": {
+    "users": [
+      "portal_role, full_name, active_sport, sports_enabled"
+    ],
+    "rombot_context": [
+      "user_id, full_name, latest_assessment_id, rom_total, worst_joints, joint_scores, technique_summary, red_techniques, green_techniques, yellow_techniques, protocol, saved_game_plans"
+    ],
+    "ai_conversations": [
+      "id"
+    ],
+    "ai_messages": [
+      "role, content"
+    ]
+  },
+  "rpcs": [
+    {
+      "name": "search_rombot_knowledge",
+      "arg_keys": [
+        "query_embedding",
+        "p_sport",
+        "match_threshold",
+        "match_count"
+      ]
+    }
+  ],
+  "session_or_session_log_tables_queried": [],
+  "local_inserts_count": 1,
+  "checkin_note_seeded_in_history": true,
+  "checkin_note_present_in_completions_body": false,
+  "marker_hits": {
+    "age": {
+      "marker": "AGE_MARKER_ZXQ94_AGE_47",
+      "hits_in_openai_bodies": 0
+    },
+    "gender": {
+      "marker": "GENDER_MARKER_ZXQ94_NONBINARY",
+      "hits_in_openai_bodies": 0
+    },
+    "injury_notes": {
+      "marker": "INJURY_NOTE_MARKER_ZXQ94_LEFT_KNEE_ACL",
+      "hits_in_openai_bodies": 0
+    },
+    "session_log": {
+      "marker": "SESSION_LOG_MARKER_ZXQ94_SET_COUNT_999",
+      "hits_in_openai_bodies": 0
+    },
+    "session": {
+      "marker": "SESSION_MARKER_ZXQ94_DURATION_777",
+      "hits_in_openai_bodies": 0
+    }
+  },
+  "markers_any_hit": false
+}
