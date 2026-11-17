@@ -168,7 +168,7 @@ export function buildIcs(input: CalendarInput): string {
   if (!(checkDay && retestDay && checkDay >= retestDay)) {
     oneShot("romrx-check", input.next_check_at, "ROMRx check-in", "A short ROMRx check-in is due.");
   }
-  oneShot("romrx-retest", input.next_retest_at, "ROMRx 6-week retest", "Your 6-week ROMRx retest is due.");
+  oneShot("romrx-retest", input.next_retest_at, "ROMRx retest", "Your ROMRx retest is due.");
   lines.push("END:VCALENDAR");
   return lines.map(fold).join("\r\n") + "\r\n";
 }

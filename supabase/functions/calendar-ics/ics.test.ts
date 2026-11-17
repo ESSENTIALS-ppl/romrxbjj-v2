@@ -22,7 +22,11 @@ Deno.test("P1-12 ics has weekly protocol days, check and retest, no scores", () 
   assert(ics.includes("DTSTART;TZID=America/New_York:20261115T070000"));
   assert(ics.includes("SUMMARY:ROMRx protocol session"));
   assert(ics.includes("SUMMARY:ROMRx check-in"));
-  assert(ics.includes("SUMMARY:ROMRx 6-week retest"));
+  assert(ics.includes("SUMMARY:ROMRx retest\r\n"));
+  assert(ics.includes("DESCRIPTION:Your ROMRx retest is due.\r\n"));
+  assertFalse(/6-week/.test(ics));
+  assert(ics.includes("DESCRIPTION:Your ROMRx session for today.\r\n"));
+  assert(ics.includes("DESCRIPTION:A short ROMRx check-in is due.\r\n"));
   assert(ics.includes("DTSTART;TZID=America/New_York:20261122T070000"));
   assert(ics.includes("DTSTART;TZID=America/New_York:20261227T070000"));
   assertFalse(/score|PRS|hip|shoulder|joint/i.test(ics));
@@ -143,6 +147,8 @@ Deno.test("P1-12 after the day-8 roll or a quick check (next_check_at = next_ret
   });
   assertFalse(ics.includes("UID:romrx-check"));
   assert(ics.includes("UID:romrx-retest"));
+  assert(ics.includes("SUMMARY:ROMRx retest\r\n"));
+  assert(ics.includes("DESCRIPTION:Your ROMRx retest is due.\r\n"));
   assertEquals(ics.split("BEGIN:VEVENT").length - 1, 2);
 });
 
