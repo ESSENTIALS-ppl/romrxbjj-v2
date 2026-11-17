@@ -1,0 +1,27 @@
+{
+  "id": "d9bc6384-fc26-44fb-a51d-32aa8f28dd7b",
+  "name": "incomparable-pastelito-849104",
+  "url": "https://romrx.io",
+  "ssl_url": "https://romrx.io",
+  "custom_domain": "romrx.io",
+  "stop_builds": true,
+  "stopped_builds": null,
+  "published_deploy": {
+    "id": "6afb9d261d2f405269bcab7a",
+    "state": "ready",
+    "locked": true,
+    "published_at": "2026-11-17T00:18:18.008Z",
+    "created_at": "2026-11-17T00:17:42.294Z",
+    "updated_at": "2026-11-17T00:18:20.490Z",
+    "commit_ref": null,
+    "branch": "main",
+    "context": "deploy-preview",
+    "error_message": null,
+    "deploy_time": 4,
+    "deploy_ssl_url": "https://6afb9d261d2f405269bcab7a--incomparable-pastelito-849104.netlify.app",
+    "manual_deploy": false,
+    "title": "adc6249b7a778b2ea5b94afe8d380f1b3482b7b6 TZ fallback v2 (manual CLI, not from main)",
+    "deploy_source": "cli",
+    "build_id": null
+  }
+}
