@@ -1,0 +1,7 @@
+ecd674f571aa2a8c69254594fd25720350b4ee47a1c550c2bb39fd2f285f8b8d  ./RECEIPT-P1-12-ON-47AAD435-v2-20261116.md
+8e2c91fa47b138181696f380b59444badc1f7ce22cff4021f52faf97ebc56e2c  ./f39839a0.patch
+b3d64210b84b94e2826d7e6ec7d15fcf95beb28c9f65b976f8d237a9ca358a60  ./logs-r2/base-47aad435-deployed-compare.txt
+fdd133bf831a67c1983752ba8954214088d51a21c0d1fab352de12f883d6c146  ./logs-r2/deno-check-r2.txt
+3e2f7460ee1b92a589e2d6c7d2d8a64b2a2750731f528a98e14d6a055b29a8f9  ./logs-r2/deno-test-r2.txt
+d1cb6a3e51f169596cf9bf01a63f7b0fd909d937e390e7a9d63406fabbfc6188  ./samples-r2/sample-r2-after-roll.ics
+e8b5a6dfdcc8511a2e9a69f6dd4eca49f958258a8b08400c114d60ef5936300e  ./samples-r2/sample-r2-base.ics

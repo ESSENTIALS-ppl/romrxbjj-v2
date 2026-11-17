@@ -1,0 +1,45 @@
+PASS  input: replayed P1-29 SQL sha256 = b4861884... (from ae58b91f, not on this branch)  b4861884e9b69c0fb06680a12801c50a91b10020204c1dd128221f42b19d16d9
+PASS  input: P1-29 migration file is NOT on this branch
+PASS  input: P1-29b sql sha256  f0558b7459d71dba8345fc88bed78258dc701be9378970b5617a6f58a259966b
+PASS  input: P1-29b rollback sha256  b1de7f7a59a20a8abcf4ca3942f7a783236d305758cf0e3e1b8267789a436066
+PASS  P1-29 baseline: policy "users: linked coach reads roster athletes" present
+PASS  P1-29 baseline (the WARN): coach_C can read athlete D email/stripe_* directly  1
+PASS  apply: P1-29b applies cleanly after P1-29
+PASS  helper: exists once, SECURITY DEFINER, STABLE  [{"prosecdef":true,"provolatile":"s","proconfig":["search_path=\"\""],"res":"TABLE(id uuid, full_name text, belt text)","owner":"postgres"}]
+PASS  helper: search_path pinned to empty  ["search_path=\"\""]
+PASS  helper: returns TABLE(id uuid, full_name text, belt text)  TABLE(id uuid, full_name text, belt text)
+PASS  helper grants: EXECUTE authenticated only (anon false, service_role false, no PUBLIC)  {"priv":[{"r":"anon","x":false},{"r":"authenticated","x":true},{"r":"service_role","x":false}],"acl":"{postgres=X/postgres,authenticated=X/postgres}"}
+PASS  policy: "users: linked coach reads roster athletes" dropped; other users policies unchanged  ["users: school admin reads school users","users: self read","users: service role full access"]
+PASS  view: security_invoker=true and security_barrier=true kept  ["security_barrier=true","security_invoker=true"]
+PASS  view: grants unchanged (authenticated, service_role SELECT; no anon)  [{"grantee":"authenticated","privilege_type":"SELECT"},{"grantee":"service_role","privilege_type":"SELECT"}]
+PASS  linked coach: helper columns are exactly id, full_name, belt  ["id","full_name","belt"]
+PASS  linked coach: helper rows = linked athlete D only  [{"id":"eeeeeeee-0000-4000-8000-0000000000d1","full_name":"Athlete D","belt":"blue"}]
+PASS  linked coach: roster columns unchanged (athlete_id, user_id, full_name, belt)  ["athlete_id","user_id","full_name","belt"]
+PASS  linked coach: roster rows identical to P1-29 (D only)  [{"athlete_id":"ffffffff-0000-4000-8000-0000000000d1","user_id":"eeeeeeee-0000-4000-8000-0000000000d1","full_name":"Athlete D","belt":"blue"}]
+PASS  linked coach: SELECT email/stripe_*/gender/age_bucket or * from users for athlete D = 0 rows; sees no other users rows  {"sensitive":0,"star":0,"others":0}
+PASS  linked coach: own users row still visible (self read)  ["c1"]
+PASS  unlinked coach: helper 0 rows  []
+PASS  unlinked coach: roster 0 rows  []
+PASS  athlete_D: own users SELECT unchanged from P1-29 (all columns, same rows)  ["d1"]
+PASS  athlete_D: roster 0 rows  []
+PASS  athlete_D: helper 0 rows  []
+PASS  athlete_E: own users SELECT unchanged from P1-29 (all columns, same rows)  ["e1"]
+PASS  athlete_E: roster 0 rows  []
+PASS  athlete_E: helper 0 rows  []
+PASS  anon: cannot EXECUTE helper (42501)  {"err":"42501:permission denied for function coach_linked_athletes"}
+PASS  anon: cannot SELECT roster (42501)  {"err":"42501:permission denied for view coach_roster"}
+PASS  school admin: users SELECT identical to P1-29 (self + school member SU)  ["a1","b1"]
+PASS  school admin: roster identical to P1-29 (0 rows)  []
+PASS  service_role: users SELECT identical to P1-29 (all 6)  6
+PASS  service_role: helper EXECUTE denied (authenticated only)  {"err":"42501:permission denied for function coach_linked_athletes"}
+PASS  rollback: helper dropped  0
+PASS  rollback: users policies identical to P1-29 (policy restored, same qual)  ["users: linked coach reads roster athletes","users: school admin reads school users","users: self read","users: service role full access"]
+PASS  rollback: coach_roster definition identical to P1-29
+PASS  rollback: coach_roster reloptions identical to P1-29  ["security_barrier=true","security_invoker=true"]
+PASS  rollback: every persona users + roster result identical to P1-29
+PASS  re-apply after rollback: still narrowed  {"sensitive":0,"star":0,"others":0}
+PASS  mutant setup: DROP POLICY line removed from mutant SQL
+PASS  mutant caught: P1-29 users policy left in place
+PASS  mutant caught: helper EXECUTE left to anon
+PASS  mutant caught: helper returns an extra column (email)
+{"passed":44,"failed":0,"total":44,"failed_names":[]}

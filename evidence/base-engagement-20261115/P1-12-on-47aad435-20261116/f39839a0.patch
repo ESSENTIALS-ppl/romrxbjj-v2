@@ -1,0 +1,39 @@
+diff --git a/supabase/functions/calendar-ics/ics.test.ts b/supabase/functions/calendar-ics/ics.test.ts
+index f2c6d75..c1587da 100644
+--- a/supabase/functions/calendar-ics/ics.test.ts
++++ b/supabase/functions/calendar-ics/ics.test.ts
+@@ -22,7 +22,11 @@ Deno.test("P1-12 ics has weekly protocol days, check and retest, no scores", ()
+   assert(ics.includes("DTSTART;TZID=America/New_York:20261115T070000"));
+   assert(ics.includes("SUMMARY:ROMRx protocol session"));
+   assert(ics.includes("SUMMARY:ROMRx check-in"));
+-  assert(ics.includes("SUMMARY:ROMRx 6-week retest"));
++  assert(ics.includes("SUMMARY:ROMRx retest\r\n"));
++  assert(ics.includes("DESCRIPTION:Your ROMRx retest is due.\r\n"));
++  assertFalse(/6-week/.test(ics));
++  assert(ics.includes("DESCRIPTION:Your ROMRx session for today.\r\n"));
++  assert(ics.includes("DESCRIPTION:A short ROMRx check-in is due.\r\n"));
+   assert(ics.includes("DTSTART;TZID=America/New_York:20261122T070000"));
+   assert(ics.includes("DTSTART;TZID=America/New_York:20261227T070000"));
+   assertFalse(/score|PRS|hip|shoulder|joint/i.test(ics));
+@@ -143,6 +147,8 @@ Deno.test("P1-12 after the day-8 roll or a quick check (next_check_at = next_ret
+   });
+   assertFalse(ics.includes("UID:romrx-check"));
+   assert(ics.includes("UID:romrx-retest"));
++  assert(ics.includes("SUMMARY:ROMRx retest\r\n"));
++  assert(ics.includes("DESCRIPTION:Your ROMRx retest is due.\r\n"));
+   assertEquals(ics.split("BEGIN:VEVENT").length - 1, 2);
+ });
+ 
+diff --git a/supabase/functions/calendar-ics/ics.ts b/supabase/functions/calendar-ics/ics.ts
+index a6e2852..30235ff 100644
+--- a/supabase/functions/calendar-ics/ics.ts
++++ b/supabase/functions/calendar-ics/ics.ts
+@@ -168,7 +168,7 @@ export function buildIcs(input: CalendarInput): string {
+   if (!(checkDay && retestDay && checkDay >= retestDay)) {
+     oneShot("romrx-check", input.next_check_at, "ROMRx check-in", "A short ROMRx check-in is due.");
+   }
+-  oneShot("romrx-retest", input.next_retest_at, "ROMRx 6-week retest", "Your 6-week ROMRx retest is due.");
++  oneShot("romrx-retest", input.next_retest_at, "ROMRx retest", "Your ROMRx retest is due.");
+   lines.push("END:VCALENDAR");
+   return lines.map(fold).join("\r\n") + "\r\n";
+ }

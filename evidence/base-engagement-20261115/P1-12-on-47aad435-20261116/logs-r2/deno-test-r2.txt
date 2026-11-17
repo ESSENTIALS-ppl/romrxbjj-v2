@@ -1,0 +1,11 @@
+running 7 tests from ./ics.test.ts
+P1-12 parseReminderTime ... ok (942µs)
+P1-12 ics has weekly protocol days, check and retest, no scores ... ok (11ms)
+P1-12 handler: 401 without auth, 200 ics with user, missing schedule still returns weekly events ... ok (7ms)
+P1-12 ics is valid for Google Calendar and Apple Calendar (RFC 5545 + ical.js) ... ok (7ms)
+P1-12 fold counts octets (multibyte), never splits a character, unfolds back exactly ... ok (217µs)
+P1-12 after the day-8 roll or a quick check (next_check_at = next_retest_at): retest only, no duplicate check-in ... ok (514µs)
+P1-12 missing or invalid timezone falls back to America/New_York (live P1-07 v4) ... ok (765µs)
+
+ok | 7 passed | 0 failed (36ms)
+
