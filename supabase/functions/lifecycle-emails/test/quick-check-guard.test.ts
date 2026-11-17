@@ -130,8 +130,10 @@ async function runHandle(kind: "check7" | "check14", env: Record<string, string>
 
 Deno.test("handler: QUICK_CHECK_ON unset (or not exactly 'on') skips version A and still sends version B; no send switch is written", async () => {
   const base = { LIFECYCLE_EMAILS_SEND: "on", LIFECYCLE_AUDIENCE: "all", UNSUBSCRIBE_HMAC_SECRET: "s".repeat(40) };
-  for (const extra of [{}, { QUICK_CHECK_ON: "" }, { QUICK_CHECK_ON: "true" }, { QUICK_CHECK_ON: "TRUE" }, { QUICK_CHECK_ON: "1" }]) {
-    const env = { ...base, ...extra };
+  // extras is explicitly Record<string, string>[] so spreading {} does not make QUICK_CHECK_ON: string | undefined (TS2345).
+  const extras: Record<string, string>[] = [{}, { QUICK_CHECK_ON: "" }, { QUICK_CHECK_ON: "true" }, { QUICK_CHECK_ON: "TRUE" }, { QUICK_CHECK_ON: "1" }];
+  for (const extra of extras) {
+    const env: Record<string, string> = { ...base, ...extra };
     const a7 = await runHandle("check7", env);
     assertEquals(a7.body.results.check7, { sent: 0, already: 0, failed: 0 }, JSON.stringify(extra));
     assertEquals(a7.sends.length, 0);
