@@ -38,7 +38,7 @@ import {
   disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
 } from "../_shared/arl_copy.ts";
 import { ArlConsentUnavailableError, COACH_DISCLOSURE, CONSENT_UNAVAILABLE_MESSAGE, CONSENT_UNAVAILABLE_STATUS, createConsentSession } from "./consent_session.ts";
-import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS } from "./packs_gate.ts";
+import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS, planBaseCheckout, planUnlockTrialEndUnix } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY      = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -185,7 +185,8 @@ Deno.serve(async (req: Request) => {
   // v40 sport pack kill switch (default closed). Read per request so a secret change needs no code change.
   // Lead-email unlock (base + lead_token) naming a sport: sport dropped, continues as Base-only (logged after the claim).
   let packSportDropped: string | null = null;
-  if (!packsCheckoutOpen(Deno.env.get("PACKS_CHECKOUT_OPEN"))) {
+  const packsOpen = packsCheckoutOpen(Deno.env.get("PACKS_CHECKOUT_OPEN"));
+  if (!packsOpen) {
     const gate = packGateDecision(mode, body, BASE_PRICE_ID);
     if (gate.action === "block") {
       await logEvent("checkout_packs_closed", { props: { mode, reason: gate.reason } });
@@ -217,8 +218,14 @@ Deno.serve(async (req: Request) => {
       await logEvent("checkout_packs_closed_sport_dropped", { userId: body.user_id, props: { mode, dropped_sport: packSportDropped.slice(0, 32), lead_token: true } });
     }
     const pendingSport = normalizePendingSport(body.pending_sport ?? body.add);
+    // Defense in depth: never add a pack line item while packs are closed (the gate above should already 403 or drop).
+    if (pendingSport && !packsOpen) {
+      await logEvent("checkout_packs_closed", { userId: body.user_id, props: { mode, reason: "combo_item_blocked" } });
+      return json(PACKS_CLOSED_STATUS, packsClosedBody());
+    }
+    const packPlan = planBaseCheckout(!!pendingSport, packsOpen);
     const meta: Record<string, string> = { purpose: "base", user_id: body.user_id };
-    if (pendingSport) meta.pending_sport = pendingSport;
+    if (packPlan.includePack && pendingSport) meta.pending_sport = pendingSport;
     if (pendingSport && !SPORT_PRICE_IDS[pendingSport]) return json(400, { error: "invalid_pending_sport" });
     // Test mode only for a signed-in fixture checking out as themself.
     const caller = stripeTest && testRequested ? await getCallerUser(admin, req) : null;
@@ -230,7 +237,7 @@ Deno.serve(async (req: Request) => {
       basePrice = await resolveYearlyPrice(s, testMode, "base", BASE_PRICE_ID);
       // Locked Legal terms (spec 3b, signup page) say $60 per year. Refuse rather than show a different price.
       if (basePrice.amount !== 6000) throw new ArlPriceError(`base price ${basePrice.id} is ${basePrice.amount}, expected 6000`);
-      if (pendingSport) sportPriceR = await resolveYearlyPrice(s, testMode, pendingSport, SPORT_PRICE_IDS[pendingSport]);
+      if (packPlan.includePack && pendingSport) sportPriceR = await resolveYearlyPrice(s, testMode, pendingSport, SPORT_PRICE_IDS[pendingSport]);
     } catch (e) {
       console.error("arl price resolve failed", String(e));
       return json(502, { error: "stripe_error", stripe_type: null, stripe_code: null, message: "Could not load plan price" });
@@ -238,21 +245,21 @@ Deno.serve(async (req: Request) => {
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       { price: basePrice.id, quantity: 1 },
     ];
-    if (sportPriceR) line_items.push({ price: sportPriceR.id, quantity: 1 });
-    const disclosure = pendingSport && sportPriceR
+    if (packPlan.includePack && sportPriceR) line_items.push({ price: sportPriceR.id, quantity: 1 });
+    const disclosure = packPlan.includePack && pendingSport && sportPriceR
       ? disclosureCombo(formatUsd(basePrice.amount), formatUsd(sportPriceR.amount), SPORT_PACK_NAMES[pendingSport])
       : disclosureBase(formatUsd(basePrice.amount));
     const arlMeta: Record<string, string> = {
       ...meta,
       arl_version: ARL_DISCLOSURE_VERSION,
-      arl_offer: pendingSport ? "combo" : "base",
+      arl_offer: packPlan.includePack ? "combo" : "base",
       arl_period: "free",
       arl_price_ids: line_items.map((l) => l.price).join(","),
-      arl_amounts: [basePrice.amount, ...(sportPriceR ? [sportPriceR.amount] : [])].join(","),
+      arl_amounts: [basePrice.amount, ...(packPlan.includePack && sportPriceR ? [sportPriceR.amount] : [])].join(","),
       arl_ua: (req.headers.get("user-agent") ?? "").slice(0, 255),
       arl_mode: testMode ? "test" : "live",
     };
-    const successUrl = pendingSport
+    const successUrl = packPlan.includePack && pendingSport
       ? `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_success&add=${pendingSport}`
       : `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_success`;
     try {
@@ -265,10 +272,9 @@ Deno.serve(async (req: Request) => {
         success_url: successUrl,
         cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_cancel`,
         metadata: arlMeta,
-        subscription_data: {
-          metadata: meta,
-          trial_end: 1798822800,
-        },
+        subscription_data: packPlan.trialEndUnix != null
+          ? { metadata: meta, trial_end: packPlan.trialEndUnix }
+          : { metadata: meta },
         payment_method_collection: "always",
       };
       let session: Stripe.Checkout.Session;
@@ -340,6 +346,10 @@ Deno.serve(async (req: Request) => {
       arl_ua: (req.headers.get("user-agent") ?? "").slice(0, 255),
       arl_mode: testMode ? "test" : "live",
     };
+    if (!packsOpen) {
+      await logEvent("checkout_packs_closed", { userId, props: { mode, reason: "unlock_item_blocked" } });
+      return json(PACKS_CLOSED_STATUS, packsClosedBody());
+    }
     try {
       const unlockParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
@@ -347,9 +357,12 @@ Deno.serve(async (req: Request) => {
         allow_promotion_codes: true,
         client_reference_id: userId,
         metadata: unlockArlMeta,
-        subscription_data: freePeriod
-          ? { metadata: unlockMeta, trial_end: BETA_TRIAL_END_UNIX }
-          : { metadata: unlockMeta },
+        subscription_data: (() => {
+          const packTrialEnd = planUnlockTrialEndUnix();
+          return packTrialEnd != null
+            ? { metadata: unlockMeta, trial_end: packTrialEnd }
+            : { metadata: unlockMeta };
+        })(),
         payment_method_collection: "always",
         success_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_success`,
         cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=unlock_cancel`,

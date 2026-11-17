@@ -11,16 +11,37 @@ export const PACKS_CLOSED_CODE = "packs_closed";
 export const PACKS_CLOSED_STATUS = 403;
 
 // JAN1-PACK-CHARGE fix (2026-11-17, Jim Oct 29 ruling: packs are "Coming Spring 2027" at $149/yr, no pack charge on
-// Jan 1, 2027). Every pack checkout path in index.ts (Base+sport combo and sport unlock) sends trial_end = Jan 1, 2027
-// noon ET while the free period runs, so a pack opened before then would bill $149 (Base+pack $209) on Jan 1.
-// Hard floor: packs stay CLOSED until this instant even if PACKS_CHECKOUT_OPEN=true. After it, index.ts sends no
-// pack trial_end (freePeriod false) and a pack is charged only at the moment the customer buys it.
+// Jan 1, 2027). Without this, every pack checkout path in index.ts (Base+sport combo and sport unlock) would send
+// trial_end = Jan 1, 2027 noon ET while the free period runs, so a pack opened before then would bill $149
+// (Base+pack $209) on Jan 1.
+// Hard floor: packs stay CLOSED until this instant even if PACKS_CHECKOUT_OPEN=true.
+// index.ts also refuses to add a pack line item unless packsCheckoutOpen is true, and never sets trial_end
+// on a pack-bearing subscription (combo or unlock). After the floor, a pack is charged only when bought.
 // Must equal BETA_TRIAL_END_UNIX in _shared/arl_copy.ts (asserted in test/packs_gate_jan1.test.ts).
 export const PACKS_EARLIEST_OPEN_UNIX = 1798822800;
 
 export function packsCheckoutOpen(raw: string | undefined | null, nowMs: number = Date.now()): boolean {
   if (nowMs <= PACKS_EARLIEST_OPEN_UNIX * 1000) return false;
   return String(raw ?? "").trim().toLowerCase() === "true";
+}
+
+// Combo / unlock session plan (pure). index.ts must use this so a pack line item cannot be added
+// while packs are closed, and a pack-bearing subscription never gets the Jan 1, 2027 trial_end.
+export type BaseCheckoutPlan = {
+  includePack: boolean;
+  /** Unix trial_end for subscription_data, or null to omit it. */
+  trialEndUnix: number | null;
+};
+
+/** Base-only keeps the Jan 1 trial. A pack is added only when packs are open, and then trial_end is omitted. */
+export function planBaseCheckout(packRequested: boolean, packsOpen: boolean): BaseCheckoutPlan {
+  if (packRequested && packsOpen) return { includePack: true, trialEndUnix: null };
+  return { includePack: false, trialEndUnix: PACKS_EARLIEST_OPEN_UNIX };
+}
+
+/** Sport unlock never uses the Jan 1 trial_end (that would charge the pack on Jan 1). */
+export function planUnlockTrialEndUnix(): null {
+  return null;
 }
 
 // Values that mean "no sport" on a Base request (Base events log sport "general").
