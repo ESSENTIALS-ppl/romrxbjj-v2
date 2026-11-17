@@ -1,5 +1,5 @@
 {
-  "passed": 25,
+  "passed": 40,
   "failed": 0,
   "results": {
     "T1 default mode is dry_run and written=false": {
@@ -9,13 +9,12 @@
         "written": false
       }
     },
-    "T2 over-90 completed ADR and over-90 soft-delete are included (2)": {
+    "T2 only over-90 completed ADR is included (1); path 2 deleted_at-only is not": {
       "pass": true,
       "info": {
-        "n": 2,
+        "n": 1,
         "ids": [
-          "00000000-0000-4000-8000-000000000001",
-          "00000000-0000-4000-8000-000000000004"
+          "00000000-0000-4000-8000-000000000001"
         ]
       }
     },
@@ -23,8 +22,7 @@
       "pass": true,
       "info": {
         "ids": [
-          "00000000-0000-4000-8000-000000000001",
-          "00000000-0000-4000-8000-000000000004"
+          "00000000-0000-4000-8000-000000000001"
         ]
       }
     },
@@ -32,17 +30,15 @@
       "pass": true,
       "info": {
         "ids": [
-          "00000000-0000-4000-8000-000000000001",
-          "00000000-0000-4000-8000-000000000004"
+          "00000000-0000-4000-8000-000000000001"
         ]
       }
     },
-    "T5 included ids are OVER90 and SOFT90 only": {
+    "T5 included ids are OVER90 only": {
       "pass": true,
       "info": {
         "ids": [
-          "00000000-0000-4000-8000-000000000001",
-          "00000000-0000-4000-8000-000000000004"
+          "00000000-0000-4000-8000-000000000001"
         ]
       }
     },
@@ -85,14 +81,16 @@
         "hardAuth": 1,
         "internalRow": 1,
         "billing": 1,
-        "pe": 1
+        "pe": 1,
+        "leadsUid": 1,
+        "waitlist": 1
       }
     },
-    "T10 count-only returns qualifying_count=2 and no ids": {
+    "T10 count-only returns qualifying_count=1 and no ids": {
       "pass": true,
       "info": {
         "mode": "count",
-        "n": 2,
+        "n": 1,
         "ids": null
       }
     },
@@ -102,14 +100,21 @@
     "T12 retention below 90 days is refused": {
       "pass": true
     },
-    "T13 apply reports written=true, count=2, and a backup schema": {
+    "T26 dry-run does not drop existing backup schemas": {
+      "pass": true
+    },
+    "T13 apply reports written=true, count=1, and a backup schema": {
       "pass": true,
       "info": {
-        "schema": "zz_bak_p1_25_20261117001058",
-        "n": 2
+        "schema": "zz_bak_p1_25_20261117003104",
+        "n": 1,
+        "dropped": [
+          "zz_bak_p1_25_20260101000000",
+          "zz_bak_p1_25_20260201000000"
+        ]
       }
     },
-    "T14 apply deleted qualifying auth users and their assessments": {
+    "T14 apply deleted the over-90 ADR auth user and assessments; path-2 SOFT90 remains": {
       "pass": true
     },
     "T15 apply left under-90, requested, extra, and leftover product_events of non-qualifying users": {
@@ -130,14 +135,134 @@
     "T20 leftover no-FK rows for qualifying users were deleted (claims, product_events, feedback)": {
       "pass": true
     },
-    "T21 backup schema has manifest of 2 ids and copied assessments": {
+    "T21 backup schema has manifest of 1 id, copied assessments, and _p1_25_backup_meta": {
       "pass": true,
       "info": {
-        "schema": "zz_bak_p1_25_20261117001058"
+        "schema": "zz_bak_p1_25_20261117003104"
       }
     },
-    "T22 restore from backup puts qualifying auth users and assessments back": {
+    "T27 apply dropped backup schemas older than 7 days (meta and name-only)": {
+      "pass": true,
+      "info": {
+        "dropped": [
+          "zz_bak_p1_25_20260101000000",
+          "zz_bak_p1_25_20260201000000"
+        ]
+      }
+    },
+    "T28 apply kept a backup younger than 7 days": {
+      "pass": true,
+      "info": {
+        "young": "zz_bak_p1_25_20261115003104"
+      }
+    },
+    "T29 leads: purged when matched by user id (converted_user_id)": {
       "pass": true
+    },
+    "T30 leads: purged when matched by email (case-insensitive, trimmed; no user id)": {
+      "pass": true
+    },
+    "T31 leads: another user and excluded accounts untouched": {
+      "pass": true
+    },
+    "T32 sport_pack_waitlist: purged by email; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T33 investor_requests: purged by email; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T34 partner_inquiries: purged by email; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T35 yoga_testers: purged by email; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T36 athlete_injuries: purged by user id; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T37 attendance: purged by user id; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T38 coach_competitors: purged by user id; other user and excluded / under-90 / path-2 untouched": {
+      "pass": true,
+      "info": {
+        "qGone": 0,
+        "other": 1,
+        "hard": 1,
+        "intern": 1,
+        "fix": 1,
+        "under": 1,
+        "soft": 1
+      }
+    },
+    "T39 backup copied the purged leads and waitlist rows": {
+      "pass": true
+    },
+    "T22 restore from backup puts the qualifying auth user and assessments back": {
+      "pass": true
+    },
+    "T40 a later apply drops this run's own backup once older than 7 days, and keeps the still-young one": {
+      "pass": true,
+      "info": {
+        "dropped2": [
+          "zz_bak_p1_25_20261117003104"
+        ],
+        "newSchema": "zz_bak_p1_25_20261117003105"
+      }
     },
     "T23 function rollback drops purge_deleted_accounts": {
       "pass": true
