@@ -1,0 +1,219 @@
+-- ROLLBACK for P1-27 rebuilt on P1-29c (pending migration 20261117030000_p1_27_rls_perf_cleanup.sql).
+-- Restores the live-after-29c state read 2026-11-16 9:36 PM ET (head 20261117022451, 145 public policies):
+-- drops the 64 policies the migration creates, re-creates the 83 policies it drops with their exact
+-- live definitions (pg_policies), and re-creates the 3 duplicate indexes and the coach_notes unique constraint.
+-- coaches_select_athletes (dropped by P1-29c) is NOT re-created. Apply ONLY if P1-27 was applied and must be undone.
+
+BEGIN;
+
+-- 1. Drop every policy the migration created
+DROP POLICY IF EXISTS "account_deletion_requests: owner read" ON "public"."account_deletion_requests";
+DROP POLICY IF EXISTS "Coaches manage athlete injuries" ON "public"."athlete_injuries";
+DROP POLICY IF EXISTS "athletes_service_role_all" ON "public"."athletes";
+DROP POLICY IF EXISTS "athletes_update_own" ON "public"."athletes";
+DROP POLICY IF EXISTS "attendance_athlete_read" ON "public"."attendance";
+DROP POLICY IF EXISTS "body_metrics_owner_all" ON "public"."body_metrics";
+DROP POLICY IF EXISTS "assignments_athlete" ON "public"."coach_assignments";
+DROP POLICY IF EXISTS "assignments_athlete_complete" ON "public"."coach_assignments";
+DROP POLICY IF EXISTS "assignments_coach" ON "public"."coach_assignments";
+DROP POLICY IF EXISTS "competitors_athlete_read" ON "public"."coach_competitors";
+DROP POLICY IF EXISTS "Coaches manage own journal" ON "public"."coach_journal_notes";
+DROP POLICY IF EXISTS "coach_notes_own" ON "public"."coach_notes";
+DROP POLICY IF EXISTS "Coaches manage own teaching log" ON "public"."coach_teaching_log";
+DROP POLICY IF EXISTS "video_athlete" ON "public"."coach_video_feedback";
+DROP POLICY IF EXISTS "video_coach" ON "public"."coach_video_feedback";
+DROP POLICY IF EXISTS "consents_service_role_all" ON "public"."consents";
+DROP POLICY IF EXISTS "drill_sessions_self" ON "public"."drill_sessions";
+DROP POLICY IF EXISTS "exercises: service role write" ON "public"."exercises";
+DROP POLICY IF EXISTS "game_plans_self" ON "public"."game_plans";
+DROP POLICY IF EXISTS "joint_scores: service role" ON "public"."joint_scores";
+DROP POLICY IF EXISTS "leads_claim_unclaimed" ON "public"."leads";
+DROP POLICY IF EXISTS "leads_select_owner_after_claim" ON "public"."leads";
+DROP POLICY IF EXISTS "own mesocycles" ON "public"."mesocycles";
+DROP POLICY IF EXISTS "notif_self" ON "public"."notification_preferences";
+DROP POLICY IF EXISTS "pr_records_owner_all" ON "public"."pr_records";
+DROP POLICY IF EXISTS "progress_photos_owner_all" ON "public"."progress_photos";
+DROP POLICY IF EXISTS "completions_own" ON "public"."protocol_completions";
+DROP POLICY IF EXISTS "ps_self" ON "public"."protocol_sessions";
+DROP POLICY IF EXISTS "protocols: service role" ON "public"."protocols";
+DROP POLICY IF EXISTS "rombot_knowledge_read_sport_entitled" ON "public"."rombot_knowledge";
+DROP POLICY IF EXISTS "schools_authenticated_read" ON "public"."schools";
+DROP POLICY IF EXISTS "sport_config_write_service_only" ON "public"."sport_config";
+DROP POLICY IF EXISTS "sport_entitlements_self_select" ON "public"."sport_entitlements";
+DROP POLICY IF EXISTS "technique_eligibility: service role" ON "public"."technique_eligibility";
+DROP POLICY IF EXISTS "techniques: service role write" ON "public"."techniques";
+DROP POLICY IF EXISTS "utc_delete_own" ON "public"."user_technique_competency";
+DROP POLICY IF EXISTS "utc_insert_own" ON "public"."user_technique_competency";
+DROP POLICY IF EXISTS "utc_select_own" ON "public"."user_technique_competency";
+DROP POLICY IF EXISTS "utc_update_own" ON "public"."user_technique_competency";
+DROP POLICY IF EXISTS "users: service role full access" ON "public"."users";
+DROP POLICY IF EXISTS "wex_delete" ON "public"."workout_exercises";
+DROP POLICY IF EXISTS "wex_insert" ON "public"."workout_exercises";
+DROP POLICY IF EXISTS "wex_select" ON "public"."workout_exercises";
+DROP POLICY IF EXISTS "wex_update" ON "public"."workout_exercises";
+DROP POLICY IF EXISTS "workout_sets_owner_all" ON "public"."workout_sets";
+DROP POLICY IF EXISTS "workouts_delete" ON "public"."workouts";
+DROP POLICY IF EXISTS "workouts_insert" ON "public"."workouts";
+DROP POLICY IF EXISTS "workouts_select" ON "public"."workouts";
+DROP POLICY IF EXISTS "workouts_update" ON "public"."workouts";
+DROP POLICY IF EXISTS "p1_27_merged_alert_dismissals_all" ON "public"."alert_dismissals";
+DROP POLICY IF EXISTS "p1_27_merged_assessments_all" ON "public"."assessments";
+DROP POLICY IF EXISTS "p1_27_merged_assessments_insert" ON "public"."assessments";
+DROP POLICY IF EXISTS "p1_27_merged_assessments_select" ON "public"."assessments";
+DROP POLICY IF EXISTS "p1_27_merged_athletes_select" ON "public"."athletes";
+DROP POLICY IF EXISTS "p1_27_merged_attendance_all" ON "public"."attendance";
+DROP POLICY IF EXISTS "p1_27_merged_coach_competitors_all" ON "public"."coach_competitors";
+DROP POLICY IF EXISTS "p1_27_merged_coaches_all" ON "public"."coaches";
+DROP POLICY IF EXISTS "p1_27_merged_consents_insert" ON "public"."consents";
+DROP POLICY IF EXISTS "p1_27_merged_consents_select" ON "public"."consents";
+DROP POLICY IF EXISTS "p1_27_merged_joint_scores_select" ON "public"."joint_scores";
+DROP POLICY IF EXISTS "p1_27_merged_protocols_select" ON "public"."protocols";
+DROP POLICY IF EXISTS "p1_27_merged_schools_all" ON "public"."schools";
+DROP POLICY IF EXISTS "p1_27_merged_technique_eligibility_select" ON "public"."technique_eligibility";
+DROP POLICY IF EXISTS "p1_27_merged_users_select" ON "public"."users";
+
+-- 2. Re-create every policy the migration dropped, exact live-after-29c definitions
+CREATE POLICY "account_deletion_requests: owner read" ON "public"."account_deletion_requests" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((user_id = auth.uid()));
+CREATE POLICY "Coaches manage athlete injuries" ON "public"."athlete_injuries" AS PERMISSIVE FOR ALL TO PUBLIC USING ((coach_id IN ( SELECT coaches.id
+   FROM coaches
+  WHERE (coaches.user_id = auth.uid()))));
+CREATE POLICY "athletes_service_role_all" ON "public"."athletes" AS PERMISSIVE FOR ALL TO PUBLIC USING (((auth.jwt() ->> 'role'::text) = 'service_role'::text));
+CREATE POLICY "athletes_update_own" ON "public"."athletes" AS PERMISSIVE FOR UPDATE TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "attendance_athlete_read" ON "public"."attendance" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = athlete_user_id));
+CREATE POLICY "body_metrics_owner_all" ON "public"."body_metrics" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "assignments_athlete" ON "public"."coach_assignments" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = athlete_user_id));
+CREATE POLICY "assignments_athlete_complete" ON "public"."coach_assignments" AS PERMISSIVE FOR UPDATE TO PUBLIC USING ((auth.uid() = athlete_user_id));
+CREATE POLICY "assignments_coach" ON "public"."coach_assignments" AS PERMISSIVE FOR ALL TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = coach_assignments.coach_id) AND (c.user_id = auth.uid())))));
+CREATE POLICY "competitors_athlete_read" ON "public"."coach_competitors" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = athlete_user_id));
+CREATE POLICY "Coaches manage own journal" ON "public"."coach_journal_notes" AS PERMISSIVE FOR ALL TO PUBLIC USING ((coach_id IN ( SELECT coaches.id
+   FROM coaches
+  WHERE (coaches.user_id = auth.uid()))));
+CREATE POLICY "coach_notes_own" ON "public"."coach_notes" AS PERMISSIVE FOR ALL TO PUBLIC USING ((coach_id IN ( SELECT coaches.id
+   FROM coaches
+  WHERE (coaches.user_id = auth.uid()))));
+CREATE POLICY "Coaches manage own teaching log" ON "public"."coach_teaching_log" AS PERMISSIVE FOR ALL TO PUBLIC USING ((coach_id IN ( SELECT coaches.id
+   FROM coaches
+  WHERE (coaches.user_id = auth.uid()))));
+CREATE POLICY "video_athlete" ON "public"."coach_video_feedback" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = athlete_user_id));
+CREATE POLICY "video_coach" ON "public"."coach_video_feedback" AS PERMISSIVE FOR ALL TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = coach_video_feedback.coach_id) AND (c.user_id = auth.uid())))));
+CREATE POLICY "consents_service_role_all" ON "public"."consents" AS PERMISSIVE FOR ALL TO PUBLIC USING (((auth.jwt() ->> 'role'::text) = 'service_role'::text));
+CREATE POLICY "drill_sessions_self" ON "public"."drill_sessions" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "exercises: service role write" ON "public"."exercises" AS PERMISSIVE FOR ALL TO PUBLIC USING (
+CASE
+    WHEN (current_setting('role'::text) = 'service_role'::text) THEN true
+    ELSE false
+END) WITH CHECK ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "game_plans_self" ON "public"."game_plans" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "joint_scores: service role" ON "public"."joint_scores" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "leads_claim_unclaimed" ON "public"."leads" AS PERMISSIVE FOR UPDATE TO "authenticated" USING (((converted_user_id IS NULL) AND (lower(email) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))))) WITH CHECK ((converted_user_id = auth.uid()));
+CREATE POLICY "leads_select_owner_after_claim" ON "public"."leads" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((converted_user_id = auth.uid()));
+CREATE POLICY "own mesocycles" ON "public"."mesocycles" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "notif_self" ON "public"."notification_preferences" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "pr_records_owner_all" ON "public"."pr_records" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "progress_photos_owner_all" ON "public"."progress_photos" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "completions_own" ON "public"."protocol_completions" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid()));
+CREATE POLICY "ps_self" ON "public"."protocol_sessions" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "protocols: service role" ON "public"."protocols" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "rombot_knowledge_read_sport_entitled" ON "public"."rombot_knowledge" AS PERMISSIVE FOR SELECT TO "authenticated" USING (((sport = 'general'::text) OR (sport = ANY (COALESCE(( SELECT users.platforms
+   FROM users
+  WHERE (users.id = auth.uid())), ARRAY[]::text[])))));
+CREATE POLICY "schools_authenticated_read" ON "public"."schools" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.role() = 'authenticated'::text));
+CREATE POLICY "sport_config_write_service_only" ON "public"."sport_config" AS PERMISSIVE FOR ALL TO PUBLIC USING ((auth.role() = 'service_role'::text)) WITH CHECK ((auth.role() = 'service_role'::text));
+CREATE POLICY "sport_entitlements_self_select" ON "public"."sport_entitlements" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "technique_eligibility: service role" ON "public"."technique_eligibility" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "techniques: service role write" ON "public"."techniques" AS PERMISSIVE FOR ALL TO PUBLIC USING (
+CASE
+    WHEN (current_setting('role'::text) = 'service_role'::text) THEN true
+    ELSE false
+END) WITH CHECK ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "utc_delete_own" ON "public"."user_technique_competency" AS PERMISSIVE FOR DELETE TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "utc_insert_own" ON "public"."user_technique_competency" AS PERMISSIVE FOR INSERT TO PUBLIC WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "utc_select_own" ON "public"."user_technique_competency" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "utc_update_own" ON "public"."user_technique_competency" AS PERMISSIVE FOR UPDATE TO PUBLIC USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "users: service role full access" ON "public"."users" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "wex_delete" ON "public"."workout_exercises" AS PERMISSIVE FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM workouts w
+  WHERE ((w.id = workout_exercises.workout_id) AND (w.user_id = auth.uid()) AND (w.is_template = false)))));
+CREATE POLICY "wex_insert" ON "public"."workout_exercises" AS PERMISSIVE FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
+   FROM workouts w
+  WHERE ((w.id = workout_exercises.workout_id) AND (w.user_id = auth.uid()) AND (w.is_template = false)))));
+CREATE POLICY "wex_select" ON "public"."workout_exercises" AS PERMISSIVE FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM workouts w
+  WHERE ((w.id = workout_exercises.workout_id) AND ((w.is_template = true) OR (w.user_id = auth.uid()))))));
+CREATE POLICY "wex_update" ON "public"."workout_exercises" AS PERMISSIVE FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM workouts w
+  WHERE ((w.id = workout_exercises.workout_id) AND (w.user_id = auth.uid()) AND (w.is_template = false))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM workouts w
+  WHERE ((w.id = workout_exercises.workout_id) AND (w.user_id = auth.uid()) AND (w.is_template = false)))));
+CREATE POLICY "workout_sets_owner_all" ON "public"."workout_sets" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "workouts_delete" ON "public"."workouts" AS PERMISSIVE FOR DELETE TO "authenticated" USING (((user_id = auth.uid()) AND (is_template = false)));
+CREATE POLICY "workouts_insert" ON "public"."workouts" AS PERMISSIVE FOR INSERT TO "authenticated" WITH CHECK (((user_id = auth.uid()) AND (is_template = false)));
+CREATE POLICY "workouts_select" ON "public"."workouts" AS PERMISSIVE FOR SELECT TO "authenticated" USING (((is_template = true) OR (user_id = auth.uid())));
+CREATE POLICY "workouts_update" ON "public"."workouts" AS PERMISSIVE FOR UPDATE TO "authenticated" USING (((user_id = auth.uid()) AND (is_template = false))) WITH CHECK (((user_id = auth.uid()) AND (is_template = false)));
+CREATE POLICY "alert_dismissals: coach owns" ON "public"."alert_dismissals" AS PERMISSIVE FOR ALL TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = alert_dismissals.coach_id) AND (c.user_id = ( SELECT auth.uid() AS uid))))));
+CREATE POLICY "alert_dismissals: service role" ON "public"."alert_dismissals" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "alert_dismissals_own" ON "public"."alert_dismissals" AS PERMISSIVE FOR ALL TO PUBLIC USING ((coach_id IN ( SELECT coaches.id
+   FROM coaches
+  WHERE (coaches.user_id = auth.uid()))));
+CREATE POLICY "assessments: self read/write" ON "public"."assessments" AS PERMISSIVE FOR ALL TO PUBLIC USING ((( SELECT auth.uid() AS uid) = user_id));
+CREATE POLICY "assessments: service role" ON "public"."assessments" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "assessments_service_role_all" ON "public"."assessments" AS PERMISSIVE FOR ALL TO PUBLIC USING (((auth.jwt() ->> 'role'::text) = 'service_role'::text));
+CREATE POLICY "assessments_insert_own" ON "public"."assessments" AS PERMISSIVE FOR INSERT TO PUBLIC WITH CHECK ((EXISTS ( SELECT 1
+   FROM athletes a
+  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = auth.uid())))));
+CREATE POLICY "coaches_insert_assessments" ON "public"."assessments" AS PERMISSIVE FOR INSERT TO "authenticated" WITH CHECK ((athlete_id IN ( SELECT l.athlete_id
+   FROM coach_linked_athlete_ids() l(athlete_id, user_id))));
+CREATE POLICY "assessments: linked coach reads" ON "public"."assessments" AS PERMISSIVE FOR SELECT TO PUBLIC USING (coach_linked_to_user(user_id));
+CREATE POLICY "assessments_select_own" ON "public"."assessments" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM athletes a
+  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = auth.uid())))));
+CREATE POLICY "assessments_user_select" ON "public"."assessments" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((user_id = auth.uid()));
+CREATE POLICY "athletes_select_own" ON "public"."athletes" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "attendance_coach" ON "public"."attendance" AS PERMISSIVE FOR ALL TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = attendance.coach_id) AND (c.user_id = auth.uid()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = attendance.coach_id) AND (c.user_id = auth.uid())))));
+CREATE POLICY "attendance_service" ON "public"."attendance" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text)) WITH CHECK ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "competitors_coach" ON "public"."coach_competitors" AS PERMISSIVE FOR ALL TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = coach_competitors.coach_id) AND (c.user_id = auth.uid()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM coaches c
+  WHERE ((c.id = coach_competitors.coach_id) AND (c.user_id = auth.uid())))));
+CREATE POLICY "competitors_service" ON "public"."coach_competitors" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text)) WITH CHECK ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "coaches: service role" ON "public"."coaches" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "coaches_own" ON "public"."coaches" AS PERMISSIVE FOR ALL TO PUBLIC USING ((user_id = auth.uid()));
+CREATE POLICY "consents_insert_own" ON "public"."consents" AS PERMISSIVE FOR INSERT TO PUBLIC WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "consents_self_insert" ON "public"."consents" AS PERMISSIVE FOR INSERT TO PUBLIC WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
+CREATE POLICY "consents_select_own" ON "public"."consents" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((auth.uid() = user_id));
+CREATE POLICY "consents_self_read" ON "public"."consents" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((( SELECT auth.uid() AS uid) = user_id));
+CREATE POLICY "joint_scores: athlete reads own" ON "public"."joint_scores" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM assessments a
+  WHERE ((a.id = joint_scores.assessment_id) AND (a.user_id = ( SELECT auth.uid() AS uid))))));
+CREATE POLICY "joint_scores: linked coach reads" ON "public"."joint_scores" AS PERMISSIVE FOR SELECT TO PUBLIC USING (coach_linked_to_assessment(assessment_id));
+CREATE POLICY "protocols: linked coach reads" ON "public"."protocols" AS PERMISSIVE FOR SELECT TO PUBLIC USING (coach_linked_to_user(user_id));
+CREATE POLICY "protocols: self read" ON "public"."protocols" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((( SELECT auth.uid() AS uid) = user_id));
+CREATE POLICY "schools: admin owns" ON "public"."schools" AS PERMISSIVE FOR ALL TO PUBLIC USING ((( SELECT auth.uid() AS uid) = admin_id));
+CREATE POLICY "schools: service role" ON "public"."schools" AS PERMISSIVE FOR ALL TO PUBLIC USING ((current_setting('role'::text) = 'service_role'::text));
+CREATE POLICY "schools_admin_all" ON "public"."schools" AS PERMISSIVE FOR ALL TO PUBLIC USING ((admin_id = auth.uid()));
+CREATE POLICY "technique_eligibility: linked coach reads" ON "public"."technique_eligibility" AS PERMISSIVE FOR SELECT TO PUBLIC USING (coach_linked_to_user(user_id));
+CREATE POLICY "technique_eligibility: self read" ON "public"."technique_eligibility" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((( SELECT auth.uid() AS uid) = user_id));
+CREATE POLICY "technique_eligibility_user_select" ON "public"."technique_eligibility" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((user_id = auth.uid()));
+CREATE POLICY "users: school admin reads school users" ON "public"."users" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
+   FROM schools s
+  WHERE ((s.admin_id = ( SELECT auth.uid() AS uid)) AND (s.id = users.school_id)))));
+CREATE POLICY "users: self read" ON "public"."users" AS PERMISSIVE FOR SELECT TO PUBLIC USING ((( SELECT auth.uid() AS uid) = id));
+
+-- 3. Re-create the dropped duplicate indexes / constraint (live definitions)
+ALTER TABLE public.coach_notes ADD CONSTRAINT coach_notes_coach_id_athlete_id_key UNIQUE (coach_id, athlete_id);
+CREATE INDEX consents_user_id_idx ON public.consents USING btree (user_id);
+CREATE INDEX eligibility_athlete_id_idx ON public.technique_eligibility USING btree (athlete_id);
+CREATE INDEX techniques_sport_idx ON public.techniques USING btree (sport);
+
+COMMIT;

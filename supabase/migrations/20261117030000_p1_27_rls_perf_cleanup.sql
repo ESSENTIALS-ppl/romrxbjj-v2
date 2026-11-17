@@ -1,6 +1,14 @@
--- P1-27 RLS performance cleanup (UNAPPLIED)
+-- P1-27 RLS performance cleanup, REBUILT ON LIVE P1-29c (UNAPPLIED)
 -- Generated 2026-11-15 from live get_advisors(performance) + pg_policies on cqzvqzwwevnflinxgnpp.
 -- Advisor tonight: 75 auth_rls_initplan, 258 multiple_permissive_policies, 4 duplicate_index.
+-- Rebuilt 2026-11-16 on live head 20261117022451 (P1-29c), base SQL 46016324 at 30ba24c4.
+-- Live after 29c: 145 public policies; advisor 68 auth_rls_initplan, 239 multiple_permissive, 4 duplicate_index.
+-- 29c targets kept exactly: coaches_select_athletes stays dropped (no coach arm on athletes);
+-- drill_sessions_coach, game_plans_coach, completions_coach_read, ps_coach and coaches_select_assessments
+-- are not touched (29c form, TO authenticated, via public.coach_linked_athlete_ids());
+-- the assessments INSERT merge is TO authenticated and reads the coach link through the same helper.
+-- The assessments SELECT merge keeps only its three TO PUBLIC sources (no coach-athletes arm), so anon
+-- behaviour on assessments is unchanged; coaches_select_assessments stays as 29c left it.
 -- Do not apply until Margot has a sha gate line and Vera's precheck PASS, relayed by Grant.
 -- Wrapping auth.uid()/auth.role()/auth.jwt()/current_setting() as (select ...).
 -- Merging is OR of existing USING / WITH CHECK expressions (already the permissive semantics).
@@ -69,11 +77,7 @@ CREATE POLICY "video_coach" ON "public"."coach_video_feedback" FOR ALL TO PUBLIC
 DROP POLICY IF EXISTS "consents_service_role_all" ON "public"."consents";
 CREATE POLICY "consents_service_role_all" ON "public"."consents" FOR ALL TO PUBLIC USING ((((select auth.jwt()) ->> 'role'::text) = 'service_role'::text));
 
-DROP POLICY IF EXISTS "drill_sessions_coach" ON "public"."drill_sessions";
-CREATE POLICY "drill_sessions_coach" ON "public"."drill_sessions" FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
-   FROM (athletes a
-     JOIN coaches c ON ((c.id = a.coach_id)))
-  WHERE ((a.user_id = drill_sessions.user_id) AND (c.user_id = (select auth.uid()))))));
+-- drill_sessions_coach: left as P1-29c (TO authenticated, via coach_linked_athlete_ids()).
 
 DROP POLICY IF EXISTS "drill_sessions_self" ON "public"."drill_sessions";
 CREATE POLICY "drill_sessions_self" ON "public"."drill_sessions" FOR ALL TO PUBLIC USING (((select auth.uid()) = user_id));
@@ -85,11 +89,7 @@ CASE
     ELSE false
 END) WITH CHECK (((select current_setting('role'::text)) = 'service_role'::text));
 
-DROP POLICY IF EXISTS "game_plans_coach" ON "public"."game_plans";
-CREATE POLICY "game_plans_coach" ON "public"."game_plans" FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
-   FROM (athletes a
-     JOIN coaches c ON ((c.id = a.coach_id)))
-  WHERE ((a.user_id = game_plans.user_id) AND (c.user_id = (select auth.uid()))))));
+-- game_plans_coach: left as P1-29c (TO authenticated, via coach_linked_athlete_ids()).
 
 DROP POLICY IF EXISTS "game_plans_self" ON "public"."game_plans";
 CREATE POLICY "game_plans_self" ON "public"."game_plans" FOR ALL TO PUBLIC USING (((select auth.uid()) = user_id));
@@ -115,21 +115,12 @@ CREATE POLICY "pr_records_owner_all" ON "public"."pr_records" FOR ALL TO PUBLIC 
 DROP POLICY IF EXISTS "progress_photos_owner_all" ON "public"."progress_photos";
 CREATE POLICY "progress_photos_owner_all" ON "public"."progress_photos" FOR ALL TO PUBLIC USING ((user_id = (select auth.uid()))) WITH CHECK ((user_id = (select auth.uid())));
 
-DROP POLICY IF EXISTS "completions_coach_read" ON "public"."protocol_completions";
-CREATE POLICY "completions_coach_read" ON "public"."protocol_completions" FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
-   FROM athletes a
-  WHERE ((a.user_id = protocol_completions.user_id) AND (a.coach_id IN ( SELECT coaches.id
-           FROM coaches
-          WHERE (coaches.user_id = (select auth.uid()))))))));
+-- completions_coach_read: left as P1-29c (TO authenticated, via coach_linked_athlete_ids()).
 
 DROP POLICY IF EXISTS "completions_own" ON "public"."protocol_completions";
 CREATE POLICY "completions_own" ON "public"."protocol_completions" FOR ALL TO PUBLIC USING ((user_id = (select auth.uid())));
 
-DROP POLICY IF EXISTS "ps_coach" ON "public"."protocol_sessions";
-CREATE POLICY "ps_coach" ON "public"."protocol_sessions" FOR SELECT TO PUBLIC USING ((EXISTS ( SELECT 1
-   FROM (athletes a
-     JOIN coaches c ON ((c.id = a.coach_id)))
-  WHERE ((a.user_id = protocol_sessions.user_id) AND (c.user_id = (select auth.uid()))))));
+-- ps_coach: left as P1-29c (TO authenticated, via coach_linked_athlete_ids()).
 
 DROP POLICY IF EXISTS "ps_self" ON "public"."protocol_sessions";
 CREATE POLICY "ps_self" ON "public"."protocol_sessions" FOR ALL TO PUBLIC USING (((select auth.uid()) = user_id));
@@ -237,31 +228,24 @@ CREATE POLICY "p1_27_merged_assessments_all" ON "public"."assessments" FOR ALL T
 -- merge assessments_insert_own, coaches_insert_assessments -> p1_27_merged_assessments_insert
 DROP POLICY IF EXISTS "assessments_insert_own" ON "public"."assessments";
 DROP POLICY IF EXISTS "coaches_insert_assessments" ON "public"."assessments";
-CREATE POLICY "p1_27_merged_assessments_insert" ON "public"."assessments" FOR INSERT TO PUBLIC WITH CHECK (((EXISTS ( SELECT 1
+CREATE POLICY "p1_27_merged_assessments_insert" ON "public"."assessments" FOR INSERT TO "authenticated" WITH CHECK (((EXISTS ( SELECT 1
    FROM athletes a
-  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = (select auth.uid())))))) OR ((EXISTS ( SELECT 1
-   FROM (athletes a
-     JOIN coaches c ON ((c.id = a.coach_id)))
-  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = (select auth.uid())))))));
+  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = (select auth.uid())))))) OR ((assessments.athlete_id IN ( SELECT l.athlete_id
+   FROM coach_linked_athlete_ids() l(athlete_id, user_id)))));
 
--- merge assessments: linked coach reads, assessments_select_own, assessments_user_select, coaches_select_assessments -> p1_27_merged_assessments_select
+-- merge assessments: linked coach reads, assessments_select_own, assessments_user_select -> p1_27_merged_assessments_select
+-- coaches_select_assessments is NOT merged: it stays as P1-29c (TO authenticated, via coach_linked_athlete_ids()).
 DROP POLICY IF EXISTS "assessments: linked coach reads" ON "public"."assessments";
 DROP POLICY IF EXISTS "assessments_select_own" ON "public"."assessments";
 DROP POLICY IF EXISTS "assessments_user_select" ON "public"."assessments";
-DROP POLICY IF EXISTS "coaches_select_assessments" ON "public"."assessments";
 CREATE POLICY "p1_27_merged_assessments_select" ON "public"."assessments" FOR SELECT TO PUBLIC USING ((coach_linked_to_user(user_id)) OR ((EXISTS ( SELECT 1
    FROM athletes a
-  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = (select auth.uid())))))) OR ((user_id = (select auth.uid()))) OR ((EXISTS ( SELECT 1
-   FROM (athletes a
-     JOIN coaches c ON ((c.id = a.coach_id)))
-  WHERE ((a.id = assessments.athlete_id) AND (c.user_id = (select auth.uid())))))));
+  WHERE ((a.id = assessments.athlete_id) AND (a.user_id = (select auth.uid())))))) OR ((user_id = (select auth.uid()))));
 
--- merge athletes_select_own, coaches_select_athletes -> p1_27_merged_athletes_select
+-- athletes_select_own -> p1_27_merged_athletes_select, owner arm only. coaches_select_athletes was
+-- dropped by P1-29c and is NOT recreated; no coach arm on athletes (no coach read of email, age, injury_flags).
 DROP POLICY IF EXISTS "athletes_select_own" ON "public"."athletes";
-DROP POLICY IF EXISTS "coaches_select_athletes" ON "public"."athletes";
-CREATE POLICY "p1_27_merged_athletes_select" ON "public"."athletes" FOR SELECT TO PUBLIC USING ((((select auth.uid()) = user_id)) OR ((EXISTS ( SELECT 1
-   FROM coaches c
-  WHERE ((c.user_id = (select auth.uid())) AND (c.id = athletes.coach_id))))));
+CREATE POLICY "p1_27_merged_athletes_select" ON "public"."athletes" FOR SELECT TO PUBLIC USING ((((select auth.uid()) = user_id)));
 
 -- merge attendance_coach, attendance_service -> p1_27_merged_attendance_all
 DROP POLICY IF EXISTS "attendance_coach" ON "public"."attendance";
