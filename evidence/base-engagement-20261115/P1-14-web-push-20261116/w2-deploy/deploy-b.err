@@ -1,0 +1,7 @@
+Warning: --project-ref is deprecated and will be removed in v4. Use --remote=<ref> instead
+Target: project romrxbjj-v2 (cqzvqzwwevnflinxgnpp) · production
+Confirmed by --yes: Deploy 1 Function on project romrxbjj-v2 (cqzvqzwwevnflinxgnpp) · production
+Uploading asset (save-push-subscription): supabase/functions/save-push-subscription/index.ts
+Uploading asset (save-push-subscription): supabase/functions/save-push-subscription/handler.ts
+A new version of Supabase CLI is available: v3.2.0 (currently installed v3.0.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
