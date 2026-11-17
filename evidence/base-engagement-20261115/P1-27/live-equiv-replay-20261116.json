@@ -1,0 +1,58 @@
+{
+  "ran_at": "2026-11-16 8:39 PM ET (America/New_York)",
+  "where": "/tmp/p1-27-live-equiv-20261116 (local PGlite, nothing live written)",
+  "baseline": "Nov 15 PGlite structure restore (head 20261116024102) plus the 5 later live public policies",
+  "live_head_at_check": "20261117013428",
+  "migErr": null,
+  "pol0_affected": 108,
+  "pol0_public": 146,
+  "pol1_affected": 87,
+  "pol1_public": 125,
+  "delta_before": [
+    {
+      "tablename": "assessment_feedback",
+      "policyname": "assessment_feedback_insert_own"
+    },
+    {
+      "tablename": "assessment_feedback",
+      "policyname": "assessment_feedback_select_own"
+    },
+    {
+      "tablename": "session_feedback",
+      "policyname": "session_feedback_insert_own"
+    },
+    {
+      "tablename": "session_feedback",
+      "policyname": "session_feedback_select_own"
+    },
+    {
+      "tablename": "user_mobility_schedule",
+      "policyname": "schedule_own_read"
+    }
+  ],
+  "delta_after": [
+    {
+      "tablename": "assessment_feedback",
+      "policyname": "assessment_feedback_insert_own"
+    },
+    {
+      "tablename": "assessment_feedback",
+      "policyname": "assessment_feedback_select_own"
+    },
+    {
+      "tablename": "session_feedback",
+      "policyname": "session_feedback_insert_own"
+    },
+    {
+      "tablename": "session_feedback",
+      "policyname": "session_feedback_select_own"
+    },
+    {
+      "tablename": "user_mobility_schedule",
+      "policyname": "schedule_own_read"
+    }
+  ],
+  "merged_after": 15,
+  "extra_policy_errors": [],
+  "note": "Schema restore log had the same non-policy stubs as v4 (vector type, a view, duplicate unique name). Migration applied with no error. The 5 later policies were still present after 040100."
+}
