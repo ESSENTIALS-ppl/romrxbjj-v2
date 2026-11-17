@@ -1,0 +1,85 @@
+{
+ "id": "612296fe-7b65-4062-919f-d6a6bcc14657",
+ "slug": "lifecycle-emails",
+ "name": "lifecycle-emails",
+ "status": "ACTIVE",
+ "version": 4,
+ "created_at": 1793685516373,
+ "updated_at": 1794875376743,
+ "verify_jwt": false,
+ "import_map": false,
+ "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_612296fe-7b65-4062-919f-d6a6bcc14657_4/source/source/index.ts",
+ "ezbr_sha256": "6714009f4b59627011083c51807fc4e38ead1492dc9fc3344e19af56986edb41",
+ "files": [
+  {
+   "name": "source/index.ts",
+   "bytes": 6276,
+   "sha256": "338fb541f43c3c6a7fd04ffea6abcdeb636d9b8fb67a4e1b89d7668fe026c049",
+   "git_fb53b850": "338fb541f43c3c6a7fd04ffea6abcdeb636d9b8fb67a4e1b89d7668fe026c049",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/handler.ts",
+   "bytes": 5389,
+   "sha256": "008e19471fe0b601c41d8b6b68082d86d1e31dfc6b401d7e6988acf0b162fec1",
+   "git_fb53b850": "008e19471fe0b601c41d8b6b68082d86d1e31dfc6b401d7e6988acf0b162fec1",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/logic.ts",
+   "bytes": 20622,
+   "sha256": "eea59ae68054e0de05fef21007edce38a6d999970ce31841a9563eaeb2697733",
+   "git_fb53b850": "eea59ae68054e0de05fef21007edce38a6d999970ce31841a9563eaeb2697733",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/email.ts",
+   "bytes": 10852,
+   "sha256": "a0f138d4b8181e673b5918442215b6bb3432a95e97caf66629c259ad86d1f7f2",
+   "git_fb53b850": "a0f138d4b8181e673b5918442215b6bb3432a95e97caf66629c259ad86d1f7f2",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/score.ts",
+   "bytes": 2810,
+   "sha256": "00510174f310f69c997e0c47476f0ea75985c86cf02f0c383c5640eee9caaa87",
+   "git_fb53b850": "00510174f310f69c997e0c47476f0ea75985c86cf02f0c383c5640eee9caaa87",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/mobility/mobilityBands.ts",
+   "bytes": 37110,
+   "sha256": "bb76634e7385bcefdda143a82589e6a387c0de0890e121c0d5ddf7602119a738",
+   "git_fb53b850": "bb76634e7385bcefdda143a82589e6a387c0de0890e121c0d5ddf7602119a738",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/mobility/lumbarFlag.ts",
+   "bytes": 1471,
+   "sha256": "d1845820bf98d7825f5e8a170a4ee714a7e631140ecf75312ede9822ed33870c",
+   "git_fb53b850": "d1845820bf98d7825f5e8a170a4ee714a7e631140ecf75312ede9822ed33870c",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/email_footer.ts",
+   "bytes": 1216,
+   "sha256": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+   "git_fb53b850": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/unsub_token.ts",
+   "bytes": 3713,
+   "sha256": "96f0f2e3b9e123f632febe33d9911d8db95dbe014b09398dc46573fe1f1befd9",
+   "git_fb53b850": "96f0f2e3b9e123f632febe33d9911d8db95dbe014b09398dc46573fe1f1befd9",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/deletion.ts",
+   "bytes": 1269,
+   "sha256": "edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b",
+   "git_fb53b850": "edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b",
+   "result": "MATCH"
+  }
+ ]
+}
