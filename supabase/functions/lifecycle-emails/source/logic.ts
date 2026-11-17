@@ -63,6 +63,12 @@ export interface Candidate {
   schedule?: { last_assessment_id: string | null; last_assessed_at: string | null; next_retest_at: string | null; next_check_at: string | null } | null;
   /** auth.users.last_sign_in_at, when loaded. */
   last_sign_in_at?: string | null;
+  /** Lapsed fix: created_at of the user's newest public.product_events row with source "web" (real app use), when loaded. */
+  last_app_event_at?: string | null;
+  /** Lapsed fix: newest auth.sessions activity (refreshed_at / updated_at), when a loader can read it. The v4 loader cannot (no service_role grant). */
+  last_session_at?: string | null;
+  /** Lapsed fix: true when the app-activity read failed. Lapsed then fails closed (not sent this run). */
+  activity_read_failed?: boolean;
   /** True when a check_kind=quick assessment exists after the last full one (loader; fail-soft if the column is missing). */
   has_quick_check?: boolean;
 }
@@ -197,9 +203,13 @@ export function lastActivityLocalDate(c: Candidate, tz: string | null | undefine
 export function lapsedDueOn(nowDate: string, c: Candidate, tz: string | null | undefined): boolean {
   const lastSess = lastActivityLocalDate(c, tz);
   if (!lastSess) return false;
+  // Lapsed fix: quiet is measured from the LATEST app activity (web product_event, session activity, sign-in), never sign-in alone.
+  // If the activity read failed, do not send (an active user must never get the lapsed email).
+  if (c.activity_read_failed) return false;
   let last = lastSess;
-  if (c.last_sign_in_at) {
-    const t = Date.parse(c.last_sign_in_at);
+  for (const at of [c.last_sign_in_at, c.last_app_event_at, c.last_session_at]) {
+    if (!at) continue;
+    const t = Date.parse(at);
     if (Number.isFinite(t)) {
       const d = localParts(new Date(t), tz).date;
       if (d > last) last = d;

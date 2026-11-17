@@ -62,6 +62,15 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
       const { data: au } = await sb.auth.admin.getUserById(p.user_id);
       lastSignIn = au?.user?.last_sign_in_at ?? null;
     } catch { lastSignIn = null; }
+    // Lapsed fix: newest real app use. Indexed lookup (product_events_user_created_idx on user_id, created_at DESC), one row.
+    // auth.sessions is not readable here (service_role has no SELECT on it), so web product_events stand in for session activity.
+    let lastAppEvent: string | null = null;
+    let activityReadFailed = false;
+    try {
+      const { data: ev, error: evErr } = await sb.from("product_events").select("created_at").eq("user_id", p.user_id).eq("source", "web").order("created_at", { ascending: false }).limit(1);
+      if (evErr) activityReadFailed = true;
+      else lastAppEvent = ev && ev.length ? String(ev[0].created_at) : null;
+    } catch { activityReadFailed = true; }
     let hasQuick = false;
     try {
       const since = schedule?.last_assessed_at ?? a?.assessed_at; // quick rows after the last full assessment only
@@ -74,7 +83,7 @@ async function load(kinds: Kind[]): Promise<Candidate[]> {
       user_id: p.user_id, email: u.email, full_name: u.full_name, active_sport: u.active_sport, marketing_opt_out: u.marketing_opt_out,
       deletion_requested: await deletionRequested(sb, p.user_id), pref: p as never, latest_assessment: a, latest_score: latestScore, previous_score: previousScore,
       session_dates: (s ?? []).map((r) => String(r.session_date)), has_protocol: (count ?? 0) > 0,
-      schedule, last_sign_in_at: lastSignIn, has_quick_check: hasQuick,
+      schedule, last_sign_in_at: lastSignIn, last_app_event_at: lastAppEvent, activity_read_failed: activityReadFailed, has_quick_check: hasQuick,
     });
   }
   return out;
