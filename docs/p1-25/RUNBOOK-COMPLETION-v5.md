@@ -9,6 +9,7 @@ Applies only once migration 20261117010100_p1_25_completion_cleanup (v5 bytes) i
 5. **One transaction.** In that one call it clears leads, sport_pack_waitlist, investor_requests, partner_inquiries and yoga_testers for the account, deletes the account's client_feedback and product_events rows, deletes public.users and auth.users, and marks the request completed. It refuses 7c71e421, internal accounts and test fixtures. On any error it leaves the request open with nothing erased. No backup copy is made at completion.
 6. Record the apply result's `erased` counts and the time (ET) next to the dry-run line.
 7. **After the function runs (MANUAL).** Find and delete the feedback-to-notion Notion page(s) for that user's client_feedback rows, and record the page ids deleted (or 'none found') in the completion record. Identify the page ids at dry run, while the client_feedback rows still exist, if the Notion copy is keyed off those rows; delete the pages only after a successful apply. Do not change the trigger or any code. Stacy will word the customer-facing part of this step.
+Owner: Reid.
 
 ## Lead or waitlist deletion request (no account)
 
