@@ -12,3 +12,7 @@ port = 54323
 [auth]
 site_url = "https://romrxbjj.com"
 additional_redirect_urls = ["http://localhost:3000","https://romrxbjj.netlify.app"]
+
+[functions.lifecycle-emails]
+verify_jwt = false
+entrypoint = "./functions/lifecycle-emails/source/index.ts"
