@@ -1,0 +1,930 @@
+diff --git a/app/public/sw.js b/app/public/sw.js
+new file mode 100644
+index 0000000..00df4ad
+--- /dev/null
++++ b/app/public/sw.js
+@@ -0,0 +1,102 @@
++/* P1-26 offline cache worker. Registered only when VITE_P1_26_OFFLINE_CACHE=on.
++ * Keep the URL rules in sync with app/src/lib/offlineCachePolicy.ts.
++ * Never caches auth or API responses that hold user data.
++ */
++const SHELL_CACHE = 'romrx-p1-26-shell-v1'
++const MEDIA_CACHE = 'romrx-p1-26-media-v1'
++const CACHE_PREFIX = 'romrx-p1-26-'
++const MEDIA_CACHE_CAP = 24
++const CURRENT = [SHELL_CACHE, MEDIA_CACHE]
++
++function isSupabaseHost(hostname) {
++  return hostname === 'supabase.co' || hostname.endsWith('.supabase.co')
++}
++function isUserApiPath(pathname) {
++  return /^\/(auth|rest|functions|storage|realtime)\/v\d+/.test(pathname)
++}
++function isMediaPath(pathname) {
++  return pathname === '/videos' || pathname.startsWith('/videos/')
++}
++function isShellPath(pathname) {
++  return pathname === '/app' || pathname === '/app/' || pathname.startsWith('/app/')
++}
++function isHashedAsset(pathname) {
++  return pathname.startsWith('/app/assets/')
++}
++function shouldBypass(request) {
++  if (request.method !== 'GET') return true
++  if (request.headers.has('Authorization')) return true
++  let url
++  try { url = new URL(request.url) } catch { return true }
++  if (isSupabaseHost(url.hostname)) return true
++  if (isUserApiPath(url.pathname)) return true
++  if (url.searchParams.has('access_token')) return true
++  return false
++}
++function cacheKind(request) {
++  if (shouldBypass(request)) return null
++  let url
++  try { url = new URL(request.url) } catch { return null }
++  if (url.origin !== self.location.origin) return null
++  if (isMediaPath(url.pathname)) return 'media'
++  if (!isShellPath(url.pathname)) return null
++  if (isHashedAsset(url.pathname)) return 'shell-asset'
++  return 'shell-html'
++}
++
++self.addEventListener('install', (event) => {
++  event.waitUntil(self.skipWaiting())
++})
++
++self.addEventListener('activate', (event) => {
++  event.waitUntil((async () => {
++    const names = await caches.keys()
++    await Promise.all(names.filter((n) => n.startsWith(CACHE_PREFIX) && !CURRENT.includes(n)).map((n) => caches.delete(n)))
++    await self.clients.claim()
++  })())
++})
++
++async function trimMediaCache(cache) {
++  const keys = await cache.keys()
++  const extra = keys.length - MEDIA_CACHE_CAP
++  for (let i = 0; i < extra; i++) await cache.delete(keys[i])
++}
++
++async function cacheFirst(cacheName, request, cap) {
++  const cache = await caches.open(cacheName)
++  const hit = await cache.match(request, { ignoreSearch: true })
++  if (hit) return hit
++  const res = await fetch(request)
++  if (res && res.ok) {
++    await cache.put(request, res.clone())
++    if (cap) await trimMediaCache(cache)
++  }
++  return res
++}
++
++async function networkFirst(cacheName, request) {
++  const cache = await caches.open(cacheName)
++  try {
++    const res = await fetch(request)
++    if (res && res.ok) await cache.put(request, res.clone())
++    return res
++  } catch (err) {
++    const hit = await cache.match(request, { ignoreSearch: true })
++    if (hit) return hit
++    throw err
++  }
++}
++
++self.addEventListener('fetch', (event) => {
++  const kind = cacheKind(event.request)
++  if (!kind) return
++  if (kind === 'media') {
++    event.respondWith(cacheFirst(MEDIA_CACHE, event.request, MEDIA_CACHE_CAP))
++    return
++  }
++  if (kind === 'shell-asset') {
++    event.respondWith(cacheFirst(SHELL_CACHE, event.request, 0))
++    return
++  }
++  event.respondWith(networkFirst(SHELL_CACHE, event.request))
++})
+diff --git a/app/src/lib/offlineCache.test.ts b/app/src/lib/offlineCache.test.ts
+new file mode 100644
+index 0000000..9c707ee
+--- /dev/null
++++ b/app/src/lib/offlineCache.test.ts
+@@ -0,0 +1,46 @@
++import { describe, expect, it, vi } from 'vitest'
++import { startOfflineCache, unregisterOfflineWorker } from './offlineCache'
++import { SW_SCOPE, SW_URL } from './offlineCachePolicy'
++
++describe('P1-26 register and kill switch', () => {
++  it('registers only when the flag is on', async () => {
++    const register = vi.fn(async () => ({}))
++    const getRegistrations = vi.fn(async () => [])
++    const container = { register, getRegistrations }
++    const off = await startOfflineCache({ env: {}, container, cachesApi: { keys: async () => [], delete: async () => true } })
++    expect(off).toBe('unregistered')
++    expect(register).not.toHaveBeenCalled()
++
++    const on = await startOfflineCache({
++      env: { VITE_P1_26_OFFLINE_CACHE: 'on' },
++      container,
++      cachesApi: { keys: async () => [], delete: async () => true },
++    })
++    expect(on).toBe('registered')
++    expect(register).toHaveBeenCalledWith(SW_URL, { scope: SW_SCOPE })
++  })
++
++  it('kill switch unregisters the worker and deletes our caches only', async () => {
++    const unregister = vi.fn(async () => true)
++    const container = {
++      register: vi.fn(),
++      getRegistrations: async () => [
++        { scope: 'https://romrx.io/app/', active: { scriptURL: 'https://romrx.io/app/sw.js' }, unregister },
++        { scope: 'https://romrx.io/other/', active: { scriptURL: 'https://romrx.io/other/sw.js' }, unregister },
++      ],
++    }
++    const deleted: string[] = []
++    const r = await unregisterOfflineWorker(container, {
++      keys: async () => ['romrx-p1-26-shell-v1', 'unrelated-cache'],
++      delete: async (n) => { deleted.push(n); return true },
++    })
++    expect(r.unregistered).toBe(1)
++    expect(unregister).toHaveBeenCalledTimes(1)
++    expect(deleted).toEqual(['romrx-p1-26-shell-v1'])
++  })
++
++  it('reports unsupported when there is no service worker container', async () => {
++    const r = await startOfflineCache({ env: { VITE_P1_26_OFFLINE_CACHE: 'on' }, container: null })
++    expect(r).toBe('unsupported')
++  })
++})
+diff --git a/app/src/lib/offlineCache.ts b/app/src/lib/offlineCache.ts
+new file mode 100644
+index 0000000..d06fbeb
+--- /dev/null
++++ b/app/src/lib/offlineCache.ts
+@@ -0,0 +1,73 @@
++// P1-26 registration and kill switch. Safe to call on every boot.
++import { flushSubmitQueue } from './offlineSubmitQueue'
++import {
++  CACHE_PREFIX, SW_SCOPE, SW_URL, currentCacheNames, isOurCache, offlineCacheOn,
++} from './offlineCachePolicy'
++
++export { PENDING_MESSAGE, postSubmitAssessment, flushSubmitQueue } from './offlineSubmitQueue'
++export { offlineCacheOn, SHELL_CACHE, MEDIA_CACHE, FLAG_NAME } from './offlineCachePolicy'
++
++type ServiceWorkerLike = {
++  register(url: string, opts?: { scope?: string }): Promise<unknown>
++  getRegistrations(): Promise<Array<{ scope: string; unregister(): Promise<boolean>; active?: { scriptURL: string } | null }>>
++}
++
++function swContainer(): ServiceWorkerLike | null {
++  if (typeof navigator === 'undefined') return null
++  const sw = (navigator as Navigator & { serviceWorker?: ServiceWorkerLike }).serviceWorker
++  return sw ?? null
++}
++
++export async function unregisterOfflineWorker(
++  container: ServiceWorkerLike | null = swContainer(),
++  cachesApi: Pick<CacheStorage, 'keys' | 'delete'> | undefined = typeof caches === 'undefined' ? undefined : caches,
++): Promise<{ unregistered: number; cachesDeleted: number }> {
++  let unregistered = 0
++  if (container) {
++    const regs = await container.getRegistrations()
++    for (const r of regs) {
++      const script = r.active?.scriptURL ?? ''
++      if (r.scope.endsWith(SW_SCOPE) || script.endsWith(SW_URL) || script.includes('/app/sw.js')) {
++        await r.unregister()
++        unregistered++
++      }
++    }
++  }
++  let cachesDeleted = 0
++  if (cachesApi) {
++    const names = await cachesApi.keys()
++    for (const name of names) {
++      if (isOurCache(name) || currentCacheNames().includes(name) || name.startsWith(CACHE_PREFIX)) {
++        await cachesApi.delete(name)
++        cachesDeleted++
++      }
++    }
++  }
++  return { unregistered, cachesDeleted }
++}
++
++export async function startOfflineCache(opts?: {
++  env?: Record<string, unknown>
++  container?: ServiceWorkerLike | null
++  cachesApi?: Pick<CacheStorage, 'keys' | 'delete'>
++  getAccessToken?: () => Promise<string | null>
++  apikey?: string
++}): Promise<'registered' | 'unregistered' | 'unsupported'> {
++  const env = opts?.env ?? ((import.meta as ImportMeta).env as Record<string, unknown>)
++  const container = opts?.container === undefined ? swContainer() : opts.container
++  if (!offlineCacheOn(env)) {
++    await unregisterOfflineWorker(container, opts?.cachesApi ?? (typeof caches === 'undefined' ? undefined : caches))
++    return container ? 'unregistered' : 'unsupported'
++  }
++  if (!container) return 'unsupported'
++  await container.register(SW_URL, { scope: SW_SCOPE })
++  if (opts?.getAccessToken && opts.apikey) {
++    void flushSubmitQueue({ getAccessToken: opts.getAccessToken, apikey: opts.apikey, flagOn: true })
++  }
++  if (typeof window !== 'undefined' && opts?.getAccessToken && opts.apikey) {
++    window.addEventListener('online', () => {
++      void flushSubmitQueue({ getAccessToken: opts.getAccessToken!, apikey: opts.apikey!, flagOn: true })
++    })
++  }
++  return 'registered'
++}
+diff --git a/app/src/lib/offlineCachePolicy.test.ts b/app/src/lib/offlineCachePolicy.test.ts
+new file mode 100644
+index 0000000..de9d768
+--- /dev/null
++++ b/app/src/lib/offlineCachePolicy.test.ts
+@@ -0,0 +1,67 @@
++import { readFileSync } from 'node:fs'
++import { dirname, join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { describe, expect, it } from 'vitest'
++import {
++  FLAG_NAME, MEDIA_CACHE, MEDIA_CACHE_CAP, SHELL_CACHE, cacheKind, isOurCache,
++  isUserApiPath, offlineCacheOn, shouldBypass,
++} from './offlineCachePolicy'
++
++const sw = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../public/sw.js'), 'utf8')
++
++describe('P1-26 flag', () => {
++  it('defaults off and only the exact string on enables it', () => {
++    expect(offlineCacheOn({})).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: undefined })).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: '' })).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: 'true' })).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: '1' })).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: 'ON' })).toBe(false)
++    expect(offlineCacheOn({ [FLAG_NAME]: 'on' })).toBe(true)
++  })
++})
++
++describe('P1-26 cache policy', () => {
++  const origin = 'https://romrx.io'
++  const base = { method: 'GET', hasAuthorization: false, origin }
++
++  it('never intercepts auth or API user data', () => {
++    expect(shouldBypass({ method: 'GET', url: 'https://cqzvqzwwevnflinxgnpp.supabase.co/rest/v1/assessments', hasAuthorization: false })).toBe(true)
++    expect(shouldBypass({ method: 'GET', url: 'https://cqzvqzwwevnflinxgnpp.supabase.co/auth/v1/user', hasAuthorization: true })).toBe(true)
++    expect(shouldBypass({ method: 'POST', url: `${origin}/app/`, hasAuthorization: false })).toBe(true)
++    expect(shouldBypass({ method: 'GET', url: `${origin}/app/`, hasAuthorization: true })).toBe(true)
++    expect(shouldBypass({ method: 'GET', url: 'https://example.supabase.co/functions/v1/submit-assessment', hasAuthorization: false })).toBe(true)
++    expect(isUserApiPath('/functions/v1/submit-assessment')).toBe(true)
++    expect(isUserApiPath('/auth/v1/token')).toBe(true)
++    expect(cacheKind({ ...base, url: `${origin}/app/` })).toBe('shell-html')
++    expect(cacheKind({ ...base, url: 'https://example.supabase.co/rest/v1/x' })).toBe(null)
++  })
++
++  it('caches the app shell and same-origin videos only', () => {
++    expect(cacheKind({ ...base, url: `${origin}/app/` })).toBe('shell-html')
++    expect(cacheKind({ ...base, url: `${origin}/app/index.html` })).toBe('shell-html')
++    expect(cacheKind({ ...base, url: `${origin}/app/assets/index-abc.js` })).toBe('shell-asset')
++    expect(cacheKind({ ...base, url: `${origin}/videos/hip_er.mp4` })).toBe('media')
++    expect(cacheKind({ ...base, url: `${origin}/videos/hip_er.jpg` })).toBe('media')
++    expect(cacheKind({ ...base, url: `${origin}/legal.html` })).toBe(null)
++    expect(cacheKind({ ...base, url: 'https://fonts.googleapis.com/css2?family=Inter' })).toBe(null)
++  })
++
++  it('pins cache names and the cap', () => {
++    expect(SHELL_CACHE).toBe('romrx-p1-26-shell-v1')
++    expect(MEDIA_CACHE).toBe('romrx-p1-26-media-v1')
++    expect(MEDIA_CACHE_CAP).toBe(24)
++    expect(isOurCache('romrx-p1-26-shell-v1')).toBe(true)
++    expect(isOurCache('other')).toBe(false)
++  })
++
++  it('keeps public/sw.js in sync with the deny and allow rules', () => {
++    expect(sw).toContain("request.headers.has('Authorization')")
++    expect(sw).toContain('supabase.co')
++    expect(sw).toContain('/videos/')
++    expect(sw).toContain("request.method !== 'GET'")
++    expect(sw).toContain(SHELL_CACHE)
++    expect(sw).toContain(MEDIA_CACHE)
++    expect(sw).toMatch(/functions\|storage\|realtime/)
++  })
++})
+diff --git a/app/src/lib/offlineCachePolicy.ts b/app/src/lib/offlineCachePolicy.ts
+new file mode 100644
+index 0000000..ea3bba2
+--- /dev/null
++++ b/app/src/lib/offlineCachePolicy.ts
+@@ -0,0 +1,70 @@
++// P1-26 cache policy. Pure URL/request rules used by tests and documented for app/public/sw.js
++// (keep the two in sync). Never caches auth or API responses that hold user data.
++
++export const SHELL_CACHE = 'romrx-p1-26-shell-v1'
++export const MEDIA_CACHE = 'romrx-p1-26-media-v1'
++export const CACHE_PREFIX = 'romrx-p1-26-'
++export const MEDIA_CACHE_CAP = 24
++export const SW_URL = '/app/sw.js'
++export const SW_SCOPE = '/app/'
++export const FLAG_NAME = 'VITE_P1_26_OFFLINE_CACHE'
++
++/** Only the exact string "on" enables the feature. */
++export function offlineCacheOn(env: Record<string, unknown> = (import.meta as ImportMeta).env): boolean {
++  return env[FLAG_NAME] === 'on'
++}
++
++export function isSupabaseHost(hostname: string): boolean {
++  return hostname === 'supabase.co' || hostname.endsWith('.supabase.co')
++}
++
++const API_PATH = /^\/(auth|rest|functions|storage|realtime)\/v\d+/
++
++export function isUserApiPath(pathname: string): boolean {
++  return API_PATH.test(pathname)
++}
++
++export function isMediaPath(pathname: string): boolean {
++  return pathname === '/videos' || pathname.startsWith('/videos/')
++}
++
++export function isShellPath(pathname: string): boolean {
++  return pathname === '/app' || pathname === '/app/' || pathname.startsWith('/app/')
++}
++
++export function isHashedAsset(pathname: string): boolean {
++  return pathname.startsWith('/app/assets/')
++}
++
++/** True when the service worker must not intercept the request at all. */
++export function shouldBypass(input: { method: string; url: string; hasAuthorization: boolean }): boolean {
++  if (input.method.toUpperCase() !== 'GET') return true
++  if (input.hasAuthorization) return true
++  let url: URL
++  try { url = new URL(input.url) } catch { return true }
++  if (isSupabaseHost(url.hostname)) return true
++  if (isUserApiPath(url.pathname)) return true
++  if (url.searchParams.has('access_token')) return true
++  return false
++}
++
++export type CacheKind = 'media' | 'shell-html' | 'shell-asset' | null
++
++export function cacheKind(input: { method: string; url: string; hasAuthorization: boolean; origin?: string }): CacheKind {
++  if (shouldBypass(input)) return null
++  let url: URL
++  try { url = new URL(input.url) } catch { return null }
++  if (input.origin && url.origin !== input.origin) return null
++  if (isMediaPath(url.pathname)) return 'media'
++  if (!isShellPath(url.pathname)) return null
++  if (isHashedAsset(url.pathname)) return 'shell-asset'
++  return 'shell-html'
++}
++
++export function currentCacheNames(): string[] {
++  return [SHELL_CACHE, MEDIA_CACHE]
++}
++
++export function isOurCache(name: string): boolean {
++  return name.startsWith(CACHE_PREFIX)
++}
+diff --git a/app/src/lib/offlineSubmitQueue.test.ts b/app/src/lib/offlineSubmitQueue.test.ts
+new file mode 100644
+index 0000000..5b230c0
+--- /dev/null
++++ b/app/src/lib/offlineSubmitQueue.test.ts
+@@ -0,0 +1,83 @@
++import { describe, expect, it, vi } from 'vitest'
++import {
++  PENDING_MESSAGE, flushSubmitQueue, isNetworkFailure, memoryQueueStore, postSubmitAssessment,
++} from './offlineSubmitQueue'
++
++const URL_ = 'https://example.supabase.co/functions/v1/submit-assessment'
++const body = { hip_er_l: 40 }
++
++describe('P1-26 offline submit queue', () => {
++  it('success path does not queue', async () => {
++    const store = memoryQueueStore()
++    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }))
++    const r = await postSubmitAssessment({
++      url: URL_, accessToken: 't', apikey: 'k', body, fetchImpl, store, flagOn: true,
++    })
++    expect(r.ok).toBe(true)
++    expect(r.queued).toBe(false)
++    expect(await store.getAll()).toHaveLength(0)
++  })
++
++  it('HTTP errors are not queued', async () => {
++    const store = memoryQueueStore()
++    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: false, error: 'x' }), { status: 500 }))
++    const r = await postSubmitAssessment({
++      url: URL_, accessToken: 't', apikey: 'k', body, fetchImpl, store, flagOn: true,
++    })
++    expect(r.ok).toBe(false)
++    expect(r.queued).toBe(false)
++    expect(r.error).toBe('x')
++    expect(await store.getAll()).toHaveLength(0)
++  })
++
++  it('network failure queues only when the flag is on, and does not store a bearer', async () => {
++    const store = memoryQueueStore()
++    const fetchImpl = vi.fn(async () => { throw new TypeError('Failed to fetch') })
++    const off = await postSubmitAssessment({
++      url: URL_, accessToken: 'secret-token', apikey: 'k', body, fetchImpl, store, flagOn: false,
++    })
++    expect(off.queued).toBe(false)
++    expect(await store.getAll()).toHaveLength(0)
++
++    const on = await postSubmitAssessment({
++      url: URL_, accessToken: 'secret-token', apikey: 'k', body, fetchImpl, store, flagOn: true, online: false,
++    })
++    expect(on.queued).toBe(true)
++    expect(on.error).toBe(PENDING_MESSAGE)
++    const rows = await store.getAll()
++    expect(rows).toHaveLength(1)
++    expect(rows[0].url).toBe(URL_)
++    expect(rows[0].body).toBe(JSON.stringify(body))
++    expect(JSON.stringify(rows[0])).not.toContain('secret-token')
++  })
++
++  it('flush replays with a fresh token and drops a sent item', async () => {
++    const store = memoryQueueStore([{ id: '1', url: URL_, body: JSON.stringify(body), createdAt: 1 }])
++    const fetchImpl = vi.fn(async (_url, init) => {
++      expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer fresh' })
++      return new Response(JSON.stringify({ ok: true }), { status: 200 })
++    })
++    const r = await flushSubmitQueue({
++      getAccessToken: async () => 'fresh', apikey: 'k', fetchImpl, store, flagOn: true,
++    })
++    expect(r).toEqual({ sent: 1, remaining: 0 })
++    expect(await store.getAll()).toHaveLength(0)
++  })
++
++  it('flush is a no-op when the flag is off, and leaves the queue in place', async () => {
++    const store = memoryQueueStore([{ id: '1', url: URL_, body: '{}', createdAt: 1 }])
++    const fetchImpl = vi.fn()
++    const r = await flushSubmitQueue({
++      getAccessToken: async () => 'fresh', apikey: 'k', fetchImpl, store, flagOn: false,
++    })
++    expect(r).toEqual({ sent: 0, remaining: 0 })
++    expect(fetchImpl).not.toHaveBeenCalled()
++    expect(await store.getAll()).toHaveLength(1)
++  })
++
++  it('isNetworkFailure detects offline and fetch errors', () => {
++    expect(isNetworkFailure(new TypeError('Failed to fetch'), true)).toBe(true)
++    expect(isNetworkFailure(new Error('boom'), true)).toBe(false)
++    expect(isNetworkFailure(new Error('boom'), false)).toBe(true)
++  })
++})
+diff --git a/app/src/lib/offlineSubmitQueue.ts b/app/src/lib/offlineSubmitQueue.ts
+new file mode 100644
+index 0000000..c3bda6e
+--- /dev/null
++++ b/app/src/lib/offlineSubmitQueue.ts
+@@ -0,0 +1,185 @@
++// P1-26 offline submit queue. IndexedDB (or an injected store in tests), never Cache Storage.
++// Stores the submit-assessment JSON body only. Replay uses a fresh access token; no bearer is kept.
++import { offlineCacheOn } from './offlineCachePolicy'
++
++export const QUEUE_DB = 'romrx-p1-26-offline'
++export const QUEUE_STORE = 'submit-queue'
++export const PENDING_MESSAGE = 'You appear to be offline. Your assessment is saved on this device and will submit when you are back online.'
++
++export interface QueuedSubmit {
++  id: string
++  url: string
++  body: string
++  createdAt: number
++}
++
++export interface QueueStore {
++  getAll(): Promise<QueuedSubmit[]>
++  put(item: QueuedSubmit): Promise<void>
++  delete(id: string): Promise<void>
++}
++
++export function isNetworkFailure(err: unknown, online: boolean = typeof navigator === 'undefined' ? true : navigator.onLine): boolean {
++  if (online === false) return true
++  if (!err) return false
++  const msg = err instanceof Error ? err.message : String(err)
++  return /failed to fetch|networkerror|network request failed|load failed|offline/i.test(msg)
++}
++
++export function memoryQueueStore(seed: QueuedSubmit[] = []): QueueStore {
++  const rows = new Map(seed.map((r) => [r.id, r]))
++  return {
++    async getAll() { return [...rows.values()].sort((a, b) => a.createdAt - b.createdAt) },
++    async put(item) { rows.set(item.id, item) },
++    async delete(id) { rows.delete(id) },
++  }
++}
++
++function openDb(): Promise<IDBDatabase> {
++  return new Promise((resolve, reject) => {
++    const req = indexedDB.open(QUEUE_DB, 1)
++    req.onupgradeneeded = () => { req.result.createObjectStore(QUEUE_STORE, { keyPath: 'id' }) }
++    req.onsuccess = () => resolve(req.result)
++    req.onerror = () => reject(req.error)
++  })
++}
++
++export function idbQueueStore(): QueueStore {
++  return {
++    async getAll() {
++      const db = await openDb()
++      return new Promise((resolve, reject) => {
++        const q = db.transaction(QUEUE_STORE, 'readonly').objectStore(QUEUE_STORE).getAll()
++        q.onsuccess = () => resolve((q.result as QueuedSubmit[]).sort((a, b) => a.createdAt - b.createdAt))
++        q.onerror = () => reject(q.error)
++      })
++    },
++    async put(item) {
++      const db = await openDb()
++      return new Promise((resolve, reject) => {
++        const q = db.transaction(QUEUE_STORE, 'readwrite').objectStore(QUEUE_STORE).put(item)
++        q.onsuccess = () => resolve()
++        q.onerror = () => reject(q.error)
++      })
++    },
++    async delete(id) {
++      const db = await openDb()
++      return new Promise((resolve, reject) => {
++        const q = db.transaction(QUEUE_STORE, 'readwrite').objectStore(QUEUE_STORE).delete(id)
++        q.onsuccess = () => resolve()
++        q.onerror = () => reject(q.error)
++      })
++    },
++  }
++}
++
++export function defaultQueueStore(): QueueStore {
++  return typeof indexedDB === 'undefined' ? memoryQueueStore() : idbQueueStore()
++}
++
++export interface SubmitResult {
++  ok: boolean
++  queued: boolean
++  status?: number
++  data?: Record<string, unknown>
++  error?: string
++}
++
++export async function enqueueSubmit(
++  url: string,
++  body: unknown,
++  store: QueueStore,
++  now: number = Date.now(),
++  id: string = `${now}-${Math.random().toString(36).slice(2, 10)}`,
++): Promise<QueuedSubmit> {
++  const item: QueuedSubmit = { id, url, body: typeof body === 'string' ? body : JSON.stringify(body), createdAt: now }
++  await store.put(item)
++  return item
++}
++
++/**
++ * POST submit-assessment. On a network failure, and only when the flag is on, the body is queued.
++ * HTTP error responses are not queued. Tokens are not stored.
++ */
++export async function postSubmitAssessment(opts: {
++  url: string
++  accessToken: string
++  apikey: string
++  body: unknown
++  fetchImpl?: typeof fetch
++  store?: QueueStore
++  flagOn?: boolean
++  online?: boolean
++}): Promise<SubmitResult> {
++  const flagOn = opts.flagOn ?? offlineCacheOn()
++  const fetchImpl = opts.fetchImpl ?? fetch
++  try {
++    const res = await fetchImpl(opts.url, {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        Authorization: `Bearer ${opts.accessToken}`,
++        apikey: opts.apikey,
++      },
++      body: JSON.stringify(opts.body),
++    })
++    const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` })) as Record<string, unknown>
++    if (!res.ok || data.ok === false) {
++      return { ok: false, queued: false, status: res.status, data, error: String(data.error ?? `HTTP ${res.status}`) }
++    }
++    return { ok: true, queued: false, status: res.status, data }
++  } catch (err) {
++    if (flagOn && isNetworkFailure(err, opts.online)) {
++      const store = opts.store ?? defaultQueueStore()
++      await enqueueSubmit(opts.url, opts.body, store)
++      return { ok: false, queued: true, error: PENDING_MESSAGE }
++    }
++    return { ok: false, queued: false, error: 'Something went wrong. Please try again.' }
++  }
++}
++
++export async function flushSubmitQueue(opts: {
++  getAccessToken: () => Promise<string | null>
++  apikey: string
++  fetchImpl?: typeof fetch
++  store?: QueueStore
++  flagOn?: boolean
++}): Promise<{ sent: number; remaining: number }> {
++  if (!(opts.flagOn ?? offlineCacheOn())) return { sent: 0, remaining: 0 }
++  const store = opts.store ?? defaultQueueStore()
++  const fetchImpl = opts.fetchImpl ?? fetch
++  const items = await store.getAll()
++  let sent = 0
++  for (const item of items) {
++    const token = await opts.getAccessToken()
++    if (!token) break
++    try {
++      const res = await fetchImpl(item.url, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          Authorization: `Bearer ${token}`,
++          apikey: opts.apikey,
++        },
++        body: item.body,
++      })
++      if (res.ok) {
++        const data = await res.json().catch(() => ({ ok: true })) as Record<string, unknown>
++        if (data.ok === false) {
++          if (res.status >= 500 || res.status === 401 || res.status === 429) break
++          await store.delete(item.id)
++          continue
++        }
++        await store.delete(item.id)
++        sent++
++        continue
++      }
++      if (res.status >= 500 || res.status === 401 || res.status === 429) break
++      await store.delete(item.id)
++    } catch {
++      break
++    }
++  }
++  const remaining = (await store.getAll()).length
++  return { sent, remaining }
++}
+diff --git a/app/src/main.tsx b/app/src/main.tsx
+index 5fac155..8575fa0 100644
+--- a/app/src/main.tsx
++++ b/app/src/main.tsx
+@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
+ import App from './App'
+ import './index.css'
+ import { isStripeTestRequested } from './lib/stripeTestMode'
++import { startOfflineCache } from './lib/offlineCache'
+ 
+ // Latch ?stripe_test=1 for this tab as soon as the app loads. Before, the flag was only stored the first time a
+ // checkout/portal request was built, so landing on /login?stripe_test=1 and later opening Settings lost it and the
+@@ -10,6 +11,16 @@ import { isStripeTestRequested } from './lib/stripeTestMode'
+ // ignores the flag unless the signed-in user passes is_test_account, so this cannot move a real user to test mode.
+ isStripeTestRequested()
+ 
++// P1-26: register the offline cache worker only when VITE_P1_26_OFFLINE_CACHE=on; otherwise unregister.
++void startOfflineCache({
++  getAccessToken: async () => {
++    const { supabase } = await import('./lib/supabase')
++    const { data } = await supabase.auth.getSession()
++    return data.session?.access_token ?? null
++  },
++  apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
++})
++
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+     <App />
+diff --git a/app/src/pages/Assessment.tsx b/app/src/pages/Assessment.tsx
+index fee0e57..0afedd2 100644
+--- a/app/src/pages/Assessment.tsx
++++ b/app/src/pages/Assessment.tsx
+@@ -15,6 +15,7 @@ import {
+   type Draft, type DraftSaver, type SaveStatus,
+ } from '../lib/assessmentDraft'
+ import { supabaseDraftStore } from '../lib/assessmentDraftStore'
++import { postSubmitAssessment } from '../lib/offlineSubmitQueue'
+ 
+ // localStorage for the per-member progress copy. Signed-in members only (Stacy Oct 28): no copy for signed-out visitors.
+ const draftStorage = () => { try { return window.localStorage } catch { return null } }
+@@ -228,20 +229,18 @@ export function Assessment() {
+         return
+       }
+       try {
+-        const res = await fetch(SUBMIT_ASSESSMENT_URL, {
+-          method: 'POST',
+-          headers: {
+-            'Content-Type': 'application/json',
+-            'Authorization': `Bearer ${session.access_token}`,
+-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+-          },
+-          body: JSON.stringify(assessment_data),
++        // P1-26: when the offline-cache flag is on, a network drop queues this signed-in submit
++        // and syncs on reconnect. Success and HTTP-error paths are unchanged. Lead submits are not queued.
++        const result = await postSubmitAssessment({
++          url: SUBMIT_ASSESSMENT_URL,
++          accessToken: session.access_token,
++          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
++          body: assessment_data,
+         })
+-        const data = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
+         setLoading(false)
+-        if (!res.ok || !data.ok) {
++        if (!result.ok) {
+           saverRef.current?.saver.reopen()
+-          setError(data.error ?? `Submission failed (HTTP ${res.status}). Please try again.`)
++          setError(result.error ?? 'Submission failed. Please try again.')
+           return
+         }
+         // Done: the database clears the draft on insert. Drop this device's copy now and delete the row once any
+diff --git a/app/src/pages/QuickCheck.tsx b/app/src/pages/QuickCheck.tsx
+index 572995d..453edf1 100644
+--- a/app/src/pages/QuickCheck.tsx
++++ b/app/src/pages/QuickCheck.tsx
+@@ -16,6 +16,7 @@ import {
+   nextCheckLineInCycle, quickSubmitBody, dayOneAssessment, SCHEDULE_COLUMNS, quickCheckPageGate, quickSubmitOutcome, GENERIC_ERROR,
+   type QuickContext, type Schedule,
+ } from '../lib/quickCheck'
++import { postSubmitAssessment } from '../lib/offlineSubmitQueue'
+ 
+ const SUBMIT_ASSESSMENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-assessment`
+ const TODAY = '/dashboard/my-protocol'
+@@ -74,20 +75,26 @@ function QuickCheckInner() {
+     if (!schedule?.check_joints) return
+     setLoading(true); setError('')
+     try {
+-      const res = await fetch(SUBMIT_ASSESSMENT_URL, {
+-        method: 'POST',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'Authorization': `Bearer ${session.access_token}`,
+-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+-        },
+-        body: JSON.stringify(quickSubmitBody(values, schedule.check_joints)),
++      // P1-26: same signed-in submit helper as Assessment. Queues only when the flag is on and the network is down.
++      const result = await postSubmitAssessment({
++        url: SUBMIT_ASSESSMENT_URL,
++        accessToken: session.access_token,
++        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
++        body: quickSubmitBody(values, schedule.check_joints),
+       })
+-      const data = await res.json().catch(() => ({ ok: false }))
+       setLoading(false)
++      if (result.queued) { setError(result.error ?? GENERIC_ERROR); return }
++      if (!result.ok) {
++        const outcome = quickSubmitOutcome(result.status ?? 0, result.data ?? { ok: false })
++        if (outcome.kind === 'today') { navigate(TODAY, { replace: true }); return }
++        if (outcome.kind === 'error') { setError(outcome.message); return }
++        setError(GENERIC_ERROR)
++        return
++      }
++      const data = result.data ?? { ok: true }
+       // 47aad435: 200 { ok: true, check_kind: 'quick', ... }. The window 400 'No quick re-check is scheduled'
+       // goes to Today (no retry loop); any other failure shows the existing generic line.
+-      const outcome = quickSubmitOutcome(res.status, data)
++      const outcome = quickSubmitOutcome(result.status ?? 200, data)
+       if (outcome.kind === 'today') { navigate(TODAY, { replace: true }); return }
+       if (outcome.kind === 'error') { setError(outcome.message); return }
+       track('quick_check_completed', { joints: schedule.check_joints.length })
+diff --git a/app/src/vite-env.d.ts b/app/src/vite-env.d.ts
+index 24eee56..6127fe3 100644
+--- a/app/src/vite-env.d.ts
++++ b/app/src/vite-env.d.ts
+@@ -9,6 +9,8 @@ interface ImportMetaEnv {
+   readonly VITE_BASE_LUMBAR_REMOVED?: string
+   /** 'on' turns on the one-time terms re-accept screen (default off; Sunday batch). */
+   readonly VITE_TERMS_REACCEPT_GATE?: string
++  /** 'on' enables P1-26 offline cache / service worker (default off). Only the exact string on. */
++  readonly VITE_P1_26_OFFLINE_CACHE?: string
+ }
+ 
+ interface ImportMeta {
+diff --git a/docs/p1-26/BUILD-NOTES.md b/docs/p1-26/BUILD-NOTES.md
+new file mode 100644
+index 0000000..e8e3087
+--- /dev/null
++++ b/docs/p1-26/BUILD-NOTES.md
+@@ -0,0 +1,37 @@
++# P1-26 BUILD-NOTES — offline assessment and media caching (BUILD ONLY)
++
++Started and finished: Mon Nov 16, 2026, evening ET (America/New_York). Spec first, then the build. Flag defaults off. Nothing deployed.
++
++Branch: romrx-io-web `feat/p1-26-offline-cache-20261116` off `8bf3d601674fe9bd6ff2252e71409d29a71df662`.
++
++## Hunks (every changed path)
++
++### New
++
++1. `docs/p1-26/SPEC-P1-26-OFFLINE.md` — spec (written first).
++2. `docs/p1-26/ROLLBACK.md` — unregister the worker and flag off.
++3. `docs/p1-26/BUILD-NOTES.md` — this file.
++4. `app/public/sw.js` — service worker (shell + `/videos/*`). Not registered unless the flag is on.
++5. `app/src/lib/offlineCachePolicy.ts` — flag (`=== 'on'` only), cache names, bypass rules.
++6. `app/src/lib/offlineCachePolicy.test.ts`
++7. `app/src/lib/offlineSubmitQueue.ts` — IndexedDB/memory queue, no bearer stored, replay with a fresh token.
++8. `app/src/lib/offlineSubmitQueue.test.ts`
++9. `app/src/lib/offlineCache.ts` — register when on; unregister + delete our caches when off.
++10. `app/src/lib/offlineCache.test.ts`
++
++### Edited
++
++11. `app/src/main.tsx` — `startOfflineCache()` on boot (no-op / kill switch when the flag is off).
++12. `app/src/vite-env.d.ts` — `VITE_P1_26_OFFLINE_CACHE?: string`.
++13. `app/src/pages/Assessment.tsx` — signed-in submit goes through `postSubmitAssessment` (queue only when the flag is on and the network is down). Lead path unchanged.
++14. `app/src/pages/QuickCheck.tsx` — same signed-in helper. Success and HTTP-error outcomes unchanged.
++
++No other paths. No Netlify header change, no CSP change, no edge or database change, no flag turned on.
++
++## Jules overlap (client files)
++
++Touched in Jules's area: `app/src/pages/Assessment.tsx`, `app/src/pages/QuickCheck.tsx`, and the boot file `app/src/main.tsx`.
++
++Overlap not edited: `app/src/pages/AssessmentMeasureScreen.tsx`, `app/src/pages/AssessmentPhases.tsx`, `app/src/pages/assessmentSteps.ts`, `app/src/components/StepVideo.tsx`, `app/src/components/GuidedPlayer.tsx`, `app/src/pages/MyProtocol.tsx`, `app/src/lib/assessmentDraft.ts`, `app/src/lib/assessmentDraftStore.ts`, `app/src/lib/assessmentDraftCopy.ts`, `app/src/lib/stepVideo.ts`, `app/src/lib/pushSubscribe.ts` (uses `serviceWorker.ready`; this worker is the one later P1-14 push should join), `app/src/App.tsx`.
++
++Not messaged. Coordination is left to Grant.
+diff --git a/docs/p1-26/ROLLBACK.md b/docs/p1-26/ROLLBACK.md
+new file mode 100644
+index 0000000..2dee037
+--- /dev/null
++++ b/docs/p1-26/ROLLBACK.md
+@@ -0,0 +1,12 @@
++# P1-26 rollback
++
++BUILD ONLY. Flag defaults off, so live behavior does not change until a later gate turns `VITE_P1_26_OFFLINE_CACHE=on` and rebuilds.
++
++To roll back after the flag has been on:
++
++1. Remove `VITE_P1_26_OFFLINE_CACHE` or set it to anything other than `on`.
++2. Rebuild and publish the Base web app as usual (not from this item).
++3. On load, `startOfflineCache()` sees the flag off, unregisters `/app/sw.js`, and deletes the `romrx-p1-26-shell-v1` and `romrx-p1-26-media-v1` caches (and any older `romrx-p1-26-*` names).
++4. Queued offline submits are not replayed while the flag is off. They stay in IndexedDB (`romrx-p1-26-offline`) until the flag is on again or the member clears site data.
++
++No service worker remains registered for this feature after step 3. No database or edge-function rollback is needed; this item is client-only.
+diff --git a/docs/p1-26/SPEC-P1-26-OFFLINE.md b/docs/p1-26/SPEC-P1-26-OFFLINE.md
+new file mode 100644
+index 0000000..dfec8a5
+--- /dev/null
++++ b/docs/p1-26/SPEC-P1-26-OFFLINE.md
+@@ -0,0 +1,62 @@
++# SPEC-P1-26-OFFLINE — offline assessment and media caching (Base web app)
++
++Avery, Mon Nov 16, 2026, evening ET (America/New_York). Web app only; no native. Build sits behind a flag that defaults off. Nothing in this item is for deploy until gated.
++
++## Goal
++
++A signed-in member can keep moving through the Base assessment and protocol media when the network drops, without a second source of user data beyond the live save-as-you-go drafts.
++
++## Flag and kill switch
++
++- Env flag: `VITE_P1_26_OFFLINE_CACHE`. Only the exact string `on` enables the feature (same rule as other ROMRx flags). Unset, empty, `true`, `1`, or anything else is off.
++- Default: off. Production builds stay unchanged until a later gate turns the flag on and rebuilds.
++- Kill switch / rollback: set the flag off (or leave it unset) and rebuild. On boot, if the flag is off, the app unregisters this service worker and deletes this feature's Cache Storage entries. See `ROLLBACK.md`.
++
++## Service worker
++
++- One worker, URL `/app/sw.js`, scope `/app/`. The Base app is already mounted at `/app/`.
++- Registered from the app entry only when the flag is on. Never registered otherwise.
++- P1-14 (web push) is not in this tree (`SHOW_PUSH` is false; there is no worker on 8bf3d601). This worker is the one later push work should join, so we do not ship a second worker that would collide. This item does not add push.
++
++## Cache Storage
++
++Two versioned caches:
++
++- `romrx-p1-26-shell-v1` — app shell: `/app/` navigations (`index.html`) and hashed `/app/assets/*` static files (js, css, fonts served by the app, icons). HTML is network-first, falling back to cache when offline. Hashed assets are cache-first.
++- `romrx-p1-26-media-v1` — same-origin `/videos/*` (mp4 and poster jpg) for assessment and protocol screens. Cache-first, LRU cap of 24 files (about 12 videos plus posters). A miss while offline returns a network error the existing video slot already hides.
++
++Cache names are versioned. On activate, any `romrx-p1-26-*` cache that is not a current name is deleted.
++
++## What is never cached
++
++The worker does not intercept, and never writes to Cache Storage:
++
++- Requests with an `Authorization` header.
++- Any non-GET request.
++- Auth and API URLs: Supabase hosts (`*.supabase.co`), `/auth/v1`, `/rest/v1`, `/functions/v1`, `/storage/v1`, `/realtime`.
++- Any response that holds user data from the API.
++
++This is stricter than "cache it but don't store": those requests fall through to the browser default, so the worker cannot accidentally keep a copy.
++
++## Save-as-you-go
++
++Live save-as-you-go (`lib/assessmentDraft.ts` + `assessmentDraftStore.ts`, signed-in only) already:
++
++- upserts the member's `assessment_drafts` row when online, and
++- keeps a per-user local mirror (`romrx.assessment_draft.v1.<userId>`) so a draft can be restored if the network save fails.
++
++This item does not add a second draft store and does not cache draft API responses. Offline measuring continues to use that existing mirror. The 48-hour / 7-day draft rules are unchanged.
++
++## Offline submit queue
++
++When the flag is on and a signed-in `submit-assessment` call fails because the network is down, the payload is queued on the device (IndexedDB, not Cache Storage) and sent again on reconnect (`online` event, and once at start-up). Replay uses a fresh access token; the queue does not store bearer tokens.
++
++- Success path is unchanged when the network works.
++- HTTP error responses (4xx/5xx) are not treated as offline and are not queued.
++- Lead (signed-out) `submit-lead-assessment` is not queued: there is no signed-in draft mirror for that path, and this item does not add one.
++- The outro / "great-job" success screen is not shown until the request actually succeeds. A queued submit leaves the member on the assessment with a pending message.
++- Quick Check uses the same helper so a dropped connection there also queues, behind the same flag.
++
++## Out of scope
++
++Native apps, web push, precaching the entire video library, caching Google Fonts or other third-party hosts, CSP changes (P1-30), turning the flag on, and any deploy.
