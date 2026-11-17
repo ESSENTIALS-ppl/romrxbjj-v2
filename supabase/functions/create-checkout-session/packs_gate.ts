@@ -2,7 +2,7 @@
 // January 2027; existing holders keep access). Pure module: no imports, so it is unit-testable without Stripe/Supabase.
 //
 // Default is CLOSED. Packs reopen only when the env secret PACKS_CHECKOUT_OPEN is exactly "true" (case-insensitive).
-// January reopen = `supabase secrets set PACKS_CHECKOUT_OPEN=true` (no code change, no redeploy).
+// Reopen (Spring 2027, Jim go needed) = `supabase secrets set PACKS_CHECKOUT_OPEN=true`; ignored before PACKS_EARLIEST_OPEN_UNIX.
 //
 // Scope: only NEW checkout sessions in create-checkout-session. stripe-webhook, create-portal-session, renewals and
 // sport_entitlements are untouched, so existing subscriptions and access are unaffected.
@@ -10,7 +10,16 @@ export const PACKS_CLOSED_MESSAGE = "Sport packs open in January 2027.";
 export const PACKS_CLOSED_CODE = "packs_closed";
 export const PACKS_CLOSED_STATUS = 403;
 
-export function packsCheckoutOpen(raw: string | undefined | null): boolean {
+// JAN1-PACK-CHARGE fix (2026-11-17, Jim Oct 29 ruling: packs are "Coming Spring 2027" at $149/yr, no pack charge on
+// Jan 1, 2027). Every pack checkout path in index.ts (Base+sport combo and sport unlock) sends trial_end = Jan 1, 2027
+// noon ET while the free period runs, so a pack opened before then would bill $149 (Base+pack $209) on Jan 1.
+// Hard floor: packs stay CLOSED until this instant even if PACKS_CHECKOUT_OPEN=true. After it, index.ts sends no
+// pack trial_end (freePeriod false) and a pack is charged only at the moment the customer buys it.
+// Must equal BETA_TRIAL_END_UNIX in _shared/arl_copy.ts (asserted in test/packs_gate_jan1.test.ts).
+export const PACKS_EARLIEST_OPEN_UNIX = 1798822800;
+
+export function packsCheckoutOpen(raw: string | undefined | null, nowMs: number = Date.now()): boolean {
+  if (nowMs <= PACKS_EARLIEST_OPEN_UNIX * 1000) return false;
   return String(raw ?? "").trim().toLowerCase() === "true";
 }
 
