@@ -1,0 +1,647 @@
+diff --git a/supabase/functions/send-push-notification/SECRETS.md b/supabase/functions/send-push-notification/SECRETS.md
+new file mode 100644
+index 0000000..6a6fa89
+--- /dev/null
++++ b/supabase/functions/send-push-notification/SECRETS.md
+@@ -0,0 +1,19 @@
++# P1-14 secrets required at deploy (values not listed)
++
++This file lists names only. Presence was not checked this turn. Values must
++never be printed, committed, or pasted into receipts.
++
++## New or confirm on the `send-push-notification` function
++
++1. `VAPID_PUBLIC_KEY` — generated off-box. Also mirrored on the web app as `VITE_VAPID_PUBLIC_KEY` (public).
++2. `VAPID_PRIVATE_KEY` — generated off-box. Function only.
++3. `VAPID_SUBJECT` — `mailto:hello@romrx.io` or `https://romrx.io`.
++4. `WEB_PUSH_SEND` — leave unset or anything other than exact `on` for dry run. Flip to `on` only after the checklist in `VAPID-PLAN.md`.
++
++## Already expected (reuse, do not duplicate)
++
++5. Vault `cron_webhook_secret` — `cron_call_edge` sends it as `x-cron-secret`; the function verifies with `verify_webhook_secret(p_name => cron_webhook_secret)`. Fail-closed if the header is missing, shorter than 32 characters, or verification is not exactly true.
++6. `SUPABASE_URL`
++7. `SUPABASE_SERVICE_ROLE_KEY`
++
++Deploy the function with `verify_jwt = false` (pg_cron, no user JWT), same as the other cron senders. The unapplied cron SQL does not embed a secret; it calls `public.cron_call_edge('send-push-notification', 120000)`.
+diff --git a/supabase/functions/send-push-notification/VAPID-PLAN.md b/supabase/functions/send-push-notification/VAPID-PLAN.md
+new file mode 100644
+index 0000000..1537e17
+--- /dev/null
++++ b/supabase/functions/send-push-notification/VAPID-PLAN.md
+@@ -0,0 +1,40 @@
++# P1-14 VAPID key plan (no keys in this file)
++
++This branch does not generate, store, or print VAPID key material. Do not paste
++public or private keys into git, tickets, chat, receipts, or build notes.
++
++## Generate off-box
++
++On a trusted machine that is not this repo (for example Sable or a logged-in
++operator laptop), generate a new pair with the official `web-push` tool:
++
++```
++npx web-push generate-vapid-keys
++```
++
++Record the pair in the operator's secret store only. Never commit the output.
++Never echo the values into a shell history that lands in a ticket or this tree.
++
++## Where each value lives
++
++- `VAPID_PRIVATE_KEY` — Supabase Edge Function secrets for `send-push-notification` only. Never in the web app, Netlify env, git, or client bundles.
++- `VAPID_PUBLIC_KEY` — the same function secret, plus a public copy as `VITE_VAPID_PUBLIC_KEY` on the web app (already read by `app/src/lib/pushSubscribe.ts`). The public key is not a secret, but do not casually paste it into tickets.
++- `VAPID_SUBJECT` — function secret. Must be a `mailto:` or `https:` URI. Preferred values: `mailto:hello@romrx.io` or `https://romrx.io` (allowed addresses only). The function refuses to send if the subject is missing or not one of those schemes.
++- `WEB_PUSH_SEND` — function secret. Sends only when the value is exactly `on`. Any other value, including `ON`, `true`, or unset, is a dry run (count due, do not claim, do not call web-push).
++- Existing Vault secret `cron_webhook_secret` — already used by `public.cron_call_edge` / `verify_webhook_secret`. Reuse it. Do not mint a second cron secret for this function.
++- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — already present on the Edge runtime. Not added by this pack.
++
++Do not set `WEB_PUSH_SEND=on` until (a) VAPID secrets are in place, (b) Jim / Stacy have cleared lock-screen wording (`PUSH_COPY` in `handler.ts` is a placeholder), (c) the function is deployed with `verify_jwt = false`, and (d) a dry-run cron pass has been reviewed.
++
++## Rotation
++
++Generate a new pair off-box, update the three VAPID function secrets and `VITE_VAPID_PUBLIC_KEY`, then ask opted-in clients to re-subscribe (old endpoint keys will fail until they do). Retire the old private key from the function secrets after re-subscribe completes. Do not commit either generation.
++
++## Service worker path
++
++This pack does not add a service worker and does not add a Netlify redirect.
++romrx.io currently rewrites `/app/*` to the SPA document, which would serve
++`/app/sw.js` as HTML. Jules is adding a `/app/sw.js` rule ahead of that rewrite,
++with `Cache-Control: no-cache`, in his combined client r3 (~8:50 PM ET, 16 Nov 2026).
++P1-14 uses that same `/app/sw.js` path and rule. Do not add a competing worker
++path or a second redirect rule.
+diff --git a/supabase/functions/send-push-notification/handler.test.ts b/supabase/functions/send-push-notification/handler.test.ts
+new file mode 100644
+index 0000000..8ffe4b1
+--- /dev/null
++++ b/supabase/functions/send-push-notification/handler.test.ts
+@@ -0,0 +1,223 @@
++import { assertEquals, assertFalse, assertStringIncludes } from "jsr:@std/assert@1";
++import { dedupeKey, handle, sendEnabled, vapidReady, vapidSubjectOk, type Candidate, type Deps, type PushSub } from "./handler.ts";
++
++const FAKE_SUB: PushSub = { endpoint: "https://example.com/push/device-1", p256dh: "B" + "x".repeat(40), auth: "a".repeat(16) };
++
++function cand(over: Partial<Candidate> = {}): Candidate {
++  return { userId: "00000000-0000-4000-8000-000000000001", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: FAKE_SUB, ...over };
++}
++
++function base(over: Partial<Deps> = {}): Deps {
++  const sends: unknown[] = [];
++  const claims = new Set<string>();
++  return {
++    cronCallerOk: async () => true,
++    webPushSend: undefined,
++    vapidPublicKey: "pub-not-a-real-key",
++    vapidPrivateKey: "priv-not-a-real-key",
++    vapidSubject: "mailto:hello@romrx.io",
++    now: () => new Date("2026-11-16T14:45:00-05:00"),
++    listDue: async () => [cand()],
++    claim: async (userId, key) => {
++      const k = `${userId}:${key}`;
++      if (claims.has(k)) return false;
++      claims.add(k);
++      return true;
++    },
++    send: async (sub, payload) => {
++      sends.push({ endpoint: sub.endpoint, payload });
++      return { ok: true };
++    },
++    markSuccess: async () => {},
++    markFailure: async () => {},
++    ...over,
++    // expose for assertions
++    _sends: sends,
++    _claims: claims,
++  } as Deps & { _sends: unknown[]; _claims: Set<string> };
++}
++
++function req(opts: { secret?: string; body?: unknown; method?: string } = {}): Request {
++  const headers = new Headers({ "Content-Type": "application/json" });
++  if (opts.secret !== undefined) headers.set("x-cron-secret", opts.secret);
++  return new Request("https://example.com/functions/v1/send-push-notification", {
++    method: opts.method ?? "POST",
++    headers,
++    body: opts.method === "GET" ? undefined : JSON.stringify(opts.body ?? {}),
++  });
++}
++
++async function json(r: Response): Promise<Record<string, unknown>> {
++  return await r.json() as Record<string, unknown>;
++}
++
++Deno.test("sendEnabled is exact-string on only", () => {
++  assertEquals(sendEnabled("on"), true);
++  assertEquals(sendEnabled("ON"), false);
++  assertEquals(sendEnabled("true"), false);
++  assertEquals(sendEnabled(""), false);
++  assertEquals(sendEnabled(undefined), false);
++});
++
++Deno.test("vapidSubjectOk allows only mailto: or https:", () => {
++  assertEquals(vapidSubjectOk("mailto:hello@romrx.io"), true);
++  assertEquals(vapidSubjectOk("https://romrx.io"), true);
++  assertEquals(vapidSubjectOk("http://romrx.io"), false);
++  assertEquals(vapidSubjectOk(""), false);
++  assertEquals(vapidSubjectOk(undefined), false);
++});
++
++Deno.test("vapidReady requires both keys and a valid subject", () => {
++  assertEquals(vapidReady({ vapidPublicKey: "p", vapidPrivateKey: "s", vapidSubject: "mailto:hello@romrx.io" }), true);
++  assertEquals(vapidReady({ vapidPublicKey: "p", vapidPrivateKey: "s", vapidSubject: "not-a-uri" }), false);
++  assertEquals(vapidReady({ vapidPublicKey: "p", vapidPrivateKey: undefined, vapidSubject: "https://romrx.io" }), false);
++});
++
++Deno.test("OPTIONS is 204", async () => {
++  const r = await handle(new Request("https://example.com/", { method: "OPTIONS" }), base());
++  assertEquals(r.status, 204);
++});
++
++Deno.test("GET is 405", async () => {
++  const r = await handle(req({ method: "GET" }), base());
++  assertEquals(r.status, 405);
++});
++
++Deno.test("fail-closed: missing cron secret is 403, no send", async () => {
++  let sent = 0;
++  const d = base({ cronCallerOk: async () => false, webPushSend: "on", send: async () => { sent += 1; return { ok: true }; } });
++  const r = await handle(req({}), d);
++  assertEquals(r.status, 403);
++  assertEquals(sent, 0);
++  const body = await json(r);
++  assertEquals(body.error, "forbidden");
++  assertEquals("due" in body, false);
++});
++
++Deno.test("fail-closed: short or rejected secret is 403", async () => {
++  const d = base({ cronCallerOk: async () => false, webPushSend: "on" });
++  const r = await handle(req({ secret: "too-short" }), d);
++  assertEquals(r.status, 403);
++});
++
++Deno.test("dry-run when WEB_PUSH_SEND is unset: 200, counts due, never claims or sends", async () => {
++  let claimed = 0;
++  let sent = 0;
++  const d = base({
++    webPushSend: undefined,
++    claim: async () => { claimed += 1; return true; },
++    send: async () => { sent += 1; return { ok: true }; },
++  });
++  const r = await handle(req({ secret: "x".repeat(32) }), d);
++  assertEquals(r.status, 200);
++  const body = await json(r);
++  assertEquals(body.ok, true);
++  assertEquals(body.dry_run, true);
++  assertEquals(body.due, 1);
++  assertEquals(body.sent, 0);
++  assertEquals(body.claimed, 0);
++  assertEquals(body.skipped, 1);
++  assertEquals(claimed, 0);
++  assertEquals(sent, 0);
++  const text = JSON.stringify(body);
++  assertEquals(text.includes("example.com"), false);
++  assertEquals(text.includes("@"), false);
++  assertEquals(text.includes("00000000"), false);
++});
++
++Deno.test("dry-run when WEB_PUSH_SEND is 'true' or 'ON', not exact on", async () => {
++  for (const v of ["true", "ON", "1", "yes"]) {
++    let sent = 0;
++    const r = await handle(req(), base({ webPushSend: v, send: async () => { sent += 1; return { ok: true }; } }));
++    assertEquals(r.status, 200);
++    const body = await json(r);
++    assertEquals(body.dry_run, true);
++    assertEquals(body.sent, 0);
++    assertEquals(sent, 0);
++  }
++});
++
++Deno.test("WEB_PUSH_SEND=on without VAPID is 503 and does not send", async () => {
++  let sent = 0;
++  const r = await handle(req(), base({
++    webPushSend: "on",
++    vapidPrivateKey: undefined,
++    send: async () => { sent += 1; return { ok: true }; },
++  }));
++  assertEquals(r.status, 503);
++  const body = await json(r);
++  assertEquals(body.error, "vapid_not_configured");
++  assertEquals(body.sent, 0);
++  assertEquals(sent, 0);
++});
++
++Deno.test("WEB_PUSH_SEND=on claims then sends, no secrets or endpoints in body", async () => {
++  let sent = 0;
++  let success = 0;
++  const r = await handle(req(), base({
++    webPushSend: "on",
++    send: async () => { sent += 1; return { ok: true }; },
++    markSuccess: async () => { success += 1; },
++  }));
++  assertEquals(r.status, 200);
++  const body = await json(r);
++  assertEquals(body.dry_run, false);
++  assertEquals(body.due, 1);
++  assertEquals(body.claimed, 1);
++  assertEquals(body.sent, 1);
++  assertEquals(body.failed, 0);
++  assertEquals(sent, 1);
++  assertEquals(success, 1);
++  const text = JSON.stringify(body);
++  assertFalse(text.includes("pub-not-a-real-key"));
++  assertFalse(text.includes("priv-not-a-real-key"));
++  assertFalse(text.includes("example.com"));
++  assertFalse(text.includes("hello@"));
++});
++
++Deno.test("duplicate claim is skipped, second call does not send", async () => {
++  const claims = new Set<string>();
++  let sent = 0;
++  const d = base({
++    webPushSend: "on",
++    claim: async (userId, key) => {
++      const k = `${userId}:${key}`;
++      if (claims.has(k)) return false;
++      claims.add(k);
++      return true;
++    },
++    send: async () => { sent += 1; return { ok: true }; },
++  });
++  const a = await json(await handle(req(), d));
++  const b = await json(await handle(req(), d));
++  assertEquals(a.sent, 1);
++  assertEquals(b.sent, 0);
++  assertEquals(b.skipped, 1);
++  assertEquals(sent, 1);
++});
++
++Deno.test("send failure marks failure and increments failed, 410 is gone", async () => {
++  let goneMarked = false;
++  const r = await handle(req(), base({
++    webPushSend: "on",
++    send: async () => ({ ok: false, gone: true }),
++    markFailure: async (_id, gone) => { goneMarked = gone; },
++  }));
++  const body = await json(r);
++  assertEquals(body.sent, 0);
++  assertEquals(body.failed, 1);
++  assertEquals(goneMarked, true);
++});
++
++Deno.test("dedupeKey is kind:localDate, no mailbox form", () => {
++  assertEquals(dedupeKey("retest", "2026-11-16"), "retest:2026-11-16");
++  assertFalse(dedupeKey("protocol", "2026-11-16").includes("@"));
++});
++
++Deno.test("response never echoes candidate payloads", async () => {
++  const r = await handle(req(), base({ webPushSend: undefined, listDue: async () => [cand({ userId: "user@example.com" as unknown as string })] }));
++  const text = await r.text();
++  assertEquals(text.includes("user@example.com"), false);
++  assertEquals(text.includes("https://"), false);
++  assertStringIncludes(text, '"dry_run":true');
++});
+diff --git a/supabase/functions/send-push-notification/handler.ts b/supabase/functions/send-push-notification/handler.ts
+new file mode 100644
+index 0000000..066ff21
+--- /dev/null
++++ b/supabase/functions/send-push-notification/handler.ts
+@@ -0,0 +1,118 @@
++// P1-14 send-push-notification. BUILD ONLY, not deployed.
++// Replaces the 2026-10-01 410 stub. Fail-closed x-cron-secret gate (same pattern as
++// send-conversion-drip / cron_call_edge). Sends only when WEB_PUSH_SEND is exactly "on".
++// No mailbox addresses, no VAPID values, and no subscription endpoints are logged or returned.
++// Lock-screen strings are placeholders and need Jim / Stacy wording before WEB_PUSH_SEND is flipped.
++
++export const PUSH_COPY = {
++  protocol: { title: "ROMRx", body: "Your protocol session is due." },
++  retest: { title: "ROMRx", body: "Your 6-week retest is due." },
++  digest: { title: "ROMRx", body: "Your weekly progress is ready." },
++  test: { title: "ROMRx", body: "This is a test notification." },
++} as const;
++
++export type Kind = keyof typeof PUSH_COPY;
++
++export interface PushSub {
++  endpoint: string;
++  p256dh: string;
++  auth: string;
++}
++
++export interface Candidate {
++  userId: string;
++  subscriptionId: string | null;
++  kind: Kind;
++  dedupeKey: string;
++  localDate: string; // YYYY-MM-DD
++  sub: PushSub;
++}
++
++export interface Deps {
++  cronCallerOk: (req: Request) => Promise<boolean>;
++  webPushSend: string | undefined;
++  vapidPublicKey: string | undefined;
++  vapidPrivateKey: string | undefined;
++  vapidSubject: string | undefined;
++  now: () => Date;
++  listDue: (kinds: Kind[], now: Date) => Promise<Candidate[]>;
++  claim: (userId: string, dedupeKey: string) => Promise<boolean>;
++  send: (sub: PushSub, payload: string) => Promise<{ ok: boolean; gone?: boolean }>;
++  markSuccess: (subscriptionId: string | null) => Promise<void>;
++  markFailure: (subscriptionId: string | null, gone: boolean) => Promise<void>;
++}
++
++export function sendEnabled(value: string | undefined): boolean {
++  return value === "on";
++}
++
++export function vapidSubjectOk(subject: string | undefined): boolean {
++  if (!subject) return false;
++  return subject.startsWith("mailto:") || subject.startsWith("https:");
++}
++
++export function vapidReady(d: Pick<Deps, "vapidPublicKey" | "vapidPrivateKey" | "vapidSubject">): boolean {
++  return !!(d.vapidPublicKey && d.vapidPrivateKey && vapidSubjectOk(d.vapidSubject));
++}
++
++export function dedupeKey(kind: Kind, localDate: string): string {
++  return `${kind}:${localDate}`;
++}
++
++export async function handle(req: Request, d: Deps): Promise<Response> {
++  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
++  if (req.method !== "POST") return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: { "Content-Type": "application/json" } });
++  if (!(await d.cronCallerOk(req))) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { "Content-Type": "application/json" } });
++
++  let kinds: Kind[] = ["protocol", "retest"];
++  try {
++    const body = await req.json().catch(() => ({})) as { kinds?: unknown };
++    if (Array.isArray(body.kinds) && body.kinds.length) {
++      const allowed = body.kinds.filter((k): k is Kind => k === "protocol" || k === "retest" || k === "digest" || k === "test");
++      if (allowed.length) kinds = allowed;
++    }
++  } catch {
++    // default kinds
++  }
++
++  const live = sendEnabled(d.webPushSend);
++  if (live && !vapidReady(d)) {
++    return new Response(JSON.stringify({ error: "vapid_not_configured", dry_run: false, sent: 0 }), { status: 503, headers: { "Content-Type": "application/json" } });
++  }
++
++  const due = await d.listDue(kinds, d.now());
++  let claimed = 0;
++  let sent = 0;
++  let failed = 0;
++  let skipped = 0;
++  for (const c of due) {
++    const key = c.dedupeKey || dedupeKey(c.kind, c.localDate);
++    if (live) {
++      const okClaim = await d.claim(c.userId, key);
++      if (!okClaim) { skipped += 1; continue; }
++      claimed += 1;
++      const payload = JSON.stringify(PUSH_COPY[c.kind]);
++      const result = await d.send(c.sub, payload);
++      if (result.ok) {
++        sent += 1;
++        await d.markSuccess(c.subscriptionId);
++      } else {
++        failed += 1;
++        await d.markFailure(c.subscriptionId, !!result.gone);
++      }
++    } else {
++      skipped += 1; // counted as dry-run candidates, not claimed
++    }
++  }
++
++  // Response counts only. No user ids, emails, endpoints, or keys.
++  return new Response(JSON.stringify({
++    ok: true,
++    dry_run: !live,
++    due: due.length,
++    claimed: live ? claimed : 0,
++    sent: live ? sent : 0,
++    failed: live ? failed : 0,
++    skipped,
++  }), { status: 200, headers: { "Content-Type": "application/json" } });
++}
+diff --git a/supabase/functions/send-push-notification/index.ts b/supabase/functions/send-push-notification/index.ts
+index 87f8ee3..a43ce8c 100644
+--- a/supabase/functions/send-push-notification/index.ts
++++ b/supabase/functions/send-push-notification/index.ts
+@@ -1,9 +1,181 @@
+-// send-push-notification: RETIRED 2026-10-01 (security audit). The previous version accepted unauthenticated
+-// calls (key check was skipped when the header was absent) and could email/push all users.
+-// Not scheduled by pg_cron and not called by any client. Returns 410. Re-introduce only with
+-// a fail-closed x-cron-secret gate (see send-s1-2-followup-email cronCallerOk).
+-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+-Deno.serve((req: Request) => {
+-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+-  return new Response(JSON.stringify({ error: "gone" }), { status: 410, headers: { ...CORS, "Content-Type": "application/json" } });
+-});
++// send-push-notification (P1-14). Re-introduced after the 2026-10-01 410 stub.
++// BRANCH ONLY, not deployed. verify_jwt must be false (pg_cron, no user JWT).
++// Fail-closed x-cron-secret via public.verify_webhook_secret (cron_webhook_secret), same as other cron senders.
++// Sends only when WEB_PUSH_SEND is exactly "on". Never logs VAPID values, endpoints, or emails.
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createClient } from "jsr:@supabase/supabase-js@2";
++import { handle, type Candidate, type Deps, type Kind, type PushSub, dedupeKey, vapidSubjectOk } from "./handler.ts";
++
++const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
++const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
++
++async function cronCallerOk(req: Request): Promise<boolean> {
++  const got = (req.headers.get("x-cron-secret") ?? "").trim();
++  if (got.length < 32) return false;
++  if (!SUPABASE_URL || !SERVICE) return false;
++  try {
++    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_webhook_secret`, {
++      method: "POST",
++      headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
++      body: JSON.stringify({ p_name: "cron_webhook_secret", p_candidate: got }),
++    });
++    return r.ok && (await r.json()) === true;
++  } catch {
++    return false;
++  }
++}
++
++function admin() {
++  return createClient(SUPABASE_URL, SERVICE, { auth: { persistSession: false } });
++}
++
++function localDateAndHour(now: Date, tz: string | null): { date: string; hour: number } {
++  const zone = tz && tz.length <= 64 ? tz : "America/New_York";
++  let date = "";
++  let hour = 0;
++  try {
++    const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
++    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
++    date = `${g("year")}-${g("month")}-${g("day")}`;
++    hour = parseInt(g("hour") || "0", 10);
++  } catch {
++    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
++    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
++    date = `${g("year")}-${g("month")}-${g("day")}`;
++    hour = parseInt(g("hour") || "0", 10);
++  }
++  return { date, hour };
++}
++
++function reminderHour(t: string | null | undefined): number | null {
++  if (!t) return 9;
++  const m = /^\s*(\d{1,2})(?::(\d{2}))?/.exec(t);
++  if (!m) return 9;
++  const h = parseInt(m[1], 10);
++  return h >= 0 && h <= 23 ? h : 9;
++}
++
++function subFromJson(raw: unknown): PushSub | null {
++  if (!raw || typeof raw !== "object") return null;
++  const o = raw as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
++  if (typeof o.endpoint !== "string" || !o.endpoint.startsWith("https://")) return null;
++  const p256dh = o.keys && typeof o.keys.p256dh === "string" ? o.keys.p256dh : "";
++  const auth = o.keys && typeof o.keys.auth === "string" ? o.keys.auth : "";
++  if (p256dh.length < 20 || auth.length < 8) return null;
++  return { endpoint: o.endpoint, p256dh, auth };
++}
++
++async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
++  const sb = admin();
++  const out: Candidate[] = [];
++  const seen = new Set<string>();
++
++  if (kinds.includes("protocol") || kinds.includes("retest")) {
++    const { data: prefs, error } = await sb.from("notification_preferences").select("user_id, timezone, reminder_time, push_reminders, push_subscription").eq("push_reminders", true);
++    if (error || !prefs) return out;
++
++    const ids = prefs.map((p: { user_id: string }) => p.user_id);
++    const { data: tableSubs } = ids.length
++      ? await sb.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", ids).is("disabled_at", null)
++      : { data: [] as { id: string; user_id: string; endpoint: string; p256dh: string; auth: string }[] };
++
++    const { data: schedules } = kinds.includes("retest") && ids.length
++      ? await sb.from("user_mobility_schedule").select("user_id, next_retest_at").in("user_id", ids)
++      : { data: [] as { user_id: string; next_retest_at: string | null }[] };
++    const retestByUser = new Map((schedules ?? []).map((s: { user_id: string; next_retest_at: string | null }) => [s.user_id, s.next_retest_at]));
++
++    const subsByUser = new Map<string, { id: string | null; sub: PushSub }[]>();
++    for (const row of tableSubs ?? []) {
++      const sub: PushSub = { endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth };
++      const list = subsByUser.get(row.user_id) ?? [];
++      list.push({ id: row.id, sub });
++      subsByUser.set(row.user_id, list);
++    }
++    for (const p of prefs as { user_id: string; timezone: string | null; reminder_time: string | null; push_subscription: unknown }[]) {
++      if (!subsByUser.has(p.user_id)) {
++        const fallback = subFromJson(p.push_subscription);
++        if (fallback) subsByUser.set(p.user_id, [{ id: null, sub: fallback }]);
++      }
++    }
++
++    for (const p of prefs as { user_id: string; timezone: string | null; reminder_time: string | null }[]) {
++      const subs = subsByUser.get(p.user_id) ?? [];
++      if (!subs.length) continue;
++      const local = localDateAndHour(now, p.timezone);
++      if (kinds.includes("protocol") && reminderHour(p.reminder_time) === local.hour) {
++        for (const s of subs) {
++          const k = `protocol:${p.user_id}:${s.sub.endpoint}`;
++          if (seen.has(k)) continue;
++          seen.add(k);
++          out.push({ userId: p.user_id, subscriptionId: s.id, kind: "protocol", dedupeKey: dedupeKey("protocol", local.date), localDate: local.date, sub: s.sub });
++        }
++      }
++      if (kinds.includes("retest")) {
++        const iso = retestByUser.get(p.user_id);
++        if (iso) {
++          const retestLocal = localDateAndHour(new Date(iso), p.timezone);
++          if (retestLocal.date === local.date) {
++            for (const s of subs) {
++              const k = `retest:${p.user_id}:${s.sub.endpoint}`;
++              if (seen.has(k)) continue;
++              seen.add(k);
++              out.push({ userId: p.user_id, subscriptionId: s.id, kind: "retest", dedupeKey: dedupeKey("retest", local.date), localDate: local.date, sub: s.sub });
++            }
++          }
++        }
++      }
++    }
++  }
++  return out;
++}
++
++async function claim(userId: string, dedupeKeyValue: string): Promise<boolean> {
++  const { error } = await admin().from("push_sends").insert({ user_id: userId, dedupe_key: dedupeKeyValue });
++  if (!error) return true;
++  if (String(error.message || "").toLowerCase().includes("duplicate") || (error as { code?: string }).code === "23505") return false;
++  return false;
++}
++
++async function markSuccess(subscriptionId: string | null): Promise<void> {
++  if (!subscriptionId) return;
++  await admin().from("push_subscriptions").update({ last_success_at: new Date().toISOString(), failure_count: 0 }).eq("id", subscriptionId);
++}
++
++async function markFailure(subscriptionId: string | null, gone: boolean): Promise<void> {
++  if (!subscriptionId) return;
++  const patch: Record<string, unknown> = { last_failure_at: new Date().toISOString() };
++  if (gone) patch.disabled_at = new Date().toISOString();
++  await admin().from("push_subscriptions").update(patch).eq("id", subscriptionId);
++}
++
++async function liveSend(sub: PushSub, payload: string): Promise<{ ok: boolean; gone?: boolean }> {
++  const pub = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
++  const priv = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
++  const subject = Deno.env.get("VAPID_SUBJECT") ?? "";
++  if (!pub || !priv || !vapidSubjectOk(subject)) return { ok: false };
++  try {
++    const webpush = (await import("npm:web-push@3.6.7")).default;
++    webpush.setVapidDetails(subject, pub, priv);
++    await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
++    return { ok: true };
++  } catch (e) {
++    const status = (e as { statusCode?: number }).statusCode;
++    return { ok: false, gone: status === 404 || status === 410 };
++  }
++}
++
++Deno.serve((req) =>
++  handle(req, {
++    cronCallerOk,
++    webPushSend: Deno.env.get("WEB_PUSH_SEND"),
++    vapidPublicKey: Deno.env.get("VAPID_PUBLIC_KEY"),
++    vapidPrivateKey: Deno.env.get("VAPID_PRIVATE_KEY"),
++    vapidSubject: Deno.env.get("VAPID_SUBJECT"),
++    now: () => new Date(),
++    listDue,
++    claim,
++    send: liveSend,
++    markSuccess,
++    markFailure,
++  } satisfies Deps),
++);
+diff --git a/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.ROLLBACK.sql b/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.ROLLBACK.sql
+new file mode 100644
+index 0000000..dafc6f4
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.ROLLBACK.sql
+@@ -0,0 +1,4 @@
++-- Rollback for P1-14 send-push-notification hourly cron. NOT APPLIED.
++-- Unschedules only this job name. Does not touch job 1 or any other cron job.
++
++select cron.unschedule('send-push-notification-hourly');
+diff --git a/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.sql b/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.sql
+new file mode 100644
+index 0000000..d455b33
+--- /dev/null
++++ b/supabase/migrations-unapplied/20261117020200_p1_14_send_push_notification_cron.sql
+@@ -0,0 +1,12 @@
++-- P1-14 send-push-notification hourly cron. NOT APPLIED. NOT SCHEDULED.
++-- Does not touch job 1 (send-renewal-reminders-daily) or any existing job.
++-- Existing jobs already use minute :00, :15, :17, :20, :30. This job uses :45.
++-- Calls public.cron_call_edge so the x-cron-secret is injected from Vault
++-- (cron_webhook_secret) and never appears in this file.
++-- Rollback: 20261117020200_p1_14_send_push_notification_cron.ROLLBACK.sql
++
++select cron.schedule(
++  'send-push-notification-hourly',
++  '45 * * * *',
++  $$select public.cron_call_edge('send-push-notification', 120000)$$
++);

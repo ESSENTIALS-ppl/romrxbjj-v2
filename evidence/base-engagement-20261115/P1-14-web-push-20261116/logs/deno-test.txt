@@ -1,0 +1,19 @@
+[0m[38;5;245mrunning 15 tests from ./handler.test.ts[0m
+sendEnabled is exact-string on only ... [0m[32mok[0m [0m[38;5;245m(577µs)[0m
+vapidSubjectOk allows only mailto: or https: ... [0m[32mok[0m [0m[38;5;245m(83µs)[0m
+vapidReady requires both keys and a valid subject ... [0m[32mok[0m [0m[38;5;245m(44µs)[0m
+OPTIONS is 204 ... [0m[32mok[0m [0m[38;5;245m(6ms)[0m
+GET is 405 ... [0m[32mok[0m [0m[38;5;245m(973µs)[0m
+fail-closed: missing cron secret is 403, no send ... [0m[32mok[0m [0m[38;5;245m(440µs)[0m
+fail-closed: short or rejected secret is 403 ... [0m[32mok[0m [0m[38;5;245m(297µs)[0m
+dry-run when WEB_PUSH_SEND is unset: 200, counts due, never claims or sends ... [0m[32mok[0m [0m[38;5;245m(683µs)[0m
+dry-run when WEB_PUSH_SEND is 'true' or 'ON', not exact on ... [0m[32mok[0m [0m[38;5;245m(556µs)[0m
+WEB_PUSH_SEND=on without VAPID is 503 and does not send ... [0m[32mok[0m [0m[38;5;245m(231µs)[0m
+WEB_PUSH_SEND=on claims then sends, no secrets or endpoints in body ... [0m[32mok[0m [0m[38;5;245m(231µs)[0m
+duplicate claim is skipped, second call does not send ... [0m[32mok[0m [0m[38;5;245m(199µs)[0m
+send failure marks failure and increments failed, 410 is gone ... [0m[32mok[0m [0m[38;5;245m(148µs)[0m
+dedupeKey is kind:localDate, no mailbox form ... [0m[32mok[0m [0m[38;5;245m(34µs)[0m
+response never echoes candidate payloads ... [0m[32mok[0m [0m[38;5;245m(166µs)[0m
+
+[0m[32mok[0m | 15 passed | 0 failed [0m[38;5;245m(16ms)[0m
+
