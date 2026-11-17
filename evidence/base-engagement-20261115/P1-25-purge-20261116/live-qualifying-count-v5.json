@@ -1,0 +1,17 @@
+{
+  "read_at": "2026-11-16 7:58 PM ET (America/New_York)",
+  "project": "cqzvqzwwevnflinxgnpp",
+  "query": "MCP execute_sql, read-only; counts only; no emails, names, or row contents selected",
+  "rules": "day-90: completed account_deletion_requests.completed_at older than 90 days, minus 7c71e421, ops.internal_accounts, fixtures",
+  "qualifying_day90": 0,
+  "candidates_before_exclusions": 0,
+  "open_requests_would_use_completion_hook": 0,
+  "adr_total": 0,
+  "p1_25_functions_live": 0,
+  "catalog_read_7_54_PM_ET": {
+    "client_feedback": "user_id uuid nullable, FK auth.users ON DELETE SET NULL; triggers feedback-to-notion, trg_client_feedback_updated_at (no delete trigger)",
+    "product_events": "user_id uuid nullable, FK auth.users ON DELETE SET NULL; no triggers",
+    "client_feedback_rows_total": 1, "client_feedback_rows_null_user_id": 0,
+    "product_events_rows_total": 9603, "product_events_rows_null_user_id": 1879
+  }
+}

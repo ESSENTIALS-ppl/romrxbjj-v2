@@ -1,0 +1,254 @@
+{
+  "passed": 35,
+  "failed": 0,
+  "results": {
+    "C1 completion default is dry_run, reports counts, writes nothing": {
+      "pass": true,
+      "info": {
+        "expected": {
+          "auth.users": 1,
+          "public.leads": 3,
+          "public.users": 1,
+          "public.yoga_testers": 1,
+          "public.product_events": 3,
+          "public.client_feedback": 2,
+          "public.investor_requests": 1,
+          "public.partner_inquiries": 1,
+          "public.sport_pack_waitlist": 2
+        }
+      }
+    },
+    "V1 dry run reports client_feedback (2) and product_events (3) counts, plus public.users and auth.users (1 each)": {
+      "pass": true
+    },
+    "V2 apply without the recorded dry-run counts is refused and erases nothing": {
+      "pass": true
+    },
+    "V3 apply whose counts differ from the recorded dry run (a product event added after it) stops and erases nothing": {
+      "pass": true
+    },
+    "C2 the dry-run and apply return values contain no email addresses": {
+      "pass": true
+    },
+    "C3 apply: request completed with completed_at, public.users and auth.users removed": {
+      "pass": true,
+      "info": {
+        "erased": {
+          "auth.users": 1,
+          "public.leads": 3,
+          "public.users": 1,
+          "public.yoga_testers": 1,
+          "public.product_events": 3,
+          "public.client_feedback": 2,
+          "public.investor_requests": 1,
+          "public.partner_inquiries": 1,
+          "public.sport_pack_waitlist": 2
+        }
+      }
+    },
+    "C4 apply cleared all 5 lists for the account (8 rows)": {
+      "pass": true,
+      "info": {
+        "cleared": {
+          "public.leads": 3,
+          "public.yoga_testers": 1,
+          "public.investor_requests": 1,
+          "public.partner_inquiries": 1,
+          "public.sport_pack_waitlist": 2
+        }
+      }
+    },
+    "V4 apply erased the user's client_feedback (incl. the deletion-request note) and product_events before auth.users": {
+      "pass": true
+    },
+    "V5 other users' client_feedback and product_events, and anonymous events, untouched": {
+      "pass": true
+    },
+    "C5 leads matched by converted_user_id (other address) and by email (cased/padded) are gone": {
+      "pass": true
+    },
+    "C6 other user O rows untouched in every list": {
+      "pass": true,
+      "info": {
+        "o": {
+          "leads": 2,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        }
+      }
+    },
+    "C7 cascade: identities, athletes, clients, assessments of D1 gone; O kept": {
+      "pass": true
+    },
+    "C8 billing_consents and consent_events rows kept (consent_events user_id set null by FK)": {
+      "pass": true
+    },
+    "C9 apply return value contains no email addresses": {
+      "pass": true
+    },
+    "C10 a completion with no list rows works (0 cleared, completed, account removed)": {
+      "pass": true
+    },
+    "C11 an email still owned by another account is never matched (O untouched; D3 own rows cleared)": {
+      "pass": true,
+      "info": {
+        "d3": {
+          "public.leads": 1,
+          "public.yoga_testers": 0,
+          "public.investor_requests": 1,
+          "public.partner_inquiries": 0,
+          "public.sport_pack_waitlist": 1
+        }
+      }
+    },
+    "C12 forced cleanup failure (yoga_testers) fails the completion and rolls back every step": {
+      "pass": true,
+      "info": {
+        "d4": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        }
+      }
+    },
+    "C13 failure at the auth.users delete rolls back the already-run list cleanup and public.users delete": {
+      "pass": true,
+      "info": {
+        "d5": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 0,
+          "partner_inquiries": 0,
+          "yoga_testers": 1
+        }
+      }
+    },
+    "V6 forced failure at the product_events delete rolls back the list cleanup and the client_feedback delete": {
+      "pass": true
+    },
+    "C14 excluded_hardcoded: completion and cleanup refused (apply and dry_run), nothing changed": {
+      "pass": true,
+      "info": {
+        "lists": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
+        }
+      }
+    },
+    "C15 excluded_internal_accounts: completion and cleanup refused (apply and dry_run), nothing changed": {
+      "pass": true,
+      "info": {
+        "lists": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
+        }
+      }
+    },
+    "C16 excluded_fixture: completion and cleanup refused (apply and dry_run), nothing changed": {
+      "pass": true,
+      "info": {
+        "lists": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
+        }
+      }
+    },
+    "C17 ops.internal_accounts never written": {
+      "pass": true
+    },
+    "C18 cleanup_at_completion alone is refused without an open request": {
+      "pass": true
+    },
+    "C19 completing an already completed request is refused": {
+      "pass": true
+    },
+    "C20 an unknown mode is refused": {
+      "pass": true
+    },
+    "C21 EXECUTE is service_role only on all four functions": {
+      "pass": true
+    },
+    "C22 purge_deleted_accounts() default is still dry_run, 90 days, writes nothing": {
+      "pass": true
+    },
+    "C23 purge retention below 90 days still refused": {
+      "pass": true
+    },
+    "C24 just-completed requests (under 90 days) do not qualify for the day-90 purge": {
+      "pass": true
+    },
+    "C25 hook rollback drops the four functions and leaves purge_deleted_accounts": {
+      "pass": true
+    },
+    "S1 day-90 dry run finds the account and writes nothing": {
+      "pass": true,
+      "info": {
+        "counts": {
+          "auth.users": 0,
+          "public.leads": 2,
+          "public.users": 0,
+          "public.clients": 1,
+          "public.athletes": 1,
+          "public.assessments": 0,
+          "public.yoga_testers": 1,
+          "public.product_events": 0,
+          "public.client_feedback": 0,
+          "public.investor_requests": 1,
+          "public.partner_inquiries": 1,
+          "public.sport_pack_waitlist": 1,
+          "public.account_deletion_requests": 1
+        }
+      }
+    },
+    "S2 day-90 sweep clears the 5 lists using emails still recoverable from identities, athletes and leads": {
+      "pass": true,
+      "info": {
+        "before": {
+          "leads": 3,
+          "sport_pack_waitlist": 2,
+          "investor_requests": 2,
+          "partner_inquiries": 2,
+          "yoga_testers": 2
+        },
+        "after": {
+          "leads": 1,
+          "sport_pack_waitlist": 1,
+          "investor_requests": 1,
+          "partner_inquiries": 1,
+          "yoga_testers": 1
+        }
+      }
+    },
+    "S3 day-90 sweep never matches an email that belongs to another live account (O kept in all 5 lists)": {
+      "pass": true
+    },
+    "S4 the day-90 apply wrote a zz_bak_p1_25_* backup (7-day window unchanged)": {
+      "pass": true
+    }
+  }
+}
