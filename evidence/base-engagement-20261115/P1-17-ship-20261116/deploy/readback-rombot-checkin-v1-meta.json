@@ -1,0 +1,71 @@
+{
+ "id": "ca5b47bf-a761-4c18-ae38-958c055fd190",
+ "slug": "rombot-checkin",
+ "name": "rombot-checkin",
+ "status": "ACTIVE",
+ "version": 1,
+ "created_at": 1794875714903,
+ "updated_at": 1794875714903,
+ "verify_jwt": false,
+ "import_map": false,
+ "entrypoint_path": "/tmp/user_fn_cqzvqzwwevnflinxgnpp_ca5b47bf-a761-4c18-ae38-958c055fd190_1/source/source/index.ts",
+ "ezbr_sha256": "fbad002179ca31898451e69b0b9a34c9add02a0ed0d09de83d7659553befdd19",
+ "files": [
+  {
+   "name": "source/index.ts",
+   "bytes": 9188,
+   "sha256": "58b9a42531d4d69e123be5fa59b0b785f80aae93702ddd923964d61f399efa4b",
+   "git_11803fee": "58b9a42531d4d69e123be5fa59b0b785f80aae93702ddd923964d61f399efa4b",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/handler.ts",
+   "bytes": 6555,
+   "sha256": "b3546c05272882040108020aff6401fc4127ee08118fdd85cd8a12809f5eff39",
+   "git_11803fee": "b3546c05272882040108020aff6401fc4127ee08118fdd85cd8a12809f5eff39",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/logic.ts",
+   "bytes": 18380,
+   "sha256": "cd0a8d915a78664801e4b8c51e31c78a8442f333ea2834daea48870408830a0f",
+   "git_11803fee": "cd0a8d915a78664801e4b8c51e31c78a8442f333ea2834daea48870408830a0f",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/copy.ts",
+   "bytes": 7488,
+   "sha256": "58e445128654cf8a9c87cce179aed887ffe87ea43579848700ee1267809b110f",
+   "git_11803fee": "58e445128654cf8a9c87cce179aed887ffe87ea43579848700ee1267809b110f",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/email.ts",
+   "bytes": 3954,
+   "sha256": "a4bfb5df0786f5c37850e97208404005724e9b65de4b7ba5e7b289f5d54fee00",
+   "git_11803fee": "a4bfb5df0786f5c37850e97208404005724e9b65de4b7ba5e7b289f5d54fee00",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/email_footer.ts",
+   "bytes": 1216,
+   "sha256": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+   "git_11803fee": "0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b",
+   "result": "MATCH"
+  },
+  {
+   "name": "_shared/unsub_token.ts",
+   "bytes": 3443,
+   "sha256": "26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424",
+   "git_11803fee": "26723e53b38b31fe7686304e5e933dab8910908f8f54f9a2e451dbd06a046424",
+   "result": "MATCH"
+  },
+  {
+   "name": "source/deletion.ts",
+   "bytes": 1269,
+   "sha256": "edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b",
+   "git_11803fee": "edbcee01bb5b1e62d88159b9c593e61379da488582cc95741cd9d77f26bc907b",
+   "result": "MATCH"
+  }
+ ]
+}

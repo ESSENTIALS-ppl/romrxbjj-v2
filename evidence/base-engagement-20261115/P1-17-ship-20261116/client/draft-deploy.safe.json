@@ -1,0 +1,14 @@
+{
+ "id": "6afba1b9a6f1c859e9d9695c",
+ "state": "ready",
+ "published_at": null,
+ "created_at": "2026-11-17T00:37:13.048Z",
+ "context": "deploy-preview",
+ "deploy_source": "cli",
+ "build_id": null,
+ "title": "29eb4fa66f920450d71c44e6edbad123cfd38596 P1-17 combined v5 ROMBot check-in + privacy v5 (manual CLI, not from main)",
+ "locked": null,
+ "commit_ref": null,
+ "branch": "main",
+ "deploy_time": 3
+}

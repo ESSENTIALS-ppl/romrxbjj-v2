@@ -1,0 +1,314 @@
+[
+ {
+  "slug": "activate-beta-base",
+  "version": 13,
+  "verify_jwt": true,
+  "ezbr_sha256": "c1bbafc2f3809135b9b8b5bd1982a6e4ed25384bbc026187cea76ce31025d18b",
+  "updated_at": 1790107246123,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "ai-chat",
+  "version": 96,
+  "verify_jwt": true,
+  "ezbr_sha256": "2db1a2de38f0e57c86ea3e43e2644c0f572787fc5830774ef73c53e51466dff7",
+  "updated_at": 1794791677539,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "ai-chat-claims-test",
+  "version": 11,
+  "verify_jwt": true,
+  "ezbr_sha256": "0b9a93a97a0a147b2d04fd8a7120fdd71a319f77d4572d594d18f832793a3087",
+  "updated_at": 1791848518380,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "coach-actions",
+  "version": 27,
+  "verify_jwt": true,
+  "ezbr_sha256": "831bb410b7016a009da34f0dd1a8c595d88538fc24c2f6c0e1c177632f771889",
+  "updated_at": 1780590972480,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "compute-tiers",
+  "version": 54,
+  "verify_jwt": false,
+  "ezbr_sha256": "f4c62a384310b5db2966b566ad1085c61733aa4653853cb34b50c7f17e33170b",
+  "updated_at": 1794840179988,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "compute-tiers-base",
+  "version": 11,
+  "verify_jwt": false,
+  "ezbr_sha256": "b14f678b14b24f8184c8066588c4d92836bc05105fd5dd4b40f3f8a35d6258f5",
+  "updated_at": 1793748448928,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "create-checkout-session",
+  "version": 45,
+  "verify_jwt": true,
+  "ezbr_sha256": "2b7dd0ce33acb5300763a9898afca6d67b3f02709b265dd3d951df459551239c",
+  "updated_at": 1791306753921,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "create-portal-session",
+  "version": 23,
+  "verify_jwt": true,
+  "ezbr_sha256": "67ab693a0618313e9b2d2db28dfd564848563003a81af9ae74aeaf8f42895aee",
+  "updated_at": 1793213409586,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "embed-general-once",
+  "version": 10,
+  "verify_jwt": false,
+  "ezbr_sha256": "8be466ff82163eb12fd8153b8dd7e8eb67cbaab98d8ab4a8c527325672c1d043",
+  "updated_at": 1790031710163,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "embed-knowledge",
+  "version": 23,
+  "verify_jwt": false,
+  "ezbr_sha256": "fa413811e18962e390a2afa580a0419de3a2a3a374e32389b227b37daaa757ad",
+  "updated_at": 1793748443107,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "export-my-data",
+  "version": 2,
+  "verify_jwt": true,
+  "ezbr_sha256": "0de35f2bf74278900d329a35a66fccf29fc7d146eeb22eb808e8a7d27b86e7e1",
+  "updated_at": 1793674590569,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "feedback-to-notion",
+  "version": 24,
+  "verify_jwt": false,
+  "ezbr_sha256": "6bc351ca50e8a8ffa82946437218476286ba59af0ae609d6af127b1b5d4358b1",
+  "updated_at": 1790652861342,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "get-coach-roster",
+  "version": 21,
+  "verify_jwt": true,
+  "ezbr_sha256": "8945b54bae7456ca5e441f6d46dadbc4c8a19ee92735506fc38df176a8d7bad4",
+  "updated_at": 1780258247331,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "join-waitlist",
+  "version": 3,
+  "verify_jwt": false,
+  "ezbr_sha256": "1fc0dccc8e95e602f3133febe57d7b351406764d3eaf2b7cd2d5e1a86a3a48b4",
+  "updated_at": 1793302097366,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "lifecycle-emails",
+  "version": 4,
+  "verify_jwt": false,
+  "ezbr_sha256": "6714009f4b59627011083c51807fc4e38ead1492dc9fc3344e19af56986edb41",
+  "updated_at": 1794875376743,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "notify-coach-signup",
+  "version": 23,
+  "verify_jwt": false,
+  "ezbr_sha256": "daffdfbabba556e0dd5dcf418f4e3916614d342716522c87f4432200af7d0304",
+  "updated_at": 1790886213516,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "notify-inbound-lead",
+  "version": 10,
+  "verify_jwt": false,
+  "ezbr_sha256": "688f7a4c3eda26596bb64ca208bc5157e593f9a9b60e584f16e18e4550fdeb53",
+  "updated_at": 1790654751690,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "request-account-deletion",
+  "version": 11,
+  "verify_jwt": true,
+  "ezbr_sha256": "d662e9b8c50da51f4d7b9793d7589dabc08aa883ce61ab8cc6a0cc3e0989a4fc",
+  "updated_at": 1794795721977,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "rombot-conversations",
+  "version": 2,
+  "verify_jwt": true,
+  "ezbr_sha256": "986e2f585e1f9df2292bbe94706c894c001e208d56af2dc3a1d930d1d775f373",
+  "updated_at": 1793673315762,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "save-push-subscription",
+  "version": 20,
+  "verify_jwt": true,
+  "ezbr_sha256": "5d123c2b6955e631531cc5d753c199d5e2eaeee28dd47f72eddf84bfbb02f35c",
+  "updated_at": 1793674569121,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-bb-s1-2-followup-email",
+  "version": 20,
+  "verify_jwt": false,
+  "ezbr_sha256": "e9e5475d70d730dd18d45baa829a950dcad7c3ac41b79d51be615fb181b8d3f7",
+  "updated_at": 1791116031611,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-bb-s1-3-followup-email",
+  "version": 20,
+  "verify_jwt": false,
+  "ezbr_sha256": "d84da24acc90669c5643f739094eb4b488d9546463db7973c1ff44586869443c",
+  "updated_at": 1791116062759,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-bb-s1-4-stilhere-email",
+  "version": 20,
+  "verify_jwt": false,
+  "ezbr_sha256": "67191eb37ab2971063efbe118451c5f3346648f1fec6d00bf17e808a87a9b2e0",
+  "updated_at": 1791116095345,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-conversion-drip",
+  "version": 21,
+  "verify_jwt": false,
+  "ezbr_sha256": "bb615a0e2a4a114757e6486102451c3fdad04e2efb826fedecfead19cc1233e2",
+  "updated_at": 1791115846524,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-protocol-reminder",
+  "version": 21,
+  "verify_jwt": false,
+  "ezbr_sha256": "0e35974d9243e138cb8c65f31af303beb97ab4990d5729ddf0c8077cd0567ddd",
+  "updated_at": 1790886207282,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-push-notification",
+  "version": 21,
+  "verify_jwt": false,
+  "ezbr_sha256": "408b8f4b9b1931ba6039c279d28f74912ebfb7e2d92f2dadf2ff9d1d96c3b830",
+  "updated_at": 1793674571102,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-renewal-reminders",
+  "version": 27,
+  "verify_jwt": false,
+  "ezbr_sha256": "3bcc783c19962ebd2ce0e0e207b37f089a79fca8e729015706010b08c50acf22",
+  "updated_at": 1794840693475,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-s1-2-followup-email",
+  "version": 23,
+  "verify_jwt": false,
+  "ezbr_sha256": "70ec7706585689d1d6a1915df83b2982dc83d6220feec5d924d2cbf7eed550c0",
+  "updated_at": 1791115922617,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-s1-3-masters-email",
+  "version": 23,
+  "verify_jwt": false,
+  "ezbr_sha256": "8cc03fd50078a84dff9ed816d3fb7f4ff66fdf47472e0d91f7974ab0ddcf4433",
+  "updated_at": 1791115959091,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-s1-4-stilhere-email",
+  "version": 23,
+  "verify_jwt": false,
+  "ezbr_sha256": "00490da68499bff91910db568df3a722e3eabab569ebe1c856b20b0c4008f4ff",
+  "updated_at": 1791115990751,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-s1-welcome-email",
+  "version": 35,
+  "verify_jwt": false,
+  "ezbr_sha256": "99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85",
+  "updated_at": 1791306107030,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "send-whats-new",
+  "version": 7,
+  "verify_jwt": false,
+  "ezbr_sha256": "fc831df4880f90ba4fb62a922fb77b908f20e2df1482e8d8b93bdaf6d25a002d",
+  "updated_at": 1792361907890,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "serve-base-icon",
+  "version": 13,
+  "verify_jwt": false,
+  "ezbr_sha256": "6d3d9acc54a85c70ab7dd44b3d29d8cb4744181fddf2024341c5dfe12323e2d6",
+  "updated_at": 1788904501829,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "stripe-webhook",
+  "version": 54,
+  "verify_jwt": false,
+  "ezbr_sha256": "3c60342df64e5fed71d945683faf07ec0c2a291e69f3b59d86878685a3fe43e0",
+  "updated_at": 1794798202544,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "submit-assessment",
+  "version": 45,
+  "verify_jwt": true,
+  "ezbr_sha256": "edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296",
+  "updated_at": 1794840159779,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "submit-consent",
+  "version": 24,
+  "verify_jwt": true,
+  "ezbr_sha256": "e760e6763d19463d8c5d0c3f075d0e3682eded8ae1f3f4ba8ebb2350f9fc14d1",
+  "updated_at": 1777906243266,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "submit-feedback",
+  "version": 21,
+  "verify_jwt": false,
+  "ezbr_sha256": "d6c1e021cabb96536a1e4d3ef1e64078965ec362a5a881f5802f68e4acbb944d",
+  "updated_at": 1783297865088,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "submit-lead-assessment",
+  "version": 31,
+  "verify_jwt": false,
+  "ezbr_sha256": "48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf",
+  "updated_at": 1793051542506,
+  "status": "ACTIVE"
+ },
+ {
+  "slug": "unsubscribe",
+  "version": 14,
+  "verify_jwt": false,
+  "ezbr_sha256": "879abbfacde0fc1e812713205c4ed38aaa3c6f606d1cf37a3704e85293ff8622",
+  "updated_at": 1794875280360,
+  "status": "ACTIVE"
+ }
+]
