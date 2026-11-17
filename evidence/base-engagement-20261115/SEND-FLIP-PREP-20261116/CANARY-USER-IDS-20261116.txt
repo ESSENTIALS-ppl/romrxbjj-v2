@@ -1,0 +1,33 @@
+# Recommended LIFECYCLE_CANARY_USER_IDS (team test fixtures only). Ids only; no addresses.
+# 28 public.users rows where is_test_account is true and test_fixture is true.
+# Format for the secret: comma-separated, no spaces required. One id per line here.
+# Confirmed not present: 7c71e421-929b-4691-a6bc-cc614ed2a08d, 076ce453.
+# Read 8:20:10 PM ET Mon Nov 16 2026. Do not add or remove ids without a new receipt.
+1caad02d-6261-4013-b6a6-84b1b884844f
+2d870eb6-e747-4fdb-b131-595c170cd1b6
+30e6e845-dfae-4612-94c4-3794b2f9a414
+3676c1ec-e90f-4f66-a47d-3cf730770e98
+3ccc019d-a5bf-4896-9e32-3dcf0f01e740
+4099a2fc-8822-49ff-8d19-95635dad4191
+5ab1e4cd-ad18-4927-81be-374d4644b74d
+61264cb3-e723-43a2-9706-367181b7195a
+6a015e84-0dfc-4631-8686-65ea7403a1d2
+7bdc5615-fd24-4f61-981f-cfb41ebb1371
+81f1cf44-76a3-4370-a9ea-e51bb1e48772
+8274fb6c-3320-48e4-b879-0c7ce14c5868
+8f8b7aa0-3f87-4795-9be0-915a2590441e
+9d287227-e0ce-4a9c-90bf-d6230405d84a
+9d64f196-ffa8-43e6-9c45-c2a6b10fb6c5
+a0638644-1833-4348-ac44-0900d19836b8
+a96dce0f-7cc8-4827-b947-e12b0366b595
+aa50528d-e258-42ef-b34c-9326c1897e0f
+af305114-6fcd-45c3-87bd-2514d12a5e9d
+ba22df2a-e059-462c-8fb7-d4848aef2b8f
+bcdb9083-4350-492a-925f-3a33edb9a045
+c20130ce-0222-472b-81e0-cf681febd1e9
+cfe85f8e-33ad-4eb8-9bfc-671e9031e40b
+d0308547-2ca2-4ebc-bc8a-ddd0326e6af5
+d266691b-6b98-4237-ab4c-d143fad71795
+ebfe4f3d-0619-4460-a5f7-08217ea31909
+fb2ef500-eba5-4032-9870-98d15c935c5f
+fe266170-84bc-4fbe-95f7-32f917704172
