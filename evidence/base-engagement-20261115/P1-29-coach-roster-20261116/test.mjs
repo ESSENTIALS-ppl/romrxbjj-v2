@@ -1,0 +1,202 @@
+// P1-29: 4-role tests for coach_roster security_invoker. Synthetic data only. No live writes.
+import { PGlite } from '@electric-sql/pglite';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const MIG = fs.readFileSync(path.join(here, '../../supabase/migrations/20261117020100_p1_29_coach_roster_security_invoker.sql'), 'utf8');
+const ROLL = fs.readFileSync(path.join(here, '../../supabase/migrations/20261117020100_p1_29_coach_roster_security_invoker.rollback.sql.txt'), 'utf8');
+
+const C = 'eeeeeeee-0000-4000-8000-0000000000c1';
+const D = 'eeeeeeee-0000-4000-8000-0000000000d1';
+const E = 'eeeeeeee-0000-4000-8000-0000000000e1';
+const SA = 'eeeeeeee-0000-4000-8000-0000000000a1';
+const SU = 'eeeeeeee-0000-4000-8000-0000000000b1';
+const COACH = 'ffffffff-0000-4000-8000-0000000000c1';
+const ATH_D = 'ffffffff-0000-4000-8000-0000000000d1';
+const ATH_E = 'ffffffff-0000-4000-8000-0000000000e1';
+const SCHOOL = 'ffffffff-0000-4000-8000-0000000000a1';
+
+const PERSONAS = {
+  anon: { role: 'anon', claims: { role: 'anon' } },
+  coach_C: { role: 'authenticated', claims: { sub: C, role: 'authenticated' } },
+  athlete_D: { role: 'authenticated', claims: { sub: D, role: 'authenticated' } },
+  school_admin_SA: { role: 'authenticated', claims: { sub: SA, role: 'authenticated' } },
+  unlinked_E: { role: 'authenticated', claims: { sub: E, role: 'authenticated' } },
+  service_role: { role: 'service_role', claims: { role: 'service_role' } },
+  postgres: { role: 'postgres', claims: { role: 'postgres' } },
+};
+
+async function asP(db, name, fn) {
+  const p = PERSONAS[name];
+  await db.exec('begin');
+  try {
+    await db.query(
+      `select set_config('request.jwt.claims',$1,true), set_config('request.jwt.claim.sub',$2,true), set_config('request.jwt.claim.role',$3,true), set_config('role',$4,true)`,
+      [JSON.stringify(p.claims), p.claims.sub || '', p.claims.role || '', p.role === 'service_role' ? 'service_role' : 'postgres'],
+    );
+    await db.exec(`set local role ${p.role}`);
+    return await fn();
+  } catch (e) {
+    return { err: (e.code || '') + ':' + String(e.message || '').slice(0, 80) };
+  } finally {
+    await db.exec('rollback');
+  }
+}
+
+async function roster(db, name) {
+  const r = await asP(db, name, async () => {
+    const q = await db.query('select athlete_id::text, user_id::text, full_name, belt from public.coach_roster order by athlete_id');
+    return q.rows.map((row) => `${row.full_name}:${row.belt}`);
+  });
+  if (r && r.err) return r.err;
+  return r.join(' ') || '(none)';
+}
+
+async function usersVisible(db, name) {
+  const r = await asP(db, name, async () => {
+    const q = await db.query(`select id::text from public.users where id in ('${D}','${E}','${SU}') order by id`);
+    return q.rows.map((row) => row.id.slice(-2));
+  });
+  if (r && r.err) return r.err;
+  return r.join(' ') || '(none)';
+}
+
+async function setup(db) {
+  await db.exec(`
+    set check_function_bodies=off;
+    create role anon nologin noinherit;
+    create role authenticated nologin noinherit;
+    create role service_role nologin noinherit bypassrls;
+    create schema auth;
+    grant usage on schema public, auth to anon, authenticated, service_role;
+    create function auth.uid() returns uuid language sql stable as $$
+      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+    $$;
+    create function auth.jwt() returns jsonb language sql stable as $$
+      select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb;
+    $$;
+    create table public.schools (id uuid primary key, admin_id uuid not null);
+    create table public.users (
+      id uuid primary key,
+      full_name text not null,
+      belt text not null,
+      school_id uuid
+    );
+    create table public.coaches (id uuid primary key, user_id uuid not null unique);
+    create table public.athletes (id uuid primary key, user_id uuid not null unique, coach_id uuid);
+    alter table public.users enable row level security;
+    alter table public.coaches enable row level security;
+    alter table public.athletes enable row level security;
+    grant select on public.users, public.coaches, public.athletes, public.schools to anon, authenticated, service_role;
+    create policy "athletes_service_role_all" on public.athletes for all to public using (((auth.jwt() ->> 'role') = 'service_role'));
+    create policy "athletes_select_own" on public.athletes for select to public using (auth.uid() = user_id);
+    create policy "coaches_select_athletes" on public.athletes for select to public using (exists (select 1 from public.coaches c where c.user_id = auth.uid() and c.id = athletes.coach_id));
+    create policy "coaches: service role" on public.coaches for all to public using (current_setting('role') = 'service_role');
+    create policy "coaches_own" on public.coaches for all to public using (user_id = auth.uid());
+    create policy "users: service role full access" on public.users for all to public using (current_setting('role') = 'service_role');
+    create policy "users: school admin reads school users" on public.users for select to public using (exists (select 1 from public.schools s where s.admin_id = (select auth.uid()) and s.id = users.school_id));
+    create policy "users: self read" on public.users for select to public using ((select auth.uid()) = id);
+    -- live view: security_barrier only (DEFINER)
+    create view public.coach_roster
+      with (security_barrier=true) as
+      select a.id as athlete_id, a.user_id, u.full_name, u.belt
+      from public.athletes a
+      join public.coaches c on c.id = a.coach_id
+      join public.users u on u.id = a.user_id
+      where c.user_id = auth.uid();
+    grant select on public.coach_roster to authenticated, service_role;
+    -- no grant to anon (matches live)
+    insert into public.schools(id, admin_id) values ('${SCHOOL}', '${SA}');
+    insert into public.users(id, full_name, belt, school_id) values
+      ('${C}', 'Coach C', 'black', null),
+      ('${D}', 'Athlete D', 'blue', null),
+      ('${E}', 'Athlete E', 'white', null),
+      ('${SA}', 'Admin SA', 'black', null),
+      ('${SU}', 'Member SU', 'white', '${SCHOOL}');
+    insert into public.coaches(id, user_id) values ('${COACH}', '${C}');
+    insert into public.athletes(id, user_id, coach_id) values
+      ('${ATH_D}', '${D}', '${COACH}'),
+      ('${ATH_E}', '${E}', null);
+  `);
+}
+
+function expect(cond, msg, got) {
+  if (!cond) throw new Error(`FAIL: ${msg} (got ${JSON.stringify(got)})`);
+}
+
+const results = [];
+function rec(name, ok, detail) {
+  results.push({ name, ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`);
+}
+
+const db = new PGlite();
+await setup(db);
+
+const optsBefore = (await db.query(`select reloptions from pg_class where relname='coach_roster'`)).rows[0].reloptions;
+expect(Array.isArray(optsBefore) && optsBefore.includes('security_barrier=true') && !optsBefore.some((o) => o.startsWith('security_invoker=')), 'before: barrier only', optsBefore);
+rec('before: view is security_barrier, not invoker', true, String(optsBefore));
+
+const before = {};
+for (const p of Object.keys(PERSONAS)) before[p] = await roster(db, p);
+// Definer view: coach sees D (names leak through definer); others empty or denied
+rec('before anon is denied or empty', /42501|permission denied|\(none\)/.test(before.anon), before.anon);
+rec('before coach_C sees Athlete D only', before.coach_C === 'Athlete D:blue', before.coach_C);
+rec('before athlete_D sees none', before.athlete_D === '(none)', before.athlete_D);
+rec('before school_admin_SA sees none', before.school_admin_SA === '(none)', before.school_admin_SA);
+rec('before unlinked_E sees none', before.unlinked_E === '(none)', before.unlinked_E);
+rec('before service_role without uid sees none', before.service_role === '(none)', before.service_role);
+rec('before postgres without uid sees none', before.postgres === '(none)', before.postgres);
+
+await db.exec(MIG);
+
+const optsAfter = (await db.query(`select reloptions from pg_class where relname='coach_roster'`)).rows[0].reloptions;
+const invokerOn = (optsAfter || []).some((o) => o === 'security_invoker=true' || o === 'security_invoker=on');
+const barrierOn = (optsAfter || []).includes('security_barrier=true');
+rec('after: security_invoker on and security_barrier kept', invokerOn && barrierOn, String(optsAfter));
+
+const after = {};
+for (const p of Object.keys(PERSONAS)) after[p] = await roster(db, p);
+rec('after anon is denied (no grant)', /42501|permission denied/.test(after.anon), after.anon);
+rec('after coach_C sees Athlete D only (access still works)', after.coach_C === 'Athlete D:blue', after.coach_C);
+rec('after athlete_D sees none', after.athlete_D === '(none)', after.athlete_D);
+rec('after school_admin_SA sees none', after.school_admin_SA === '(none)', after.school_admin_SA);
+rec('after unlinked_E sees none', after.unlinked_E === '(none)', after.unlinked_E);
+rec('after service_role without uid sees none', after.service_role === '(none)', after.service_role);
+rec('after postgres without uid sees none', after.postgres === '(none)', after.postgres);
+rec('after coach roster matches before (same rows)', after.coach_C === before.coach_C, `${before.coach_C} -> ${after.coach_C}`);
+
+// Direct users SELECT: coach may see linked athlete D, not E; school admin sees SU only; others do not see D+E
+const usersAfter = {};
+for (const p of ['anon', 'coach_C', 'athlete_D', 'school_admin_SA', 'unlinked_E', 'service_role', 'postgres']) {
+  usersAfter[p] = await usersVisible(db, p);
+}
+rec('coach_C users SELECT sees D only, not E', usersAfter.coach_C === 'd1', usersAfter.coach_C);
+rec('school_admin_SA users SELECT sees school member SU only', usersAfter.school_admin_SA === 'b1', usersAfter.school_admin_SA);
+rec('athlete_D users SELECT sees self only, not E', usersAfter.athlete_D === 'd1', usersAfter.athlete_D);
+rec('unlinked_E users SELECT sees self only, not D', usersAfter.unlinked_E === 'e1', usersAfter.unlinked_E);
+
+// Sensitivity: drop the new policy and coach access to names breaks
+await db.exec(`drop policy "users: linked coach reads roster athletes" on public.users`);
+const coachWithoutPolicy = await roster(db, 'coach_C');
+rec('mutant: without the users policy, coach_C no longer sees roster names', coachWithoutPolicy === '(none)', coachWithoutPolicy);
+// restore policy by re-applying just the policy statement (migration uses DROP IF EXISTS + CREATE)
+await db.exec(MIG);
+const coachRestored = await roster(db, 'coach_C');
+rec('policy restore: coach_C sees Athlete D again', coachRestored === 'Athlete D:blue', coachRestored);
+
+// Rollback returns to definer (no invoker option)
+await db.exec(ROLL);
+const optsRoll = (await db.query(`select reloptions from pg_class where relname='coach_roster'`)).rows[0].reloptions;
+const invokerOff = !(optsRoll || []).some((o) => o === 'security_invoker=true' || o === 'security_invoker=on');
+rec('rollback: security_invoker off, barrier kept', invokerOff && (optsRoll || []).includes('security_barrier=true'), String(optsRoll));
+const coachRolled = await roster(db, 'coach_C');
+rec('rollback: coach_C still sees Athlete D via definer view', coachRolled === 'Athlete D:blue', coachRolled);
+const polGone = (await db.query(`select count(*)::int n from pg_policies where tablename='users' and policyname='users: linked coach reads roster athletes'`)).rows[0].n;
+rec('rollback: added users policy is dropped', polGone === 0, polGone);
+
+const failed = results.filter((r) => !r.ok);
+console.log(JSON.stringify({ passed: results.filter((r) => r.ok).length, failed: failed.length, total: results.length, failed_names: failed.map((r) => r.name) }));
+if (failed.length) process.exit(1);

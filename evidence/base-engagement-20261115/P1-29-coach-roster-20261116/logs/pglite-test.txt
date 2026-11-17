@@ -1,0 +1,27 @@
+PASS  before: view is security_barrier, not invoker  security_barrier=true
+PASS  before anon is denied or empty  42501:permission denied for view coach_roster
+PASS  before coach_C sees Athlete D only  Athlete D:blue
+PASS  before athlete_D sees none  (none)
+PASS  before school_admin_SA sees none  (none)
+PASS  before unlinked_E sees none  (none)
+PASS  before service_role without uid sees none  (none)
+PASS  before postgres without uid sees none  (none)
+PASS  after: security_invoker on and security_barrier kept  security_barrier=true,security_invoker=true
+PASS  after anon is denied (no grant)  42501:permission denied for view coach_roster
+PASS  after coach_C sees Athlete D only (access still works)  Athlete D:blue
+PASS  after athlete_D sees none  (none)
+PASS  after school_admin_SA sees none  (none)
+PASS  after unlinked_E sees none  (none)
+PASS  after service_role without uid sees none  (none)
+PASS  after postgres without uid sees none  (none)
+PASS  after coach roster matches before (same rows)  Athlete D:blue -> Athlete D:blue
+PASS  coach_C users SELECT sees D only, not E  d1
+PASS  school_admin_SA users SELECT sees school member SU only  b1
+PASS  athlete_D users SELECT sees self only, not E  d1
+PASS  unlinked_E users SELECT sees self only, not D  e1
+PASS  mutant: without the users policy, coach_C no longer sees roster names  (none)
+PASS  policy restore: coach_C sees Athlete D again  Athlete D:blue
+PASS  rollback: security_invoker off, barrier kept  security_barrier=true
+PASS  rollback: coach_C still sees Athlete D via definer view  Athlete D:blue
+PASS  rollback: added users policy is dropped
+{"passed":26,"failed":0,"total":26,"failed_names":[]}
