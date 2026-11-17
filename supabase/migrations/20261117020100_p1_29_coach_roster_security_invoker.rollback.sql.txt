@@ -1,0 +1,10 @@
+-- Rollback for 20261117020100_p1_29_coach_roster_security_invoker (UNAPPLIED).
+-- Restores the live definer behavior (security_invoker off) and drops the added policy.
+-- security_barrier=true is left in place (it was already on).
+
+BEGIN;
+
+DROP POLICY IF EXISTS "users: linked coach reads roster athletes" ON public.users;
+ALTER VIEW public.coach_roster RESET (security_invoker);
+
+COMMIT;
