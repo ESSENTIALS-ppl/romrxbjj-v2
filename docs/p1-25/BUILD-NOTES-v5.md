@@ -4,7 +4,7 @@ Base: 1c3f1d821230fa67683a3ef5d7b79df4a7b1c6ae (feat/p1-25-purge-v4-20261116). B
 Grant's follow-up: erase client_feedback and product_events at completion; dry run first with recorded counts,
 apply must match; the hook is the only allowed way to complete a customer deletion. No backup at completion (unchanged).
 Live columns checked read-only: client_feedback.user_id uuid and product_events.user_id uuid, both FK to auth.users
-ON DELETE SET NULL. Nothing applied, deployed, scheduled, or changed live. Every hunk in this commit:
+ON DELETE SET NULL. Nothing applied, deployed, scheduled, or changed live. Every hunk in commits 06c604d4 and its build-notes follow-up (this file only):
 
 1. `supabase/migrations-unapplied/20261117010100_p1_25_completion_cleanup.sql` (modified, 13 hunks)
    - `@@ -1 +1,2 @@` header: v4 becomes v5 (client_feedback/product_events at completion; apply must match the dry run).
@@ -23,8 +23,10 @@ ON DELETE SET NULL. Nothing applied, deployed, scheduled, or changed live. Every
    - `@@ -241 +285,10 @@` after the deletes, the erased counts must equal the plan, else raise (whole call rolls back).
    - `@@ -246,2 +299 @@` apply returns `erased` (counts per table).
    - `@@ -256 +308 @@` and `@@ -260 +312 @@` REVOKE / GRANT on the new (uuid, text, jsonb) signature.
-2. `supabase/migrations-unapplied/20261117010100_p1_25_completion_cleanup_rollback.sql` (modified, 1 hunk `@@ -1,4 +1,5 @@`
-   plus the drop lines): drops the v5 signature and, IF EXISTS, the v4 signature, then the other three functions.
+2. `supabase/migrations-unapplied/20261117010100_p1_25_completion_cleanup_rollback.sql` (modified, exactly 1 hunk
+   `@@ -1,4 +1,5 @@`): the 4 comment lines are reworded for v5 and one line is added,
+   `DROP FUNCTION IF EXISTS public.p1_25_complete_account_deletion(uuid, text, jsonb);`. The existing drops of the v4
+   signature (uuid, text) and the other three functions are unchanged.
 3. `docs/p1-25/RUNBOOK-COMPLETION-v5.md` (new): only-allowed-way rule, never the dashboard 'Delete user'; dry run
    first, recorded (ET date/time, request id, counts per table); apply with the recorded counts or it stops.
 4. `docs/p1-25/BUILD-NOTES-v5.md` (new): this file.
