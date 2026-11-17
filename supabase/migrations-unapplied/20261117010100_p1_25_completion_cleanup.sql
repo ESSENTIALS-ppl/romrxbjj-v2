@@ -1,4 +1,5 @@
--- 20261117010100_p1_25_completion_cleanup (UNAPPLIED; BUILD ONLY). P1-25 v4.
+-- 20261117010100_p1_25_completion_cleanup (UNAPPLIED; BUILD ONLY). P1-25 v5 (v4 plus client_feedback and
+-- product_events erased at completion, and apply must match the recorded dry run's counts).
 -- P1-25 / L1004. Jim, verbatim, 2026-11-03 7:07 PM ET: "Purge deleted accounts after 90 days."
 -- Grant's call (a): no stored email hash. Clear the email-matched lists AT COMPLETION instead.
 --
@@ -12,11 +13,14 @@
 --   public.p1_25_exclusion_class(uuid) -> text       null, or the reason the account is excluded
 --   public.p1_25_account_emails(uuid)  -> text[]     lower(btrim()) emails still recoverable for the account
 --   public.p1_25_cleanup_at_completion(uuid, text)   clears leads + 4 pre-account lists (dry_run default)
---   public.p1_25_complete_account_deletion(uuid, text)
---       ONE call = ONE transaction: cleanup, then DELETE public.users, then DELETE auth.users
+--   public.p1_25_complete_account_deletion(uuid, text default 'dry_run', jsonb default null)
+--       ONE call = ONE transaction: cleanup, then DELETE client_feedback and product_events (user_id),
+--       then DELETE public.users, then DELETE auth.users
 --       (ON DELETE CASCADE children go with it), then mark the request 'completed'. Any error in any
 --       step (including the cleanup) aborts the whole call, so the request stays open and nothing is
---       erased. Default p_mode is 'dry_run' (counts only, writes nothing).
+--       erased. Default p_mode is 'dry_run' (counts only, writes nothing; returns 'expected').
+--       'apply' requires p_expected = that dry run's 'expected' object and stops if the counts differ.
+--       It is the ONLY allowed way to complete a customer deletion (never the dashboard 'Delete user').
 -- It does NOT touch: Stripe, Resend, Storage files (Storage API), auth.audit_log_entries, auth.flow_state,
 -- platform logs, ops.internal_accounts, public.billing_consents, public.consent_events. Those stay manual
 -- or are kept, as in the runbook and receipt v3. The safety-copy erase + second-person verify
@@ -191,7 +195,8 @@ $fn$;
 
 CREATE OR REPLACE FUNCTION public.p1_25_complete_account_deletion(
   p_request_id uuid,
-  p_mode text DEFAULT 'dry_run'
+  p_mode text DEFAULT 'dry_run',
+  p_expected jsonb DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'pg_catalog', 'pg_temp'
@@ -201,6 +206,10 @@ DECLARE
   v_req record;
   v_excl text;
   v_cleanup jsonb;
+  v_plan jsonb;
+  v_n bigint;
+  v_cf bigint := 0;
+  v_pe bigint := 0;
   v_pub bigint := 0;
   v_auth bigint := 0;
   v_done timestamptz;
@@ -220,31 +229,74 @@ BEGIN
     RAISE EXCEPTION 'account is excluded (%): completion refused', v_excl;
   END IF;
 
-  -- 1) Email-matched cleanup FIRST, while auth.users / public.users still hold the email.
-  v_cleanup := public.p1_25_cleanup_at_completion(v_req.user_id, v_mode);
+  -- v5: the plan = per-table counts this completion would erase, computed inside this transaction
+  -- with the request row locked. A dry run returns it; an apply must be given the dry run's plan
+  -- (p_expected) and stops, erasing nothing, if the counts differ.
+  v_cleanup := public.p1_25_cleanup_at_completion(v_req.user_id, 'dry_run');
+  v_plan := v_cleanup -> 'table_counts';
+  IF to_regclass('public.client_feedback') IS NOT NULL THEN
+    SELECT count(*) INTO v_n FROM public.client_feedback WHERE user_id = v_req.user_id;
+    v_plan := v_plan || jsonb_build_object('public.client_feedback', v_n);
+  END IF;
+  IF to_regclass('public.product_events') IS NOT NULL THEN
+    SELECT count(*) INTO v_n FROM public.product_events WHERE user_id = v_req.user_id;
+    v_plan := v_plan || jsonb_build_object('public.product_events', v_n);
+  END IF;
+  SELECT count(*) INTO v_n FROM public.users WHERE id = v_req.user_id;
+  v_plan := v_plan || jsonb_build_object('public.users', v_n);
+  SELECT count(*) INTO v_n FROM auth.users WHERE id = v_req.user_id;
+  v_plan := v_plan || jsonb_build_object('auth.users', v_n);
 
   IF v_mode = 'dry_run' THEN
-    SELECT count(*) INTO v_pub FROM public.users WHERE id = v_req.user_id;
-    SELECT count(*) INTO v_auth FROM auth.users WHERE id = v_req.user_id;
     RETURN jsonb_build_object(
       'ok', true, 'mode', 'dry_run', 'request_status', v_req.status,
-      'cleanup', v_cleanup, 'public_users', v_pub, 'auth_users', v_auth, 'written', false
+      'emails_matched', v_cleanup -> 'emails_matched',
+      'expected', v_plan, 'written', false
     );
   END IF;
 
-  -- 2) The existing manual deletes (runbook step 4): live account rows. CASCADE children go with them.
+  IF p_expected IS NULL THEN
+    RAISE EXCEPTION 'apply needs p_expected = the "expected" object from the recorded dry run: stopped';
+  END IF;
+  IF p_expected IS DISTINCT FROM v_plan THEN
+    RAISE EXCEPTION 'counts differ from the recorded dry run (expected %, now %): stopped, nothing erased', p_expected, v_plan;
+  END IF;
+
+  -- 1) Email-matched cleanup FIRST, while auth.users / public.users still hold the email.
+  v_cleanup := public.p1_25_cleanup_at_completion(v_req.user_id, 'apply');
+
+  -- 2) v5: the user's feedback and product events, matched on user_id, BEFORE auth.users is deleted
+  --    (their FK is ON DELETE SET NULL, which would otherwise leave them unlinked and unpurgeable).
+  IF to_regclass('public.client_feedback') IS NOT NULL THEN
+    DELETE FROM public.client_feedback WHERE user_id = v_req.user_id;
+    GET DIAGNOSTICS v_cf = ROW_COUNT;
+  END IF;
+  IF to_regclass('public.product_events') IS NOT NULL THEN
+    DELETE FROM public.product_events WHERE user_id = v_req.user_id;
+    GET DIAGNOSTICS v_pe = ROW_COUNT;
+  END IF;
+
+  -- 3) The existing manual deletes (runbook step 4): live account rows. CASCADE children go with them.
   DELETE FROM public.users WHERE id = v_req.user_id;
   GET DIAGNOSTICS v_pub = ROW_COUNT;
   DELETE FROM auth.users WHERE id = v_req.user_id;
   GET DIAGNOSTICS v_auth = ROW_COUNT;
 
-  -- 3) Mark completed (the touch trigger stamps completed_at).
+  -- The rows actually erased must equal the plan too (e.g. a row added after the count); else roll back.
+  v_cleanup := (v_cleanup -> 'table_counts')
+    || CASE WHEN v_plan ? 'public.client_feedback' THEN jsonb_build_object('public.client_feedback', v_cf) ELSE '{}'::jsonb END
+    || CASE WHEN v_plan ? 'public.product_events' THEN jsonb_build_object('public.product_events', v_pe) ELSE '{}'::jsonb END
+    || jsonb_build_object('public.users', v_pub, 'auth.users', v_auth);
+  IF v_cleanup IS DISTINCT FROM v_plan THEN
+    RAISE EXCEPTION 'erased counts differ from the recorded dry run (expected %, erased %): stopped, rolled back', v_plan, v_cleanup;
+  END IF;
+
+  -- 4) Mark completed (the touch trigger stamps completed_at).
   UPDATE public.account_deletion_requests SET status = 'completed' WHERE id = v_req.id
   RETURNING completed_at INTO v_done;
 
   RETURN jsonb_build_object(
-    'ok', true, 'mode', 'apply', 'cleanup', v_cleanup,
-    'public_users', v_pub, 'auth_users', v_auth,
+    'ok', true, 'mode', 'apply', 'erased', v_cleanup,
     'request_status', 'completed', 'completed_at', v_done, 'written', true
   );
 END
@@ -253,8 +305,8 @@ $fn$;
 REVOKE ALL ON FUNCTION public.p1_25_exclusion_class(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.p1_25_account_emails(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.p1_25_cleanup_at_completion(uuid, text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.p1_25_complete_account_deletion(uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.p1_25_complete_account_deletion(uuid, text, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.p1_25_exclusion_class(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.p1_25_account_emails(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.p1_25_cleanup_at_completion(uuid, text) TO service_role;
-GRANT EXECUTE ON FUNCTION public.p1_25_complete_account_deletion(uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.p1_25_complete_account_deletion(uuid, text, jsonb) TO service_role;

@@ -1,5 +1,6 @@
-// PGlite tests for P1-25 v4 (UNAPPLIED; BUILD ONLY): completion hook 20261117010100_p1_25_completion_cleanup
-// and the v4 day-90 sweep in 20261117010000_p1_25_purge_deleted_accounts. Run: node test-v4.mjs
+// PGlite tests for P1-25 v5 (UNAPPLIED; BUILD ONLY): completion hook 20261117010100_p1_25_completion_cleanup
+// (v5: client_feedback + product_events at completion; apply must match the dry run) and the v4 day-90 sweep
+// in 20261117010000_p1_25_purge_deleted_accounts. Run: node test-v5.mjs
 // Emails in this file are example.com test addresses only. No secrets, no live data.
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'fs';
@@ -66,6 +67,10 @@ create trigger account_deletion_requests_touch before update on public.account_d
 create table public.athletes (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete cascade, email text);
 create table public.clients (user_id uuid primary key references auth.users(id) on delete cascade, email text);
 create table public.assessments (id uuid primary key default gen_random_uuid(), user_id uuid references public.users(id) on delete cascade);
+create table public.client_feedback (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete set null,
+  category text not null default 'general', message text not null default 'x', metadata jsonb not null default '{}'::jsonb);
+create table public.product_events (id bigserial primary key, user_id uuid references auth.users(id) on delete set null,
+  anon_id text, event text not null default 'x', props jsonb not null default '{}'::jsonb);
 create table public.billing_consents (id uuid primary key default gen_random_uuid(), user_id uuid);
 create table public.consent_events (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete set null);
 create table public.leads (id uuid primary key default gen_random_uuid(), email text not null,
@@ -100,6 +105,11 @@ insert into public.athletes (user_id, email) values ('${D3}', 'O@example.com');
 insert into public.clients (user_id, email) values ('${D1}', 'd1@example.com');
 insert into public.assessments (user_id) values ('${D1}'), ('${O}');
 insert into public.billing_consents (user_id) values ('${D1}'), ('${O}');
+insert into public.client_feedback (user_id, metadata) values ('${D1}', '{"kind":"account_deletion_request"}'), ('${D1}', '{}'), ('${O}', '{}'),
+  ('${D4}', '{}'), ('${D5}', '{}'), ('${HARD}', '{}'), ('${INTERNAL}', '{}'), ('${FIXTURE}', '{}');
+insert into public.product_events (user_id, event) values ('${D1}', 'a'), ('${D1}', 'b'), ('${D1}', 'c'), ('${O}', 'a'), ('${O}', 'b'),
+  ('${D4}', 'a'), ('${D5}', 'a'), ('${HARD}', 'a'), ('${INTERNAL}', 'a'), ('${FIXTURE}', 'a');
+insert into public.product_events (anon_id, event) values ('anon-1', 'a'), ('anon-2', 'b');
 insert into public.consent_events (user_id) values ('${D1}'), ('${O}');
 insert into public.leads (converted_user_id, email) values
   ('${D1}', 'd1-other-address@example.com'),   -- matched by user id only
@@ -144,31 +154,72 @@ const totalLists = async (db) => {
 };
 const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
 const adr = async (db, id) => q1(db, `select status, completed_at from public.account_deletion_requests where id = $1`, [id]);
-const tryErr = async (db, sql) => { try { await db.query(sql); return null; } catch (e) { return String(e.message || e); } };
+const tryErr = async (db, sql, p) => { try { await db.query(sql, p); return null; } catch (e) { return String(e.message || e); } };
+const LIST_KEYS = LISTS.map((t) => 'public.' + t);
+const lists = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => LIST_KEYS.includes(k)));
+const dryRun = async (db, req) => (await q1(db, `select public.p1_25_complete_account_deletion($1) j`, [req])).j;
+const APPLY = `select public.p1_25_complete_account_deletion($1, 'apply', $2::jsonb) j`;
+const complete = async (db, req) => {
+  const d = await dryRun(db, req);
+  const a = (await q1(db, APPLY, [req, JSON.stringify(d.expected)])).j;
+  a._dry = d;
+  return a;
+};
+const cfpe = async (db, id) => ({
+  cf: await n(db, `select count(*) n from public.client_feedback where user_id = $1`, [id]),
+  pe: await n(db, `select count(*) n from public.product_events where user_id = $1`, [id]),
+});
+const cfpeTotals = async (db) => ({
+  cf: await n(db, `select count(*) n from public.client_feedback`),
+  pe: await n(db, `select count(*) n from public.product_events`),
+});
 
 const db = await mk();
 const before = await totalLists(db);
 const oBefore = await listCountFor(db, 'o@example.com');
 
 // C1 dry-run default writes nothing.
-const dry = (await q1(db, `select public.p1_25_complete_account_deletion('${R(1)}') j`)).j;
+const cfpeBefore = await cfpeTotals(db);
+const oCfpe = await cfpe(db, O);
+const dry = await dryRun(db, R(1));
 const afterDry = await totalLists(db);
 ok('C1 completion default is dry_run, reports counts, writes nothing',
   dry.mode === 'dry_run' && dry.written === false && JSON.stringify(afterDry) === JSON.stringify(before) &&
   (await adr(db, R(1))).status === 'in_progress' && (await n(db, `select count(*) n from auth.users where id='${D1}'`)) === 1 &&
-  ['public.leads', 3, 'public.sport_pack_waitlist', 2, 'public.investor_requests', 1, 'public.partner_inquiries', 1, 'public.yoga_testers', 1].every((v, i, a) => i % 2 || dry.cleanup.table_counts[v] === a[i + 1]),
-  { counts: dry.cleanup.table_counts });
+  ['public.leads', 3, 'public.sport_pack_waitlist', 2, 'public.investor_requests', 1, 'public.partner_inquiries', 1, 'public.yoga_testers', 1].every((v, i, a) => i % 2 || dry.expected[v] === a[i + 1]),
+  { expected: dry.expected });
+ok('V1 dry run reports client_feedback (2) and product_events (3) counts, plus public.users and auth.users (1 each)',
+  dry.expected['public.client_feedback'] === 2 && dry.expected['public.product_events'] === 3 && dry.expected['public.users'] === 1 && dry.expected['auth.users'] === 1 &&
+  JSON.stringify(await cfpeTotals(db)) === JSON.stringify(cfpeBefore));
+const eNoExp = await tryErr(db, `select public.p1_25_complete_account_deletion($1, 'apply')`, [R(1)]);
+ok('V2 apply without the recorded dry-run counts is refused and erases nothing',
+  (eNoExp || '').includes('p_expected') && (await adr(db, R(1))).status === 'in_progress' && JSON.stringify(await totalLists(db)) === JSON.stringify(before) &&
+  JSON.stringify(await cfpeTotals(db)) === JSON.stringify(cfpeBefore));
+await db.exec(`insert into public.product_events (user_id, event) values ('${D1}', 'late')`);
+const eMis = await tryErr(db, APPLY, [R(1), JSON.stringify(dry.expected)]);
+ok('V3 apply whose counts differ from the recorded dry run (a product event added after it) stops and erases nothing',
+  (eMis || '').includes('differ from the recorded dry run') && (await adr(db, R(1))).status === 'in_progress' &&
+  JSON.stringify(await totalLists(db)) === JSON.stringify(before) && (await cfpe(db, D1)).pe === 4 && (await cfpe(db, D1)).cf === 2 &&
+  (await n(db, `select count(*) n from auth.users where id='${D1}'`)) === 1);
+await db.exec(`delete from public.product_events where user_id = '${D1}' and event = 'late'`);
 ok('C2 the dry-run and apply return values contain no email addresses', !JSON.stringify(dry).includes('@'));
 
 // C3 apply clears all 5 lists for D1, by user id and by email, then deletes users, auth.users, marks completed.
-const app = (await q1(db, `select public.p1_25_complete_account_deletion('${R(1)}', 'apply') j`)).j;
+const app = (await q1(db, APPLY, [R(1), JSON.stringify(dry.expected)])).j;
 const a1 = await adr(db, R(1));
 ok('C3 apply: request completed with completed_at, public.users and auth.users removed',
-  app.written === true && a1.status === 'completed' && a1.completed_at !== null && app.public_users === 1 && app.auth_users === 1 &&
+  app.written === true && a1.status === 'completed' && a1.completed_at !== null && app.erased['public.users'] === 1 && app.erased['auth.users'] === 1 &&
+  JSON.stringify(Object.keys(app.erased).sort().map((k) => [k, app.erased[k]])) === JSON.stringify(Object.keys(dry.expected).sort().map((k) => [k, dry.expected[k]])) &&
   (await n(db, `select count(*) n from auth.users where id='${D1}'`)) === 0 && (await n(db, `select count(*) n from public.users where id='${D1}'`)) === 0,
-  { cleanup: app.cleanup.table_counts });
-ok('C4 apply cleared all 5 lists for the account (8 rows)', sum(app.cleanup.table_counts) === 8 &&
-  sum(await listCountFor(db, 'd1@example.com')) === 0 && sum(await listCountFor(db, 'd1.coach@example.com')) === 0, { cleared: app.cleanup.table_counts });
+  { erased: app.erased });
+ok('C4 apply cleared all 5 lists for the account (8 rows)', sum(lists(app.erased)) === 8 &&
+  sum(await listCountFor(db, 'd1@example.com')) === 0 && sum(await listCountFor(db, 'd1.coach@example.com')) === 0, { cleared: lists(app.erased) });
+ok('V4 apply erased the user\'s client_feedback (incl. the deletion-request note) and product_events before auth.users',
+  app.erased['public.client_feedback'] === 2 && app.erased['public.product_events'] === 3 && (await cfpe(db, D1)).cf === 0 && (await cfpe(db, D1)).pe === 0 &&
+  (await n(db, `select count(*) n from public.client_feedback where user_id is null`)) === 0);
+ok('V5 other users\' client_feedback and product_events, and anonymous events, untouched',
+  JSON.stringify(await cfpe(db, O)) === JSON.stringify(oCfpe) && (await n(db, `select count(*) n from public.product_events where user_id is null`)) === 2 &&
+  (await cfpeTotals(db)).cf === cfpeBefore.cf - 2 && (await cfpeTotals(db)).pe === cfpeBefore.pe - 3);
 ok('C5 leads matched by converted_user_id (other address) and by email (cased/padded) are gone',
   (await n(db, `select count(*) n from public.leads where email in ('d1-other-address@example.com')`)) === 0 &&
   (await n(db, `select count(*) n from public.leads where lower(btrim(email)) = 'd1@example.com'`)) === 0);
@@ -183,36 +234,47 @@ ok('C9 apply return value contains no email addresses', !JSON.stringify(app).inc
 
 // C10 completion with no list rows.
 const t2 = await totalLists(db);
-const app2 = (await q1(db, `select public.p1_25_complete_account_deletion('${R(2)}', 'apply') j`)).j;
+const app2 = await complete(db, R(2));
 ok('C10 a completion with no list rows works (0 cleared, completed, account removed)',
-  sum(app2.cleanup.table_counts) === 0 && (await adr(db, R(2))).status === 'completed' && app2.auth_users === 1 &&
+  sum(lists(app2.erased)) === 0 && app2.erased['public.client_feedback'] === 0 && app2.erased['public.product_events'] === 0 && (await adr(db, R(2))).status === 'completed' && app2.erased['auth.users'] === 1 &&
   JSON.stringify(await totalLists(db)) === JSON.stringify(t2));
 
 // C11 guard: D3's athletes.email is O's email; O untouched, D3's own rows cleared.
-const app3 = (await q1(db, `select public.p1_25_complete_account_deletion('${R(3)}', 'apply') j`)).j;
+const app3 = await complete(db, R(3));
 ok('C11 an email still owned by another account is never matched (O untouched; D3 own rows cleared)',
   JSON.stringify(await listCountFor(db, 'o@example.com')) === JSON.stringify(oBefore) && sum(await listCountFor(db, 'd3@example.com')) === 0 &&
-  app3.cleanup.emails_matched === 1, { d3: app3.cleanup.table_counts });
+  app3._dry.emails_matched === 1, { d3: lists(app3.erased) });
 
 // C12 forced cleanup failure rolls back the whole completion.
 await db.exec(`create function public._t_fail() returns trigger language plpgsql as $$ begin raise exception 'forced test failure'; end $$;
   create trigger _t_fail_yoga before delete on public.yoga_testers for each row when (old.email = 'd4@example.com') execute function public._t_fail();`);
 const d4Before = await listCountFor(db, 'd4@example.com');
-const e12 = await tryErr(db, `select public.p1_25_complete_account_deletion('${R(4)}', 'apply')`);
+const d4Cfpe = await cfpe(db, D4);
+const e12 = await tryErr(db, APPLY, [R(4), JSON.stringify((await dryRun(db, R(4))).expected)]);
 ok('C12 forced cleanup failure (yoga_testers) fails the completion and rolls back every step',
   e12 && e12.includes('forced test failure') && (await adr(db, R(4))).status === 'requested' && (await adr(db, R(4))).completed_at === null &&
   (await n(db, `select count(*) n from auth.users where id='${D4}'`)) === 1 && (await n(db, `select count(*) n from public.users where id='${D4}'`)) === 1 &&
-  JSON.stringify(await listCountFor(db, 'd4@example.com')) === JSON.stringify(d4Before), { d4: d4Before });
+  JSON.stringify(await listCountFor(db, 'd4@example.com')) === JSON.stringify(d4Before) && JSON.stringify(await cfpe(db, D4)) === JSON.stringify(d4Cfpe), { d4: d4Before });
 
 // C13 failure AFTER the cleanup (auth.users delete) also rolls the cleanup back.
 await db.exec(`create trigger _t_fail_auth before delete on auth.users for each row when (old.id = '${D5}') execute function public._t_fail();`);
 const d5Before = await listCountFor(db, 'd5@example.com');
-const e13 = await tryErr(db, `select public.p1_25_complete_account_deletion('${R(5)}', 'apply')`);
+const d5Cfpe = await cfpe(db, D5);
+const e13 = await tryErr(db, APPLY, [R(5), JSON.stringify((await dryRun(db, R(5))).expected)]);
 ok('C13 failure at the auth.users delete rolls back the already-run list cleanup and public.users delete',
   e13 && e13.includes('forced test failure') && (await adr(db, R(5))).status === 'requested' &&
-  (await n(db, `select count(*) n from public.users where id='${D5}'`)) === 1 && JSON.stringify(await listCountFor(db, 'd5@example.com')) === JSON.stringify(d5Before) && sum(d5Before) === 3,
+  (await n(db, `select count(*) n from public.users where id='${D5}'`)) === 1 && JSON.stringify(await listCountFor(db, 'd5@example.com')) === JSON.stringify(d5Before) && sum(d5Before) === 3 &&
+  JSON.stringify(await cfpe(db, D5)) === JSON.stringify(d5Cfpe) && d5Cfpe.cf === 1 && d5Cfpe.pe === 1,
   { d5: d5Before });
 await db.exec(`drop trigger _t_fail_yoga on public.yoga_testers; drop trigger _t_fail_auth on auth.users;`);
+// V6 a failure in the new product_events delete rolls back the lists and client_feedback already erased.
+await db.exec(`create trigger _t_fail_pe before delete on public.product_events for each row when (old.user_id = '${D4}') execute function public._t_fail();`);
+const e6 = await tryErr(db, APPLY, [R(4), JSON.stringify((await dryRun(db, R(4))).expected)]);
+ok('V6 forced failure at the product_events delete rolls back the list cleanup and the client_feedback delete',
+  (e6 || '').includes('forced test failure') && (await adr(db, R(4))).status === 'requested' &&
+  JSON.stringify(await listCountFor(db, 'd4@example.com')) === JSON.stringify(d4Before) && JSON.stringify(await cfpe(db, D4)) === JSON.stringify(d4Cfpe) &&
+  (await n(db, `select count(*) n from auth.users where id='${D4}'`)) === 1);
+await db.exec(`drop trigger _t_fail_pe on public.product_events;`);
 
 // C14-C16 exclusions refuse completion; nothing changes.
 for (const [tag, id, req, email, cls] of [
@@ -221,24 +283,26 @@ for (const [tag, id, req, email, cls] of [
   ['C16', FIXTURE, R(9), 'user@example.com', 'excluded_fixture'],
 ]) {
   const lb = await listCountFor(db, email);
-  const e = await tryErr(db, `select public.p1_25_complete_account_deletion('${req}', 'apply')`);
+  const cb = await cfpe(db, id);
+  const e = await tryErr(db, APPLY, [req, '{}']);
   const ed = await tryErr(db, `select public.p1_25_complete_account_deletion('${req}')`);
   const ec = await tryErr(db, `select public.p1_25_cleanup_at_completion('${id}', 'apply')`);
   ok(`${tag} ${cls}: completion and cleanup refused (apply and dry_run), nothing changed`,
     e && e.includes(cls) && ed && ec && ec.includes(cls) && (await adr(db, req)).status === 'requested' &&
-    (await n(db, `select count(*) n from auth.users where id='${id}'`)) === 1 && JSON.stringify(await listCountFor(db, email)) === JSON.stringify(lb) && sum(lb) === 5,
-    { lists: lb });
+    (await n(db, `select count(*) n from auth.users where id='${id}'`)) === 1 && JSON.stringify(await listCountFor(db, email)) === JSON.stringify(lb) && sum(lb) === 5 &&
+    JSON.stringify(await cfpe(db, id)) === JSON.stringify(cb) && cb.cf === 1 && cb.pe === 1,
+    { lists: lb, cfpe: cb });
 }
 ok('C17 ops.internal_accounts never written', (await n(db, `select count(*) n from ops.internal_accounts`)) === 1);
 
 // C18-C20 refusals.
 ok('C18 cleanup_at_completion alone is refused without an open request', !!(await tryErr(db, `select public.p1_25_cleanup_at_completion('${O}', 'apply')`)));
-ok('C19 completing an already completed request is refused', (await tryErr(db, `select public.p1_25_complete_account_deletion('${R(1)}', 'apply')`) || '').includes('not open'));
+ok('C19 completing an already completed request is refused', (await tryErr(db, APPLY, [R(1), '{}']) || '').includes('not open'));
 ok('C20 an unknown mode is refused', !!(await tryErr(db, `select public.p1_25_complete_account_deletion('${R(4)}', 'yes')`)));
 
 // C21 privileges: service_role only.
 const priv = (await db.query(`select f, has_function_privilege('anon', f, 'execute') a, has_function_privilege('authenticated', f, 'execute') u, has_function_privilege('service_role', f, 'execute') s
-  from unnest(array['public.p1_25_exclusion_class(uuid)','public.p1_25_account_emails(uuid)','public.p1_25_cleanup_at_completion(uuid,text)','public.p1_25_complete_account_deletion(uuid,text)']) f`)).rows;
+  from unnest(array['public.p1_25_exclusion_class(uuid)','public.p1_25_account_emails(uuid)','public.p1_25_cleanup_at_completion(uuid,text)','public.p1_25_complete_account_deletion(uuid,text,jsonb)']) f`)).rows;
 ok('C21 EXECUTE is service_role only on all four functions', priv.length === 4 && priv.every((r) => !r.a && !r.u && r.s));
 
 // C22 v3 purge defaults unchanged.
@@ -288,7 +352,7 @@ ok('S3 day-90 sweep never matches an email that belongs to another live account 
   JSON.stringify(await listCountFor(sdb, 'o@example.com')) === JSON.stringify({ leads: 1, sport_pack_waitlist: 1, investor_requests: 1, partner_inquiries: 1, yoga_testers: 1 }));
 ok('S4 the day-90 apply wrote a zz_bak_p1_25_* backup (7-day window unchanged)', typeof sapp.backup_schema === 'string' && /^zz_bak_p1_25_\d{14}$/.test(sapp.backup_schema));
 
-const out = path.join(HERE, 'results-v4.json');
+const out = path.join(HERE, 'results-v5.json');
 const passed = Object.values(results).filter((r) => r.pass).length;
 fs.writeFileSync(out, JSON.stringify({ passed, failed: fails, results }, null, 2));
 console.log(`\n${passed}/${Object.keys(results).length} passed`);

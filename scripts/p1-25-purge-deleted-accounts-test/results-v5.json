@@ -1,18 +1,31 @@
 {
-  "passed": 29,
+  "passed": 35,
   "failed": 0,
   "results": {
     "C1 completion default is dry_run, reports counts, writes nothing": {
       "pass": true,
       "info": {
-        "counts": {
+        "expected": {
+          "auth.users": 1,
           "public.leads": 3,
+          "public.users": 1,
           "public.yoga_testers": 1,
+          "public.product_events": 3,
+          "public.client_feedback": 2,
           "public.investor_requests": 1,
           "public.partner_inquiries": 1,
           "public.sport_pack_waitlist": 2
         }
       }
+    },
+    "V1 dry run reports client_feedback (2) and product_events (3) counts, plus public.users and auth.users (1 each)": {
+      "pass": true
+    },
+    "V2 apply without the recorded dry-run counts is refused and erases nothing": {
+      "pass": true
+    },
+    "V3 apply whose counts differ from the recorded dry run (a product event added after it) stops and erases nothing": {
+      "pass": true
     },
     "C2 the dry-run and apply return values contain no email addresses": {
       "pass": true
@@ -20,9 +33,13 @@
     "C3 apply: request completed with completed_at, public.users and auth.users removed": {
       "pass": true,
       "info": {
-        "cleanup": {
+        "erased": {
+          "auth.users": 1,
           "public.leads": 3,
+          "public.users": 1,
           "public.yoga_testers": 1,
+          "public.product_events": 3,
+          "public.client_feedback": 2,
           "public.investor_requests": 1,
           "public.partner_inquiries": 1,
           "public.sport_pack_waitlist": 2
@@ -40,6 +57,12 @@
           "public.sport_pack_waitlist": 2
         }
       }
+    },
+    "V4 apply erased the user's client_feedback (incl. the deletion-request note) and product_events before auth.users": {
+      "pass": true
+    },
+    "V5 other users' client_feedback and product_events, and anonymous events, untouched": {
+      "pass": true
     },
     "C5 leads matched by converted_user_id (other address) and by email (cased/padded) are gone": {
       "pass": true
@@ -104,6 +127,9 @@
         }
       }
     },
+    "V6 forced failure at the product_events delete rolls back the list cleanup and the client_feedback delete": {
+      "pass": true
+    },
     "C14 excluded_hardcoded: completion and cleanup refused (apply and dry_run), nothing changed": {
       "pass": true,
       "info": {
@@ -113,6 +139,10 @@
           "investor_requests": 1,
           "partner_inquiries": 1,
           "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
         }
       }
     },
@@ -125,6 +155,10 @@
           "investor_requests": 1,
           "partner_inquiries": 1,
           "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
         }
       }
     },
@@ -137,6 +171,10 @@
           "investor_requests": 1,
           "partner_inquiries": 1,
           "yoga_testers": 1
+        },
+        "cfpe": {
+          "cf": 1,
+          "pe": 1
         }
       }
     },
@@ -178,6 +216,8 @@
           "public.athletes": 1,
           "public.assessments": 0,
           "public.yoga_testers": 1,
+          "public.product_events": 0,
+          "public.client_feedback": 0,
           "public.investor_requests": 1,
           "public.partner_inquiries": 1,
           "public.sport_pack_waitlist": 1,
