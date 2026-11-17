@@ -4,7 +4,7 @@ import { dedupeKey, handle, sendEnabled, vapidReady, vapidSubjectOk, type Candid
 const FAKE_SUB: PushSub = { endpoint: "https://example.com/push/device-1", p256dh: "B" + "x".repeat(40), auth: "a".repeat(16) };
 
 function cand(over: Partial<Candidate> = {}): Candidate {
-  return { userId: "00000000-0000-4000-8000-000000000001", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: FAKE_SUB, ...over };
+  return { userId: "00000000-0000-4000-8000-000000000001", subscriptionId: "sub-1", kind: "protocol", dedupeKey: "protocol:2026-11-16", localDate: "2026-11-16", sub: FAKE_SUB, timezone: "America/New_York", isTest: false, ...over };
 }
 
 function base(over: Partial<Deps> = {}): Deps {

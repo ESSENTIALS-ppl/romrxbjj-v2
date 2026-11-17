@@ -65,6 +65,26 @@ function subFromJson(raw: unknown): PushSub | null {
   return { endpoint: o.endpoint, p256dh, auth };
 }
 
+// r2 is_test: same live flag as rombot-checkin v1 (public.is_test_account(p_email), SECURITY DEFINER, service_role
+// EXECUTE). No user id is special-cased here. Any read error or missing email counts as test (fail closed, no push).
+// Emails are read only to call the RPC; they are never logged or returned.
+async function testFlags(sb: ReturnType<typeof admin>, ids: string[]): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  if (!ids.length) return out;
+  const { data: users, error } = await sb.from("users").select("id, email").in("id", ids);
+  if (error || !users) return out;
+  for (const u of users as { id: string; email: string | null }[]) {
+    if (!u.email) { out.set(u.id, true); continue; }
+    try {
+      const { data, error: e } = await sb.rpc("is_test_account", { p_email: u.email });
+      out.set(u.id, e ? true : data !== false);
+    } catch {
+      out.set(u.id, true);
+    }
+  }
+  return out;
+}
+
 async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
   const sb = admin();
   const out: Candidate[] = [];
@@ -98,8 +118,11 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
       }
     }
 
+    const flags = await testFlags(sb, [...subsByUser.keys()]);
+
     for (const p of prefs as { user_id: string; timezone: string | null; reminder_time: string | null }[]) {
       const subs = subsByUser.get(p.user_id) ?? [];
+      const isTest = flags.get(p.user_id) ?? true;
       if (!subs.length) continue;
       const local = localDateAndHour(now, p.timezone);
       if (kinds.includes("protocol") && reminderHour(p.reminder_time) === local.hour) {
@@ -107,7 +130,7 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
           const k = `protocol:${p.user_id}:${s.sub.endpoint}`;
           if (seen.has(k)) continue;
           seen.add(k);
-          out.push({ userId: p.user_id, subscriptionId: s.id, kind: "protocol", dedupeKey: dedupeKey("protocol", local.date), localDate: local.date, sub: s.sub });
+          out.push({ userId: p.user_id, subscriptionId: s.id, kind: "protocol", dedupeKey: dedupeKey("protocol", local.date), localDate: local.date, sub: s.sub, timezone: p.timezone, isTest });
         }
       }
       if (kinds.includes("retest")) {
@@ -119,7 +142,7 @@ async function listDue(kinds: Kind[], now: Date): Promise<Candidate[]> {
               const k = `retest:${p.user_id}:${s.sub.endpoint}`;
               if (seen.has(k)) continue;
               seen.add(k);
-              out.push({ userId: p.user_id, subscriptionId: s.id, kind: "retest", dedupeKey: dedupeKey("retest", local.date), localDate: local.date, sub: s.sub });
+              out.push({ userId: p.user_id, subscriptionId: s.id, kind: "retest", dedupeKey: dedupeKey("retest", local.date), localDate: local.date, sub: s.sub, timezone: p.timezone, isTest });
             }
           }
         }

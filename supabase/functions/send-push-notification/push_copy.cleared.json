@@ -1,0 +1,49 @@
+{
+ "source": {
+  "stacy": "/workspace/process/evidence/STACY-P1-14-PUSH-AND-P1-31-TITLES-20261116-2029.md",
+  "stacy_sha256": "219378b5cb0b58935c2f85fdb7d151c3a4147c49a7d771ce9441a47d0c37904d",
+  "kai": "/workspace/research/p1-14/kai-p1-14-push-copy.md",
+  "kai_sha256": "481a2e9d82c925a356ede650d808756fb76450da33d03a220795f4353d449a3f",
+  "section_A_lines": "6-21"
+ },
+ "title": {
+  "text": "ROMRx Base",
+  "stacy_line": 9,
+  "sha256": "336e46476ca8f17b07379a2350f3180b6fc66a312a69afbec5a12a52236d14b5"
+ },
+ "kinds": {
+  "protocol": {
+   "title": "ROMRx Base",
+   "body": "Time for today's session. Open ROMRx Base to see your plan.",
+   "body_sha256": "83b942119e79a131bcf859676a9d51366607fa7e05edcd75008e2e14f6cc4b39",
+   "status": "EDIT",
+   "stacy_line": 12,
+   "kai_line": 27
+  },
+  "retest": {
+   "title": "ROMRx Base",
+   "body": "Your retest is due today. Time to check your 10 joints again.",
+   "body_sha256": "c9b45496d589be0c4e24acba72d57066b332f075e4edcaa8c2582b767d61a577",
+   "status": "EDIT",
+   "stacy_line": 15,
+   "kai_line": 28
+  },
+  "digest": {
+   "title": "ROMRx Base",
+   "body": "Your weekly summary is ready. See this week's sessions.",
+   "body_sha256": "3c1ff8038e642670e4a05a48c0a3839ac45253d55985d091d0053db1f73fd8f2",
+   "status": "CLEAR",
+   "stacy_line": 16,
+   "kai_line": 29
+  },
+  "test": {
+   "title": "ROMRx Base",
+   "body": "Notifications are on. We'll send your daily reminder at your reminder time.",
+   "body_sha256": "0c48cd9f3e1edc1b009f343bc603b61ce101ba106dd7760661d89ae9ac2b17e6",
+   "status": "EDIT",
+   "stacy_line": 18,
+   "kai_line": 30
+  }
+ },
+ "push_copy_ts_sha256": "63423625d0226966445a8234bb21d04070696dec6260ebc410a901fb205398f2"
+}
