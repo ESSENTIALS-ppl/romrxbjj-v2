@@ -12,13 +12,10 @@ import {
   clientIp,
   tooManyRequests,
 } from "../_shared/rate_limit.ts";
-import { handleRequest } from "./handler.js";
+import { handleRequest, corsOrigin } from "./handler.js";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// FG-38: per-request CORS. Default "*" (unchanged); flag ROMBOT_ORIGIN_ALLOWLIST=on = exact allow-list of the three sites (see handler.js).
+const CORS_HEADERS = "authorization, x-client-info, apikey, content-type";
 
 function jwtRole(jwt: string): string {
   try {
@@ -29,6 +26,7 @@ function jwtRole(jwt: string): string {
 }
 
 Deno.serve(async (req: Request) => {
+  const CORS: Record<string, string> = { ...(corsOrigin(req) as Record<string, string>), "Access-Control-Allow-Headers": CORS_HEADERS };
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
   }
