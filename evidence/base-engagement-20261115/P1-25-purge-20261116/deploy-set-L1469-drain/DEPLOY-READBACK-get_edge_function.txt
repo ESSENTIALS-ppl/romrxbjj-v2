@@ -1,0 +1,7 @@
+get_edge_function p1-25-storage-drain (read-only, right after the deploy)
+id 9ab2467f-4fc5-4322-9981-2089b81d1387, version 1, status ACTIVE, verify_jwt false, import_map false
+entrypoint_path ends in source/source/index.ts (same nesting as create-checkout-session v52, which was deployed with entrypoint_path source/index.ts)
+ezbr_sha256 208fad0837b65463f4cde9cf7c8ec9083f4bfb3f66ad6527a907867553b47def
+files (sha256 of returned content, bytes):
+source/index.ts                       bc562dfcefa2cc89e59bdda6bb28587251ed980b75e875fa57ad1da3b186a3e6  2498  MATCH staged
+_shared/p1_25_storage_drain_core.mjs  a94089d0c67676497ed32236151263978c2d4bd195d91ff78405ae321b5cefdb  6213  MATCH staged
