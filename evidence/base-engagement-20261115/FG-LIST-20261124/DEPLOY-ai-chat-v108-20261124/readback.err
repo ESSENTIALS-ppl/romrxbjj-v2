@@ -1,0 +1,5 @@
+Warning: --project-ref is deprecated and will be removed in v4. Use --remote=<ref> instead
+Target: project cqzvqzwwevnflinxgnpp
+WARNING: Docker is not running
+A new version of Supabase CLI is available: v3.4.0 (currently installed v3.0.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

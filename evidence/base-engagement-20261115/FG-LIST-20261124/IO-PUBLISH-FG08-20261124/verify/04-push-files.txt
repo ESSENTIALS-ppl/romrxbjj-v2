@@ -1,0 +1,7 @@
+unchanged vs live: app/public/sw.js
+unchanged vs live: app/src/lib/pushSubscribe.ts
+unchanged vs live: app/src/lib/pushCopy.ts
+unchanged vs live: app/src/pages/Settings.tsx
+unchanged vs live: legal.html
+89:const SHOW_PUSH = false
+SHOW_PUSH false: OK

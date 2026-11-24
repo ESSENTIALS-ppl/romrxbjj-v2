@@ -1,0 +1,12 @@
+5d669b54033e091a09748c98095ee38df8ab7ba60905d788dbdf4b8d30a0e35f  ./AFTER-function-list.txt
+90d80bad2b8b01f85a68f66be070f080119739cc6d1284717f6fc6e213bd3767  ./BEFORE-function-list.txt
+9ef8a2ca8a0af7c62bf9d319642ae0e091c3809ee80e13752805e5b44a1c1db6  ./READBACK-sha256.txt
+a75a40a29d93427c2921767f1b5c0120e350da2f67e7092adb2bb55b64056ad0  ./RECEIPT-AI-CHAT-V108-v1.md
+e17f096e7f91a1723260c5a2a020a7b9e69ec8062cb067103faf3e4066a5ff4b  ./SMOKE.txt
+f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  ./readback-v108/supabase/functions/_shared/rate_limit.ts
+21af75b82a34d05fde3222a08e1f579deb8fde36dcb78abe51fb82dc1bafdb6c  ./readback-v108/supabase/functions/ai-chat/handler.js
+728ea3cc03151e9798a2ef75a2b39098f99dbe86874a78bdd9e9cc6b7ac51f70  ./readback-v108/supabase/functions/ai-chat/index.ts
+92025b9a31a7afbfb43a64e338670b697ca51009fae6433d0b21b6071aaa633b  ./readback-v108/supabase/functions/ai-chat/mobility_score.js
+3f6edd253c3b3124c882ed0c590ba66662754fff582dd9086afc344bc35a19ab  ./readback-v108/supabase/functions/ai-chat/romood_chat.js
+15021f4419a331abec0de5de23a77966198dfe8d49427548d6eb27526249ec0d  ./readback-v108/supabase/functions/ai-chat/romood_tips.js
+96b65aac96d55a9462164c3274cbed2981089024137f211b9006750044b402ac  ./readback.err

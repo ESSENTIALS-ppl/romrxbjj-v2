@@ -1,0 +1,16 @@
+2388af9066f6e51fbde79cbaa1b0816d543dffd37ade0468eaeabc227da0bc26  ./RECEIPT-IO-PUBLISH-FG08-v1.md
+c9b68e5607e1f9cf1b9bb7922785b7486a9fafad063c3946e2c8c9df88a65daa  ./check_markers-v1.sh
+d3d2c676160a697cc68eb1726660c0415b7b73d7f748d4c587727924e038cc21  ./verify/01-tag.txt
+7a1fe0fc6913c2bb362a0d2c740d8868b28a1e7803201c8dc44e08c492fd4154  ./verify/02-commits.txt
+b912b5ab7a0033a93384ec73e7029ecf38805180491f01c4ffe1a7abc36bae1d  ./verify/03-files-vs-live.txt
+797df07bb8cd2e84edba3716556954a060154c5b099fa33b8fd00da072713612  ./verify/04-push-files.txt
+00668e9a875f2fd56f7dce2ca1aa500c1e2ea0c163fd4030673c02151f8fe808  ./verify/05-tree.txt
+b0e375608ff8a42c0b94d41f83674d83667a49ccea1c4bc8654f0a28e5c4426b  ./verify/06-mybody-check.txt
+74264c4277970b120cd9ddc0531aba515cebbe3c44ecb0bc4bc0750b7f3c17f4  ./verify/07-build.log
+c95a7c5f89051e0e4d4215ef8a89510b0d654aad99a6352b32add91d1ade6a13  ./verify/08-dist-manifest.txt
+2357229c42958c9db462a618cbf92a9fc28e7cf9ce4f7a48c3f2428107f3ba09  ./verify/09-dist.txt
+aec00abb6f9b44a4dfbb24f1933bc8cc1e392af1955eb32a8a4640fb52a820c7  ./verify/10-push-markers.txt
+b427e2836a5dd684bea1ce1a915478f31f70d942b0998098230d60b712ecaec9  ./verify/11-13-draft-publish-readback.txt
+0308ac0337b5ddf37ade93175a88c89b82a105b87e69527a67a3728dbdcae2ed  ./verify/14-file-sha1-compare.txt
+26b78612be36289cc36b03568cc0a7fc6a9581430a6fc5533af58d6d5d53e36d  ./verify/15-live-bundle.txt
+b0e375608ff8a42c0b94d41f83674d83667a49ccea1c4bc8654f0a28e5c4426b  ./verify/15-mybody-check-after.txt

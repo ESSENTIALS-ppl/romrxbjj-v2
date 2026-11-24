@@ -1,0 +1,9 @@
+app/src/components/MyBodyProgress.test.tsx
+app/src/components/MyBodyProgress.tsx
+app/src/lib/assessmentReads.ts
+app/src/lib/fg08MyBodyProgress.test.ts
+app/src/lib/jointHistory.ts
+app/src/lib/mobilityBands.ts
+app/src/pages/MyBody.fg08.test.tsx
+app/src/pages/MyBody.tsx
+files vs live: only the 8 FG-08/chip files: OK

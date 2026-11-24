@@ -1,0 +1,5 @@
+draft deploy_id 6b0621cab87dcb66dccff633 deploy_url https://6b0621cab87dcb66dccff633--incomparable-pastelito-849104.netlify.app
+restoreSiteDeploy -> 6b0621cab87dcb66dccff633 state ready locked True published_at 2026-11-24T23:46:40.080Z
+lockDeploy -> 6b0621cab87dcb66dccff633 locked True
+getSite after: published 6b0621cab87dcb66dccff633 locked True published_at 2026-11-24T23:46:40.080Z stop_builds True title FG-08+chip frozen-20261124/fg-08-on-live-v3 113f1d45 (dist c95a7c5f) draft; publish via restoreSiteDeploy
+6:46:38 PM ET / 6:46:42 PM ET

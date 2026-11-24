@@ -1,0 +1,8 @@
+requestPermission: built 2 live 2
+Notification.requestPermission: built 0 live 0
+DeviceOrientationEvent.requestPermission: built 0 live 0
+save-push-subscription: built 0 live 0
+pushManager.subscribe: built 0 live 0
+Push notifications: built 0 live 0
+serviceWorker.register: built 0 live 0
+push markers equal live: OK

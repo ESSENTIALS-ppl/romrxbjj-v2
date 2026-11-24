@@ -1,0 +1,4 @@
+live bundle /app/assets/index-C_xDmddr.js sha256 e979fd216e1c62e30f4c14923836c70641532d75c2967497ff0523e96e69959d
+local e979fd216e1c62e30f4c14923836c70641532d75c2967497ff0523e96e69959d
+      1 Where you are now
+      1 Where you started

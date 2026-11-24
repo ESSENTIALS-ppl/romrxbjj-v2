@@ -1,0 +1,3 @@
+listSiteFiles 412 published files (paths lowercased by the API): sha1 equal to local build 411, differ 1, missing locally 0
+sha1 differs /netlify.toml
+local build files not in listSiteFiles: 2 ['/app/.env.example', '/app/.gitignore']
