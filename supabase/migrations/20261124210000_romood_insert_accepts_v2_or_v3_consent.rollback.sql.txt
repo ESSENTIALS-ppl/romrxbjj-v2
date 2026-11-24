@@ -1,0 +1,18 @@
+-- ROLLBACK for 20261124210000_romood_insert_accepts_v2_or_v3_consent.sql. Manual only (MCP execute_sql or apply_migration
+-- named romood_insert_accepts_v2_or_v3_consent_rollback). Restores the exact live Oct 27 policy (v2 only, restrictive).
+-- WARNING: after this, any user whose mood_settings row says v3-rombot-20261028 cannot save a check-in. Run it only together
+-- with rolling the app back to the v2 opt-in text (Jules), or while no v3 rows exist:
+--   select count(*) from public.mood_settings where consent_version = 'v3-rombot-20261028';  -- expect 0 before rollback
+drop policy if exists mood_entries_insert_requires_v2_or_v3_consent on public.mood_entries;
+drop policy if exists mood_entries_insert_requires_v2_consent on public.mood_entries;
+create policy mood_entries_insert_requires_v2_consent on public.mood_entries
+  as restrictive
+  for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.mood_settings s
+       where s.user_id = mood_entries.user_id
+         and s.consent_version = 'v2-email-20261026'
+         and s.opted_in_at is not null
+    )
+  );

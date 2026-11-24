@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient as N } from "jsr:@supabase/supabase-js@2";
+import { isCrisisMessage, isMoodQuestion, loadMoodForAi, moodPromptBlock, composeMoodReply, stripMoodHistory, isMoodTipRequest, tipRequestReply, MOOD_CONSENT_OFF_REPLY, MOOD_NO_DATA_REPLY, MOOD_ERROR_REPLY, MOOD_PROVIDER_REPLY } from "./romood_chat.js";
 
 const q = Deno.env.get("SUPABASE_URL");
 const x = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -185,7 +186,8 @@ function formatProtocol(protocol) {
 // The ONLY user-derived data that may reach the model: this conversation's chat, name, game plan names, readiness results
 // (joint degrees and bands, and what is derived from them: priority joints, technique readiness) and the daily protocol.
 // NEVER: age, gender, injury or free-text notes, email, billing / subscription, belt (user-level OR technique-level: dropped from the allow-list and from the prompt line, Vera 6:37 PM), platforms, red-flag reasons, dates of birth.
-// Mood: no mood field is read or rendered anywhere in this function. Any future mood context must be added HERE and only for users who opted in.
+// Mood: nothing in rombot_context carries mood. ROMood check-ins are read ONLY in romood_chat.js (loadMoodForAi), and only when the
+// ROMBOT_MOOD flag is exactly "on" AND the asking user's own mood_settings row is the v3 opt-in (saving_on, tick time, v3-rombot-20261028).
 // Rows are rebuilt field by field below, so a new column on the rombot_context view can never reach the prompt by accident.
 // ---------------------------------------------------------------------------------------------------------------------------
 const CONTEXT_SELECT =
@@ -932,7 +934,10 @@ const ROMBOT_ORIGIN_ALLOWLIST_ON = flagOn(Deno.env.get("ROMBOT_ORIGIN_ALLOWLIST"
 // Data scope flag: pack data (BB workouts, PRs, body data) and any wider scope stay OFF until Privacy section 3 / Terms section 4
 // wording is live (FG-15/16). Nothing in this function reads pack data today; the test pins the exact table list. Flip is code + Jim.
 const ROMBOT_PACK_DATA_ON = flagOn(Deno.env.get("ROMBOT_PACK_DATA"));
-const FLAGS = { history: ROMBOT_HISTORY_ON, crisisRoute: true, originAllowlist: ROMBOT_ORIGIN_ALLOWLIST_ON, packData: ROMBOT_PACK_DATA_ON };
+// ROMood mood reading (Jim GO Nov 24 2026 3:36 PM ET; Stacy Oct 28 ruling). OFF unless the secret ROMBOT_MOOD is exactly "on".
+// When OFF, the request path is the same as live v101 (no mood read, history sent to the model unchanged).
+const ROMBOT_MOOD_ON = flagOn(Deno.env.get("ROMBOT_MOOD"));
+const FLAGS = { history: ROMBOT_HISTORY_ON, crisisRoute: true, originAllowlist: ROMBOT_ORIGIN_ALLOWLIST_ON, packData: ROMBOT_PACK_DATA_ON, mood: ROMBOT_MOOD_ON };
 function corsOrigin(req, on = ROMBOT_ORIGIN_ALLOWLIST_ON) {
   if (!on) return { "Access-Control-Allow-Origin": "*" };
   const o = req?.headers?.get?.("Origin") ?? "";
@@ -964,6 +969,7 @@ async function V(n) {
     let f = false;
     let d;
     let coachRoster = false;
+    let userDb; // the caller's own client (their JWT, RLS applies). Used for ROMood reads only.
     if (c === "authenticated") {
       const y = N(q, x, { global: { headers: { Authorization: l } } });
       const {
@@ -977,6 +983,7 @@ async function V(n) {
       }
       d = _.id;
       f = true;
+      userDb = y;
       // Provider guard (Grant Nov 2 2026): the provider is ALWAYS OpenAI via the platform key. user_ai_preferences is no longer
       // read, so no row (provider, model or api_key_enc) can switch the provider, the model or the key. a stays "rombot".
       const { data: v } = await s
@@ -1107,7 +1114,24 @@ async function V(n) {
         });
       }
     }
-    const i = await M(o.message, P);
+    // ROMood (Stacy ruling Oct 28 2026; re-cut on live v101 Nov 24 2026). Runs AFTER the live crisis route above. Reads this user's
+    // own check-ins only when: flag on, signed in, not the coach roster, the message asks about mood, the message has no crisis
+    // words, and the single v3 opt-in is on right now. No caching. Not opted in: fixed reply, no model call, no mood read.
+    let moodOverride = null;
+    let moodSummary = null;
+    if (ROMBOT_MOOD_ON && f && !coachRoster && d && isMoodQuestion(o.message) && !isCrisisMessage(o.message)) {
+      if (a !== "rombot") {
+        moodOverride = MOOD_PROVIDER_REPLY; // unreachable today (provider guard keeps a = "rombot"); kept as a fail-safe
+      } else {
+        const mr = await loadMoodForAi(userDb, d);
+        if (isMoodTipRequest(o.message)) moodOverride = tipRequestReply(mr, w); // tip only on request, fixed text, no model call
+        else if (mr.status === "ok") moodSummary = mr.summary;
+        else moodOverride = mr.status === "no_data" ? MOOD_NO_DATA_REPLY : mr.status === "error" ? MOOD_ERROR_REPLY : MOOD_CONSENT_OFF_REPLY;
+      }
+    }
+    // Earlier mood answers in this chat are not re-sent to the provider unless consent was just re-verified above (flag on only).
+    const wModel = ROMBOT_MOOD_ON && !moodSummary ? stripMoodHistory(w) : w;
+    const i = moodOverride ? null : await M(o.message, P);
     let e = "";
     if (i) {
       const { data: y } = await s.rpc("search_rombot_knowledge", {
@@ -1126,8 +1150,18 @@ async function V(n) {
             .join("\n");
       }
     }
-    const { text: tRaw, tokens: b, latency: E } = await G(a, r, p, h + e, w, o.message);
-    const t = postProcess(tRaw, o.message, coachRoster);
+    let t;
+    let b = 0;
+    let E = 0;
+    if (moodOverride) {
+      t = moodOverride; // fixed text, no model call, no mood data leaves the database
+    } else {
+      const g2 = await G(a, r, p, h + (moodSummary ? moodPromptBlock(moodSummary) : "") + e, wModel, o.message);
+      b = g2.tokens;
+      E = g2.latency;
+      t = postProcess(g2.text, o.message, coachRoster);
+      if (moodSummary) t = stripDashes(composeMoodReply(t, moodSummary, w));
+    }
     if (f && u && d) {
       await s.from("ai_messages").insert([
         { conversation_id: u, user_id: d, role: "user", content: o.message },
