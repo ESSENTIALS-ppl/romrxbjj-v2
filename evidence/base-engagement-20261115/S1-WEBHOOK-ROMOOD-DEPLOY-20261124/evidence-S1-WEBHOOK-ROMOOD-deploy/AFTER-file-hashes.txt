@@ -1,0 +1,21 @@
+AFTER get_edge_function file hashes vs staged sets, 2026-11-24 ET (EST).
+
+create-checkout-session v54 ezbr 299759926463ae3139fa730556c285fd63b0bc2680b04cd0094603d1ce856328 verify_jwt=true
+  source/index.ts           0fd0a4a9f45077e97698ed208c624913db61fb0d7ddecd70800cf56c59558ad6  0fd0a4a9  MATCH
+  source/packs_gate.ts      328ea953b5dc06735790681922632c561b600391beb1a14970aac0a422df6b65  328ea953  MATCH
+  _shared/arl_copy.ts       cd9b261741642de048a875eb807e2e5e69b67724a7f72bf0817b91b9b0162d74  cd9b2617  MATCH
+  _shared/events.ts         49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  49f18652  MATCH
+  _shared/rate_limit.ts     f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  f3a82f1d  MATCH
+
+stripe-webhook v60 ezbr 12b2e1c438359be2cd81b6cbd3cf5cc5df6d7ee9f27b92dc5bd135850611a7e0 verify_jwt=false
+  source/index.ts           9d7fb50282df0f9269120822101d84a8ae88da2ad1529992a87e93293b9655c3  9d7fb502  MATCH
+  _shared/arl_copy.ts       cd9b261741642de048a875eb807e2e5e69b67724a7f72bf0817b91b9b0162d74  cd9b2617  MATCH
+  _shared/events.ts         49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  49f18652  MATCH
+  _shared/email_footer.ts   uploaded 0f9d1019 (same as v59); not present in get_edge_function readback (new arl_copy cd9b2617 does not import it).
+
+ai-chat v102 ezbr b714e06099a9a7961d19d2a09cd298d9b436a4bf1bb2c53fe7320bdf3571b220 verify_jwt=true
+  source/index.ts           728ea3cc03151e9798a2ef75a2b39098f99dbe86874a78bdd9e9cc6b7ac51f70  728ea3cc  MATCH
+  source/handler.js         cccca3fa5d0aa5e48eb17435e1a2199fa38d47805d1ba0c63004a6dc0243ca0d  cccca3fa  MATCH
+  source/romood_chat.js     3f6edd253c3b3124c882ed0c590ba66662754fff582dd9086afc344bc35a19ab  3f6edd25  MATCH
+  source/romood_tips.js     15021f4419a331abec0de5de23a77966198dfe8d49427548d6eb27526249ec0d  15021f44  MATCH
+  _shared/rate_limit.ts     f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  f3a82f1d  MATCH
