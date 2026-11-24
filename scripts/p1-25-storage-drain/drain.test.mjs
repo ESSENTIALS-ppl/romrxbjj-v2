@@ -19,7 +19,7 @@ const { drainQueue } = await import(pathToFileURL(CORE).href);
 const { PGlite } = await import(process.env.PGLITE_PATH ? pathToFileURL(process.env.PGLITE_PATH).href : '@electric-sql/pglite');
 const QUIET = !!process.env.P1_25_QUIET;
 
-const MIG = fs.readFileSync(path.join(ROOT, 'supabase/migrations-unapplied/20261117120000_p1_25_purge_storage_queue.sql'), 'utf8');
+const MIG = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20261124194129_p1_25_purge_storage_queue.sql'), 'utf8');
 const QUEUE_DDL = MIG.slice(MIG.indexOf('CREATE TABLE IF NOT EXISTS public.p1_25_storage_delete_queue'), MIG.indexOf('CREATE OR REPLACE FUNCTION'));
 const CHECK_SQL = fs.readFileSync(process.env.P1_25_CHECK_SQL || path.join(HERE, 'daily-queue-check.sql'), 'utf8');
 const KEY = 'test-only-service-role-key-0123456789abcdef';

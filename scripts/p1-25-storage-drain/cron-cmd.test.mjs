@@ -8,7 +8,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../..');
 const { PGlite } = await import(process.env.PGLITE_PATH ? pathToFileURL(process.env.PGLITE_PATH).href : '@electric-sql/pglite');
 const SQL = fs.readFileSync(process.env.P1_25_CRON_SQL || path.join(ROOT, 'supabase/migrations-unapplied/20261124120000_p1_25_storage_drain_cron.sql'), 'utf8');
-const MIG = fs.readFileSync(path.join(ROOT, 'supabase/migrations-unapplied/20261117120000_p1_25_purge_storage_queue.sql'), 'utf8');
+const MIG = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20261124194129_p1_25_purge_storage_queue.sql'), 'utf8');
 const DDL = MIG.slice(MIG.indexOf('CREATE TABLE IF NOT EXISTS public.p1_25_storage_delete_queue'), MIG.indexOf('CREATE OR REPLACE FUNCTION'));
 const m = SQL.match(/cron\.schedule\(\s*'([^']+)',\s*'([^']+)',\s*\$cmd\$([\s\S]*?)\$cmd\$\s*\)/);
 let pass = 0, fail = 0;
