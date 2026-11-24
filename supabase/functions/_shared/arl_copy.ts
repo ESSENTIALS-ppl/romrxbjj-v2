@@ -16,8 +16,9 @@ export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 export const BETA_TRIAL_END_UNIX = 1798822800;
 /** BASE-IMMEDIATE-CHARGE-20261124: THE one cutover. From this instant new Base checkouts are charged at checkout (no
  *  trial_end) and every free-period wording switch (inFreePeriod) flips with them. Wed Dec 30, 2026 12:00:00 PM ET,
- *  per Stacy's clear STACY-JAN1-CHECKOUT-AND-LAUNCH-CLEAR-20261124-1414 (sha256 9162f3ab). To move the date, change
- *  this one line (e.g. 1798822800 = Jan 1, 2027 12:00 PM ET keeps Jim's L663 "not charged before January 1" literally). */
+ *  per Stacy's clear STACY-JAN1-CHECKOUT-AND-LAUNCH-CLEAR-20261124-1414 (sha256 9162f3ab). Jim picks A or C (Grant 2:31 PM ET):
+ *  A (default) 1798650000 = Wed Dec 30, 2026 12:00 PM ET; C 1798779600 = Fri Jan 1, 2027 12:00 AM ET. Change only this line;
+ *  the paid version strings below follow it (A: ...-2026-12-30-v4, C: ...-2027-01-01-v4). */
 export const BASE_PAID_CUTOVER_UNIX = 1798650000;
 export function inFreePeriod(nowMs: number = Date.now()): boolean {
   return nowMs < BASE_PAID_CUTOVER_UNIX * 1000;
@@ -175,8 +176,11 @@ export function ackText(basePrice: string, sportPack?: string | null, sportPrice
 // used from BASE_PAID_CUTOVER_UNIX on. Stacy's EXACT wording, STACY-JAN1-CHECKOUT-AND-LAUNCH-CLEAR-20261124-1414.md
 // (sha256 9162f3ab..., SUMS f6606283...) section 1.3: P1 (disclosure), P3 (consent label), P5 (ack). Only
 // {basePrice} is filled, from the live Stripe Price at runtime. Do not edit wording here without a new version string.
-export const ARL_BASE_PAID_DISCLOSURE_VERSION = "ca-arl-3b-2026-12-30-v4";
-export const ARL_BASE_PAID_ACK_VERSION = "ca-arl-3c-2026-12-30-v4";
+/** ET calendar date of the cutover (ET is UTC-5 in December and January): "2026-12-30" for A, "2027-01-01" for C. */
+export const BASE_PAID_CUTOVER_DATE_ET = new Date((BASE_PAID_CUTOVER_UNIX - 5 * 3600) * 1000).toISOString().slice(0, 10);
+/** Stacy 1414 (A) and Stacy 2:32 PM ET Nov 24 (C): ca-arl-3b/3c-<cutover date ET>-v4. */
+export const ARL_BASE_PAID_DISCLOSURE_VERSION = `ca-arl-3b-${BASE_PAID_CUTOVER_DATE_ET}-v4`;
+export const ARL_BASE_PAID_ACK_VERSION = `ca-arl-3c-${BASE_PAID_CUTOVER_DATE_ET}-v4`;
 
 /** P1, Stripe custom_text.submit (bold wrap added by the caller). */
 export function disclosureBasePaid(basePrice: string): string {

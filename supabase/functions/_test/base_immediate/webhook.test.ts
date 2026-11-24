@@ -1,6 +1,6 @@
-// Handler tests for stripe-webhook: live v59 ("pin") vs this branch at options A/B/C, Stripe/Supabase/Resend mocked.
+// Handler tests for stripe-webhook: live v59 ("pin") vs this branch at options A and C, Stripe/Supabase/Resend mocked.
 import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
-import { CLOSE_MS, loadHandler, OPTIONS, Opt, resetMocks, setNow, trace, TRIAL_END_MS, webhookReq, webhookTree } from "./harness.ts";
+import { CLOSE_MS, loadHandler, OPTIONS, Opt, PAID_VERSIONS, resetMocks, setNow, trace, TRIAL_END_MS, webhookReq, webhookTree } from "./harness.ts";
 
 const BASE = "price_1TpvnqDou9Iktbw0GMayhIQ7";
 const BJJ = "price_1TpvpxDou9Iktbw0hDQOEDwy";
@@ -9,7 +9,7 @@ const P1 = "$60 per year for ROMRx Base, charged to your card today and on this 
 const P3 = "I agree that ROMRx Base renews automatically every year at $60 until I cancel, and I agree to the [Terms](https://romrx.io/legal).";
 
 const H: Record<string, (r: Request) => Promise<Response>> = { pin: await loadHandler(webhookTree("pin")) };
-for (const o of ["A", "B", "C"] as Opt[]) H[o] = await loadHandler(webhookTree(o));
+for (const o of ["A", "C"] as Opt[]) H[o] = await loadHandler(webhookTree(o));
 
 function session(meta: Record<string, string>, extra: Record<string, unknown> = {}) {
   return {
@@ -49,24 +49,24 @@ const acks = (t: { calls: unknown[] }) => (t.calls as C[]).filter((c) => c.kind 
 
 const NOWS = [Date.UTC(2026, 10, 24, 19), CLOSE_MS + 1000, TRIAL_END_MS + 1000];
 
-Deno.test("every non-paid event is byte-identical to live v59 (options A, B, C)", async () => {
+Deno.test("every non-paid event is byte-identical to live v59 (options A and C)", async () => {
   for (const [name, ev] of Object.entries(EVENTS)) {
     if (name === "paidBaseTwoItems") continue;
     for (const now of NOWS) {
       const a = await run(H.pin, ev, now);
-      for (const o of ["A", "B", "C"]) assertEquals(JSON.stringify(await run(H[o], ev, now)), JSON.stringify(a), `${name} ${o} @${now}`);
+      for (const o of ["A", "C"]) assertEquals(JSON.stringify(await run(H[o], ev, now)), JSON.stringify(a), `${name} ${o} @${now}`);
     }
   }
 });
 
-for (const o of ["A", "B", "C"] as Opt[]) {
+for (const o of ["A", "C"] as Opt[]) {
   Deno.test(`option ${o}: paid Base session -> entitlement, trial_end NULL, P5 ack v4 (never the free ack)`, async () => {
-    const r = await run(H[o], session(PAID_META), OPTIONS[o] * 1000 + 1000);
+    const r = await run(H[o], session({ ...PAID_META, arl_version: PAID_VERSIONS[o].disclosure }), OPTIONS[o] * 1000 + 1000);
     assertEquals(r.status, 200);
     const row = consentRow(r);
     assertEquals(row.trial_end, null);
     assertEquals(row.offer, "base");
-    assertEquals(row.disclosure_text_version, "ca-arl-3b-2026-12-30-v4");
+    assertEquals(row.disclosure_text_version, PAID_VERSIONS[o].disclosure);
     assertEquals(row.disclosure_text, `**${P1}**`);
     assertEquals(row.consent_text, P3);
     assertEquals(row.stripe_consent_terms_of_service, "accepted");
@@ -86,7 +86,7 @@ for (const o of ["A", "B", "C"] as Opt[]) {
     assertFalse(a[0].body.text.includes("January 1, 2027"));
     assertFalse(a[0].body.text.includes("sport packs"));
     const sent = (r.calls as C[]).find((c) => c.kind === "event" && c.name === "email_sent");
-    assertEquals(sent.opts.props.template_version, "ca-arl-3c-2026-12-30-v4");
+    assertEquals(sent.opts.props.template_version, PAID_VERSIONS[o].ack);
     assertFalse((r.calls as C[]).some((c) => c.kind === "db" && c.table === "sport_entitlements"), "no pack entitlement");
     assertFalse((r.calls as C[]).some((c) => c.kind === "rpc" && c.name === "add_sport_access"));
     // Jim's PAID alert still goes (no Idempotency-Key).

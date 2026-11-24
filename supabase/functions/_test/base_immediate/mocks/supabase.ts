@@ -16,7 +16,11 @@ class Q {
   delete(...a: unknown[]) { this.mode = "delete"; return this.rec("delete", a); }
   private done(single: boolean) {
     S().calls.push({ kind: "db", table: this.table, ops: this.ops, single });
-    if (single) return { data: clone(S().tables[this.table] ?? null), error: null };
+    if (single) {
+      const q = S().queue[this.table];
+      if (q && q.length) return { data: clone(q.shift()), error: null };
+      return { data: clone(S().tables[this.table] ?? null), error: null };
+    }
     if (this.mode === "upsert" && this.ops.some((o) => o.op === "select")) {
       const row = (this.ops.find((o) => o.op === "upsert")!.args as Rec[])[0];
       return { data: S().upsertSelectRows ?? [{ stripe_checkout_session_id: row.stripe_checkout_session_id }], error: null };
@@ -29,12 +33,14 @@ class Q {
   then(res: any, rej: any) { return Promise.resolve(this.done(false)).then(res, rej); }
 }
 // deno-lint-ignore no-explicit-any
-export function createClient(_url: string, _key: string, _opts?: any) {
+export function createClient(_url: string, _key: string, opts?: any) {
   return {
     auth: {
-      getUser: async (jwt: string) => {
+      getUser: async (jwt?: string) => {
         S().calls.push({ kind: "auth.getUser" });
-        const u = S().users[jwt];
+        // No argument: the client's own Authorization header (activate-beta-base style).
+        const tok = jwt ?? String(opts?.global?.headers?.Authorization ?? "").replace(/^Bearer /, "");
+        const u = S().users[tok];
         return { data: { user: u ? { id: u.id, email: u.email } : null }, error: null };
       },
     },

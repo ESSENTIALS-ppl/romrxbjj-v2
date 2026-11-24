@@ -7,6 +7,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+// BASE-IMMEDIATE-CHARGE-20261124: free Unlock ends at THE shared Base cutover (same constant as checkout; not a copy).
+import { BASE_PAID_CUTOVER_UNIX } from "../_shared/arl_copy.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +73,17 @@ function isAuditTemp(email: string | undefined, userId: string): boolean {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
+
+  // BASE-IMMEDIATE-CHARGE-20261124: from the Base paid cutover, never unlock, whatever free_unlock or
+  // FREE_UNLOCK_ENABLED say. Before any read or write (no rate-limit hit, no profile upsert, no base_status write).
+  // 402 + checkout_required: the app already falls through to Stripe checkout on this.
+  if (Date.now() >= BASE_PAID_CUTOVER_UNIX * 1000) {
+    return json(402, {
+      error: "beta_ended",
+      checkout_required: true,
+      message: "Free Unlock has ended. Use Stripe checkout.",
+    });
+  }
 
   {
     const limited = await rateLimitOrNull(req.headers.get("x-forwarded-for") ?? "ip");

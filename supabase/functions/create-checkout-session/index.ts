@@ -231,6 +231,16 @@ Deno.serve(async (req: Request) => {
       await logEvent("checkout_packs_closed", { userId: body.user_id, props: { mode, reason: "base_paid_no_pack" } });
       return json(PACKS_CLOSED_STATUS, packsClosedBody());
     }
+    // Concern (e): a paid buy is refused for a user who already holds Base (e.g. the Jan 1 trial cohort), so there is
+    // never a second Base subscription or a double charge. Paid phase only; the trial path is unchanged.
+    if (basePhase === "paid") {
+      const { data: held } = await admin.from("users").select("base_status").eq("id", body.user_id).maybeSingle();
+      const heldStatus = (held as { base_status?: string } | null)?.base_status;
+      if (heldStatus === "active" || heldStatus === "past_due") {
+        await logEvent("checkout_base_already_active", { userId: body.user_id, props: { mode, base_status: heldStatus } });
+        return json(409, { error: "base_already_active", message: "You already have ROMRx Base. Manage it in Settings." });
+      }
+    }
     if (body.lead_token) {
       const claim = await claimLead(admin, body.lead_token, body.user_id, body.email);
       if (!claim.ok) return json(claim.status, { error: claim.error });

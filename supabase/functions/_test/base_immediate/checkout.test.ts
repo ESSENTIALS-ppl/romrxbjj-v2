@@ -1,15 +1,15 @@
 // Handler tests for create-checkout-session: the real index.ts with Stripe/Supabase/events mocked.
 //  - "pin" = 643e27f0 (pinned pack fix 22c490f8 + Spring 2027 packs message; fixture sha256-checked in unit.test.ts)
-//  - "A" / "B" / "C" = this branch with BASE_PAID_CUTOVER_UNIX set to Jim's option A, B or C (one line each)
+//  - "A" / "C" = this branch with BASE_PAID_CUTOVER_UNIX set to Jim's option A or C (one line each)
 import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
-import { checkoutReq, checkoutTree, CLOSE_MS, loadHandler, OPTIONS, Opt, resetMocks, S, setNow, trace, TRIAL_END_MS } from "./harness.ts";
+import { checkoutReq, checkoutTree, CLOSE_MS, loadHandler, OPTIONS, Opt, PAID_VERSIONS, resetMocks, S, setNow, trace, TRIAL_END_MS } from "./harness.ts";
 
 const BASE = "price_1TpvnqDou9Iktbw0GMayhIQ7";
 const BJJ = "price_1TpvpxDou9Iktbw0hDQOEDwy";
 const UID = "00000000-0000-4000-8000-000000000001";
 const EMAIL = "user@example.com";
 
-const OPTS = ["A", "B", "C"] as Opt[];
+const OPTS = ["A", "C"] as Opt[];
 const H: Record<string, (r: Request) => Promise<Response>> = {
   pinOn: await loadHandler(checkoutTree("pin"), { ARL_LIVE_ENABLED: "true" }),
   pinOff: await loadHandler(checkoutTree("pin"), { ARL_LIVE_ENABLED: undefined }),
@@ -115,13 +115,13 @@ for (const o of OPTS) {
       assertEquals(p.metadata.arl_amounts, "6000");
       assertEquals(p.metadata.arl_period, "paid");
       assertEquals(p.metadata.arl_offer, "base");
-      assertEquals(p.metadata.arl_version, "ca-arl-3b-2026-12-30-v4");
+      assertEquals(p.metadata.arl_version, PAID_VERSIONS[o].disclosure);
       assertFalse("pending_sport" in p.metadata);
       assertEquals(p.consent_collection?.terms_of_service, "required");
       assertEquals(p.custom_text.submit.message, `**${P1}**`);
       assertEquals(p.custom_text.terms_of_service_acceptance.message, P3);
       const started = (r.calls as Record<string, any>[]).find((x) => x.kind === "event" && x.name === "checkout_started");
-      assertEquals(started?.opts.props.arl_version, "ca-arl-3b-2026-12-30-v4");
+      assertEquals(started?.opts.props.arl_version, PAID_VERSIONS[o].disclosure);
       // Packs: every pack-shaped Base request is refused, never added (packs closed and PACKS_CHECKOUT_OPEN=true).
       for (const s of SCENARIOS.filter((x) => isPackShaped(x) && !(x.body.mode === "unlock" && x.packsOpen))) {
         const rr = await run(H[`${o}On`], s, t);
@@ -148,8 +148,8 @@ for (const o of OPTS) {
   }
 }
 
-// 3. The gap (B and C): between the v50 close and the cutover, every Base request gets the v50 503 and no session.
-for (const o of ["B", "C"] as Opt[]) {
+// 3. The gap (C only): between the v50 close and the cutover, every Base request gets the v50 503 and no session.
+for (const o of ["C"] as Opt[]) {
   Deno.test(`option ${o}: closed from Dec 30 noon ET until its cutover`, async () => {
     for (const [, t] of TIMES.filter(([, t]) => t > CLOSE_MS && t < OPTIONS[o] * 1000)) {
       for (const s of SCENARIOS.filter((x) => x.body.mode === "base" && !x.name.includes("JWT") && !x.name.includes("missing") && !isPackShaped(x) && !x.name.includes("lead_token + sport"))) {

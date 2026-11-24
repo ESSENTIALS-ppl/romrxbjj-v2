@@ -10,6 +10,7 @@ export interface MockState {
   tables: Record<string, Rec | null>; // maybeSingle() result per table
   upsertSelectRows: Rec[] | null;
   resendOk: boolean;
+  queue: Record<string, Rec[]>; // per-table maybeSingle() results, used in order before tables[]
 }
 export function freshState(): MockState {
   return {
@@ -25,6 +26,7 @@ export function freshState(): MockState {
     tables: {},
     upsertSelectRows: null,
     resendOk: true,
+    queue: {},
   };
 }
 // deno-lint-ignore no-explicit-any

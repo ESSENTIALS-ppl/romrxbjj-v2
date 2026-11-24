@@ -23,12 +23,11 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return [...d].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Jim's three cutover options (Grant 2:17 PM ET). Each is the ONE line in _shared/arl_copy.ts:
+// Jim's two cutover options (Grant 2:31 PM ET: A or C). Each is the ONE line in _shared/arl_copy.ts:
 //   export const BASE_PAID_CUTOVER_UNIX = <value>;
 export const CUTOVER_LINE_RE = /^export const BASE_PAID_CUTOVER_UNIX = \d+;$/m;
 export const OPTIONS = {
   A: 1798650000, // Wed Dec 30, 2026 12:00:00 PM ET: paid from the v50 close, price lines switch with it
-  B: 1798822800, // Fri Jan 1, 2027 12:00:00 PM ET: closed Dec 30 noon to Jan 1 noon, then paid
   C: 1798779600, // Fri Jan 1, 2027 12:00:00 AM ET: closed Dec 30 noon to Jan 1 midnight, then paid
 } as const;
 export type Opt = keyof typeof OPTIONS;
@@ -48,6 +47,7 @@ function writeTree(files: Record<string, string>): string {
     Deno.mkdirSync(p.slice(0, p.lastIndexOf("/")), { recursive: true });
     Deno.writeTextFileSync(p, content);
   }
+  Deno.mkdirSync(`${dir}/_shared`, { recursive: true });
   Deno.writeTextFileSync(`${dir}/_shared/events.ts`, `export * from ${JSON.stringify(mockUrl("events.ts"))};\n`);
   Deno.writeTextFileSync(`${dir}/_shared/rate_limit.ts`, `export * from ${JSON.stringify(mockUrl("rate_limit.ts"))};\n`);
   return dir;
@@ -56,7 +56,7 @@ const rd = (u: URL) => Deno.readTextFileSync(u);
 
 export type Variant = "pin" | Opt;
 
-/** Source files for one variant of create-checkout-session ("pin" = 643e27f0; A/B/C = this branch at that option). */
+/** Source files for one variant of create-checkout-session ("pin" = 643e27f0; A/C = this branch at that option). */
 export function checkoutTree(v: Variant): string {
   if (v === "pin") {
     return writeTree({
@@ -83,7 +83,7 @@ export function liveWebhookV59(): string {
   if (!out.success) throw new Error("git show of the live v59 baseline failed");
   return new TextDecoder().decode(out.stdout);
 }
-/** "pin" = live v59; A/B/C = this branch (the webhook does not read the clock for paid vs free). */
+/** "pin" = live v59; A/C = this branch (the webhook does not read the clock for paid vs free). */
 export function webhookTree(v: Variant): string {
   if (v === "pin") {
     return writeTree({
@@ -94,6 +94,28 @@ export function webhookTree(v: Variant): string {
   }
   return writeTree({
     "source/index.ts": rd(new URL("stripe-webhook/index.ts", SRC_ROOT)),
+    "_shared/arl_copy.ts": setCutover(rd(new URL("_shared/arl_copy.ts", SRC_ROOT)), OPTIONS[v]),
+    "_shared/email_footer.ts": rd(new URL("_shared/email_footer.ts", SRC_ROOT)),
+  });
+}
+/** Paid version strings per option (Stacy 1414 for A; Stacy 2:32 PM ET Nov 24 for C). */
+export const PAID_VERSIONS: Record<Opt, { disclosure: string; ack: string }> = {
+  A: { disclosure: "ca-arl-3b-2026-12-30-v4", ack: "ca-arl-3c-2026-12-30-v4" },
+  C: { disclosure: "ca-arl-3b-2027-01-01-v4", ack: "ca-arl-3c-2027-01-01-v4" },
+};
+/** Live activate-beta-base v18 (MCP get_edge_function 2026-11-24), read by git blob id from baseline commit d7188c03. */
+export const LIVE_ACTIVATE_V18_GIT = "cfe0027bd7c7e5655bde5808ae7021c7297ad3f4";
+export const LIVE_ACTIVATE_V18_SHA256 = "bc20dfa11e93944267476749ef79144edeca81b9c8255f333b686ef02b9e2c84";
+export function gitBlob(id: string): string {
+  const out = new Deno.Command("git", { args: ["cat-file", "blob", id], cwd: new URL(".", import.meta.url).pathname, stdout: "piped", stderr: "piped" }).outputSync();
+  if (!out.success) throw new Error(`git cat-file ${id} failed`);
+  return new TextDecoder().decode(out.stdout);
+}
+/** "pin" = live activate-beta-base v18 (one file); A/C = this branch (imports the cutover from _shared/arl_copy.ts). */
+export function activateTree(v: Variant): string {
+  if (v === "pin") return writeTree({ "source/index.ts": gitBlob(LIVE_ACTIVATE_V18_GIT) });
+  return writeTree({
+    "source/index.ts": rd(new URL("activate-beta-base/index.ts", SRC_ROOT)),
     "_shared/arl_copy.ts": setCutover(rd(new URL("_shared/arl_copy.ts", SRC_ROOT)), OPTIONS[v]),
     "_shared/email_footer.ts": rd(new URL("_shared/email_footer.ts", SRC_ROOT)),
   });

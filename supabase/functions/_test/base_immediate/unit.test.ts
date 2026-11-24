@@ -1,7 +1,7 @@
-// Unit tests: the ONE cutover constant, options A/B/C, wording switch and checkout switch flipping together,
+// Unit tests: the ONE cutover constant, options A and C, wording switch and checkout switch flipping together,
 // subscription_data shape, Stacy's exact strings, promo flag.
 import { assert, assertEquals, assertFalse, assertNotEquals } from "jsr:@std/assert@1";
-import { checkoutTree, CLOSE_MS, CUTOVER_LINE_RE, FIXTURE_HASHES, importFrom, liveWebhookV59, LIVE_V59_GIT, LIVE_V59_SHA256, OPTIONS, Opt, sha256Hex, SRC_ROOT, TRIAL_END_MS } from "./harness.ts";
+import { checkoutTree, CLOSE_MS, CUTOVER_LINE_RE, FIXTURE_HASHES, importFrom, liveWebhookV59, LIVE_V59_GIT, LIVE_V59_SHA256, OPTIONS, Opt, sha256Hex, SRC_ROOT, TRIAL_END_MS, PAID_VERSIONS } from "./harness.ts";
 
 const arl = await import(new URL("_shared/arl_copy.ts", SRC_ROOT).href);
 const cut = await import(new URL("create-checkout-session/base_cutover.ts", SRC_ROOT).href);
@@ -22,7 +22,7 @@ Deno.test("ONE cutover constant: exactly one definition line, used by inFreePeri
   const bc = Deno.readTextFileSync(new URL("create-checkout-session/base_cutover.ts", SRC_ROOT));
   assert(bc.includes("if (!inFreePeriod(nowMs)) return \"paid\";"));
   assertEquals(cut.BASE_PAID_CUTOVER_UNIX, arl.BASE_PAID_CUTOVER_UNIX);
-  assert(Object.values(OPTIONS).includes(arl.BASE_PAID_CUTOVER_UNIX), "committed value is one of A/B/C");
+  assert(Object.values(OPTIONS).includes(arl.BASE_PAID_CUTOVER_UNIX), "committed value is A or C");
   // No second copy of any option instant in the deployed function code.
   for (const f of ["create-checkout-session/index.ts", "create-checkout-session/base_cutover.ts", "stripe-webhook/index.ts"]) {
     const t = Deno.readTextFileSync(new URL(f, SRC_ROOT));
@@ -32,14 +32,16 @@ Deno.test("ONE cutover constant: exactly one definition line, used by inFreePeri
 
 Deno.test("option instants in ET", () => {
   assert(et(OPTIONS.A * 1000).startsWith("Wednesday, December 30, 2026 at 12:00:00 PM EST"), et(OPTIONS.A * 1000));
-  assert(et(OPTIONS.B * 1000).startsWith("Friday, January 1, 2027 at 12:00:00 PM EST"), et(OPTIONS.B * 1000));
+  assert(et(TRIAL_END_MS).startsWith("Friday, January 1, 2027 at 12:00:00 PM EST"), et(TRIAL_END_MS));
+  assertEquals(Object.keys(OPTIONS).join(","), "A,C");
+  assertEquals(arl.BASE_PAID_CUTOVER_UNIX, OPTIONS.A, "A is the branch default");
   assert(et(OPTIONS.C * 1000).startsWith("Friday, January 1, 2027 at 12:00:00 AM EST"), et(OPTIONS.C * 1000));
   assertEquals(arl.BETA_TRIAL_END_UNIX, 1798822800);
   assertEquals(cut.BASE_TRIAL_CLOSE_UNIX * 1000, CLOSE_MS);
-  assertEquals(TRIAL_END_MS, OPTIONS.B * 1000);
+  assertEquals(TRIAL_END_MS, arl.BETA_TRIAL_END_UNIX * 1000);
 });
 
-for (const o of ["A", "B", "C"] as Opt[]) {
+for (const o of ["A", "C"] as Opt[]) {
   Deno.test(`option ${o}: wording switch and checkout switch flip together (1 s / 1 ms either side)`, async () => {
     const tree = checkoutTree(o);
     const a = await importFrom(tree, "_shared/arl_copy.ts");
@@ -59,7 +61,7 @@ for (const o of ["A", "B", "C"] as Opt[]) {
       assertEquals(c.baseCheckoutPhase(t), "trial");
       assert(a.inFreePeriod(t));
     }
-    // Gap between the v50 close and the cutover: closed (B and C only; empty for A).
+    // Gap between the v50 close and the cutover: closed (C only; empty for A).
     const gap = [CLOSE_MS + 1, CLOSE_MS + 1000, T - 1000];
     for (const t of gap) {
       if (t >= T || t <= CLOSE_MS) continue;
@@ -114,9 +116,10 @@ Deno.test("Stacy P1 / P3 / P5 exact, version strings v4", () => {
   assertFalse(/\u2014/.test(P1 + P3 + P5.join("")));
 });
 
-Deno.test("every other arl_copy export is byte-identical to live (v59 copy); inFreePeriod identical under option B", async () => {
+Deno.test("every other arl_copy export is byte-identical to live (v59 copy)", () => {
   for (const k of Object.keys(liveArl)) {
     if (k === "inFreePeriod") continue;
+    if (k === "BASE_PAID_CUTOVER_DATE_ET") continue;
     const a = liveArl[k], b = arl[k];
     if (typeof a === "function") {
       const args = [["$60"], ["$60", "$149", "ROMRx+BJJ"], ["$149", "ROMRx+BJJ"], ["$149", "ROMRx+BJJ", true, true], ["$149", "ROMRx+BJJ", false, true], [6000], [5999], []];
@@ -130,8 +133,18 @@ Deno.test("every other arl_copy export is byte-identical to live (v59 copy); inF
       assertEquals(JSON.stringify(b), JSON.stringify(a), k);
     }
   }
-  const bArl = await importFrom(checkoutTree("B"), "_shared/arl_copy.ts");
-  for (const t of [Date.UTC(2026, 10, 24), CLOSE_MS, TRIAL_END_MS - 1, TRIAL_END_MS, TRIAL_END_MS + 1]) {
-    assertEquals(bArl.inFreePeriod(t), liveArl.inFreePeriod(t), String(t));
-  }
 });
+
+for (const o of ["A", "C"] as Opt[]) {
+  Deno.test(`option ${o}: paid version strings follow the one cutover line (${PAID_VERSIONS[o].disclosure} / ${PAID_VERSIONS[o].ack}); P1/P3/P5 unchanged`, async () => {
+    const a = await importFrom(checkoutTree(o), "_shared/arl_copy.ts");
+    assertEquals(a.ARL_BASE_PAID_DISCLOSURE_VERSION, PAID_VERSIONS[o].disclosure);
+    assertEquals(a.ARL_BASE_PAID_ACK_VERSION, PAID_VERSIONS[o].ack);
+    assertEquals(a.disclosureBasePaid("$60"), P1);
+    assertEquals(a.consentTextBasePaid("$60"), P3);
+    assertEquals(a.ackLinesBasePaid("$60"), P5);
+    // The free (pre-cutover) versions never change.
+    assertEquals(a.ARL_DISCLOSURE_VERSION, liveArl.ARL_DISCLOSURE_VERSION);
+    assertEquals(a.ARL_ACK_VERSION, liveArl.ARL_ACK_VERSION);
+  });
+}

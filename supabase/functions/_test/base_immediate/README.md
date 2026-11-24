@@ -6,7 +6,7 @@ Test-only folder. No edge function imports anything here.
   (pinned pack fix 22c490f8 + packs_gate.ts:9 message, on live v50 ezbr 2b7dd0ce). the LIVE stripe-webhook v59 (ezbr 3c60342d) index.ts is read with `git cat-file blob
   9626eee2` (git blob id, from baseline commit da087bb); its _shared files are in `live_v59/_shared/`. unit.test.ts checks their sha256. They are the "before" side
   of the byte-identical behavior tests.
-- Jim's cutover options A, B, C are tested by rewriting the ONE line `export const BASE_PAID_CUTOVER_UNIX = ...;`
+- Jim's cutover options A and C (Grant 2:31 PM ET; B dropped) are tested by rewriting the ONE line `export const BASE_PAID_CUTOVER_UNIX = ...;`
   in a throwaway copy (harness.ts OPTIONS).
 - `mocks/` stand in for Supabase, Stripe, Resend (fetch), events and rate limiting. Nothing touches a network.
 
