@@ -2,14 +2,14 @@
 //   source (ezbr 2b7dd0ce). packsCheckoutOpen stays false through Jan 1, 2027 12:00 PM ET even if
 //   PACKS_CHECKOUT_OPEN=true. Combo adds a pack line only when packs are open, and then omits trial_end.
 //   Unlock never sets trial_end. Applies to the ARL path and the leftover ARL_LIVE=false legacy paths.
-//   Base-only trial_end and the Dec 30, 2026 12:00 PM ET 503 are unchanged.
+//   Base-only trial_end is 1803920400 (March 1, 2027 12:00 PM ET). No 503. Promo codes are off for Base.
 // v40 (Jim, 2026-10-06 12:32 PM ET): sport pack checkout kill switch. Unless env PACKS_CHECKOUT_OPEN is "true",
 //   mode=unlock and any mode=base request naming a sport (pending_sport/add/sport) or a non-Base price_id returns
 //   403 {error/message:"Sport packs are coming Spring 2027.", code:"packs_closed"} before any auth, lead claim or Stripe
 //   call. Exception (Base must keep working): a lead-email unlock (mode=base WITH lead_token) that names a sport has
 //   the sport dropped and continues as Base-only (Base price, no pending_sport metadata); logged as
 //   checkout_packs_closed_sport_dropped. Plain Base, coach, webhook, portal and existing subscriptions unchanged.
-// v33+ guard: mode=base returns 503 base_checkout_unavailable after Dec 30, 2026 12:00 ET (48h before trial_end); no change before then.
+// v33+ 503 removed: mode=base has no 503. Base trial_end is 1803920400 (March 1, 2027 12:00 PM ET). Promo codes are off for Base.
 // v33 (CA auto-renewal law fix, Legal plan ca-arl-plan-20260929 sections 3b + 4D, Jim GO via Grant 2026-09-29):
 //   - Base, Base + sport (combo) and sport unlock sessions now require an UNCHECKED terms consent box
 //     (consent_collection.terms_of_service = required) with Stacy's exact consent text in
@@ -37,7 +37,7 @@ import Stripe from "https://esm.sh/stripe@17.5.0?target=deno";
 import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import {
   ARL_DISCLOSURE_VERSION, ARL_CONSENT_TEXT, SPORT_PACK_NAMES, formatUsd, disclosureBase, disclosureCombo,
-  disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
+  disclosureSport, disclosureSportPaid, inFreePeriod,
 } from "../_shared/arl_copy.ts";
 import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS, planBaseCheckout, planUnlockTrialEndUnix } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
@@ -208,11 +208,6 @@ Deno.serve(async (req: Request) => {
       const baseCaller = await getCallerUser(admin, req);
       if (!baseCaller || baseCaller.id !== body.user_id) return json(401, { error: "auth_required" });
     }
-    // Fail closed once the free period is over (or under Stripe's 48h trial_end minimum): the Base path always sends the
-    // fixed trial_end (Jan 1, 2027) and Legal has not supplied post-Jan-1 Base copy yet. Applies to live and test paths.
-    if (Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000) {
-      return json(503, { error: "base_checkout_unavailable", message: "Base sign-up is temporarily unavailable. Please check back soon." });
-    }
     if (body.lead_token) {
       const claim = await claimLead(admin, body.lead_token, body.user_id, body.email);
       if (!claim.ok) return json(claim.status, { error: claim.error });
@@ -245,7 +240,7 @@ Deno.serve(async (req: Request) => {
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
           line_items: legacyItems,
-          allow_promotion_codes: true,
+          allow_promotion_codes: false,
           client_reference_id: body.user_id,
           customer_email: body.email,
           success_url: legacyUrl,
@@ -299,7 +294,7 @@ Deno.serve(async (req: Request) => {
       const baseParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         line_items,
-        allow_promotion_codes: true,
+        allow_promotion_codes: false,
         client_reference_id: body.user_id,
         customer_email: body.email,
         success_url: successUrl,
