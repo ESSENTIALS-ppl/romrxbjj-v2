@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient as N } from "jsr:@supabase/supabase-js@2";
 import { isCrisisMessage, isMoodQuestion, loadMoodForAi, moodPromptBlock, composeMoodReply, stripMoodHistory, isMoodTipRequest, tipRequestReply, MOOD_CONSENT_OFF_REPLY, MOOD_NO_DATA_REPLY, MOOD_ERROR_REPLY, MOOD_PROVIDER_REPLY } from "./romood_chat.js";
+import { mobilityScoreForAssessment, mobilityRawScoreForAssessment, gateAssessment, gateJointScores, setHipFlexScoredAtMs } from "./mobility_score.js";
 
 const q = Deno.env.get("SUPABASE_URL");
 const x = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -154,6 +155,28 @@ function formatMeasurements(jointScores, romTotal) {
   const total = romTotal == null || romTotal === "" ? null : Number(romTotal);
   if (total != null && !Number.isNaN(total)) lines.push(`  Overall ROM score: ${total}/100`);
   return lines.join("\n");
+}
+
+// SETS/REPS (Grant 4:32 PM ET Nov 24 2026): Base takes the dose from the same source and rule as the My Protocol card
+// (MyProtocol.tsx toRx: sets AND reps -> "<sets> sets x <reps>", else reps, else nothing), read from the same
+// protocols -> exercises rows (rombot_context.protocol). This replaces the v96d "3 sets of 10" default for Base only;
+// the sport apps keep formatProtocol unchanged.
+function cardDose(t) {
+  const sets = t.sets;
+  const reps = t.reps;
+  return sets && reps ? `${sets} sets x ${reps}` : (reps ?? "");
+}
+function formatProtocolBase(protocol) {
+  if (protocol && protocol.length > 0) {
+    return protocol
+      .map((t) => {
+        const dose = String(cardDose(t) ?? "").trim();
+        const cue = t.cue ?? t.coaching_cue;
+        return `  ${t.joint ?? t.jointKey ?? t.joint_key}: ${t.exercise}${dose ? ` - ${dose}` : ""}${cue ? ` (${cue})` : ""}`;
+      })
+      .join("\n");
+  }
+  return "  Daily plan pending generation for this assessment (or no assessment yet).";
 }
 
 function formatProtocol(protocol) {
@@ -377,6 +400,68 @@ function fg17TodayLine(problemAreas, dow) {
   return `Today's session (${FG17_DAY_NAMES[dow]}, same as the Today card on My Protocol): ${baseJointLabel(problemAreas[idx])}`;
 }
 
+// SCORE (Grant 4:30 PM ET Nov 24 2026, STAGED): ROMBot quotes the score the user sees on the My Body dial (capped by
+// the same mobilityBands rule: at most 89 while any joint is Needs focus), never the raw rom_total. A change may be
+// described only with the UNCAPPED change vs the previous assessment, the same number as the app's "vs <date>" chip.
+// Scoring is the client's own code (mobility_score.js, bundled from romrx-io-web app/src/lib). The reads mirror
+// useProfile: get_my_profile's 4 newest non-quick assessments by assessed_at, the hip flexion cutover
+// (scoring_cutovers.hip_flex_scored) plus per-assessment hip flexion scores, and the latest assessment's joint_scores.
+const SCORE_ASSESSMENT_COLS =
+  "id, assessed_at, created_at, check_kind, hip_er_l, hip_er_r, hip_ir_l, hip_ir_r, hip_abd_l, hip_abd_r, hip_flex_l, hip_flex_r, shoulder_er_l, shoulder_er_r, shoulder_flex_l, shoulder_flex_r, ankle_df_l, ankle_df_r, lumbar_flex, lumbar_ext, cervical_rot_l, cervical_rot_r, cervical_lat_l, cervical_lat_r, cervical_flex, cervical_ext, thoracic_rot, thoracic_rot_l, thoracic_rot_r, worst_joints";
+/** Pure: rows = newest first (already non-quick); latestScores = joint_scores rows of rows[0]; cutMs = cutover ms or null. */
+function computeDisplayScores(rows, latestScores, cutMs, hipScoredIds) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  setHipFlexScoredAtMs(Number.isFinite(cutMs) ? cutMs : null); // same state the client loads; null = pre-cutover (client default)
+  const ids = hipScoredIds instanceof Set ? hipScoredIds : new Set(hipScoredIds ?? []);
+  const gated = rows.map((a) => gateAssessment(a, ids));
+  const latest = gated[0];
+  const js = gateJointScores(rows[0], Array.isArray(latestScores) ? latestScores : []);
+  const byId = {};
+  gated.forEach((a, i) => {
+    byId[a.id] = { dial: i === 0 ? mobilityScoreForAssessment(latest, js) : mobilityScoreForAssessment(a), raw: mobilityRawScoreForAssessment(a), assessed_at: a.assessed_at };
+  });
+  const prev = gated[1] ?? null;
+  return {
+    dial: byId[latest.id].dial,
+    latestRaw: byId[latest.id].raw,
+    previousAt: prev ? prev.assessed_at : null,
+    change: prev ? byId[latest.id].raw - byId[prev.id].raw : null,
+    byId,
+  };
+}
+async function loadDisplayScores(s, userId) {
+  const { data: rows, error } = await s
+    .from("assessments")
+    .select(SCORE_ASSESSMENT_COLS)
+    .eq("user_id", userId)
+    .or("check_kind.is.null,check_kind.neq.quick")
+    .order("assessed_at", { ascending: false })
+    .limit(4);
+  if (error || !Array.isArray(rows) || rows.length === 0) return null;
+  const ids = rows.map((r) => r.id);
+  const [cut, hip, js] = await Promise.all([
+    s.from("scoring_cutovers").select("effective_at").eq("key", "hip_flex_scored").maybeSingle(),
+    s.from("joint_scores").select("assessment_id").eq("joint_key", "hip_flex").not("score", "is", null).in("assessment_id", ids),
+    s.from("joint_scores").select("joint_key, score, left_value, right_value, asymmetry_pct, asymmetry_flag").eq("assessment_id", rows[0].id),
+  ]);
+  const cutMs = !cut.error && cut.data?.effective_at ? Date.parse(String(cut.data.effective_at)) : NaN;
+  const hipIds = new Set(!hip.error && Array.isArray(hip.data) ? hip.data.map((r) => r.assessment_id) : []);
+  return computeDisplayScores(rows, js.error ? [] : js.data, cutMs, hipIds);
+}
+/** "Nov 10", the same short date as the chip, in the user's time zone (default New York). */
+function scoreShortDate(iso, tz) {
+  for (const z of [tz, "America/New_York"]) {
+    if (!z) continue;
+    try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: z }); } catch { /* next */ }
+  }
+  return String(iso ?? "").slice(0, 10);
+}
+function formatScoreChange(sc, tz) {
+  if (!sc || sc.change == null || !sc.previousAt) return "";
+  const d = sc.change;
+  return `  Change vs previous assessment (${scoreShortDate(sc.previousAt, tz)}): ${d > 0 ? "+" : ""}${d} (same as the change shown next to the score in the app)`;
+}
+
 /** Base / general athlete prompt: mobility bands, no technique GREEN/YELLOW/RED. */
 function CBase(n) {
   const g = n.full_name ?? "Athlete";
@@ -426,10 +511,12 @@ Top three problem areas: ${priorityLine}
 ${startLine}${todayLine ? `\n${todayLine}` : ""}
 
 ## Your measurements (this person's own numbers; OK to share with them)
-${formatMeasurements(jointScores, n.rom_total)}
+${formatMeasurements(jointScores, n.display_scores ? n.display_scores.dial : null)}${n.display_scores && formatScoreChange(n.display_scores, n.score_tz) ? `\n${formatScoreChange(n.display_scores, n.score_tz)}` : ""}
+Overall ROM score rules: quote only the "Overall ROM score" above (it is the score on the My Body dial). If asked whether they improved, use only the "Change vs previous assessment" number. Never compute a score or a change yourself.
 
 ## Priority mobility protocol
-${formatProtocol(m)}
+${formatProtocolBase(m)}
+Sets and reps rule: give each movement's sets and reps exactly as written in the protocol rows above (they are the My Protocol card's dose). Never change them and never use a default such as 3 sets of 10.
 ${n.assessment_history ? `
 ## Earlier assessments (this person's own history, changes already worked out versus the latest assessment)
 ${n.assessment_history}
@@ -820,7 +907,7 @@ async function loadRecentHistory(client, conversationId, userId, limit = 20) {
  * joint_scores:[{joint_key,score,left_value,right_value}]}. All changes are computed here so the model never does arithmetic.
  * Unscored joints (hip flexion) are left out, same as the rest of the prompt.
  */
-function formatAssessmentHistory(latest, prior, latestRomTotal) {
+function formatAssessmentHistory(latest, prior, latestRomTotal, scores) {
   if (!Array.isArray(prior) || prior.length === 0) return "";
   const cur = {};
   for (const r of scoredOnly(latest) ?? []) {
@@ -831,11 +918,19 @@ function formatAssessmentHistory(latest, prior, latestRomTotal) {
   const out = [];
   for (const a of prior.slice(0, 3)) {
     const when = String(a.assessed_at ?? "").slice(0, 10) || "earlier date";
-    const total = num(a.rom_total);
-    const totNow = num(latestRomTotal);
-    const totTxt = total != null
-      ? ` (Overall ROM score ${total}/100${totNow != null ? `, ${totNow - total >= 0 ? "+" : ""}${totNow - total} to latest` : ""})`
-      : "";
+    let totTxt;
+    if (scores !== undefined) {
+      // SCORE (staged): the dial score that assessment had and the uncapped change to the latest; never rom_total.
+      const e = scores && scores.byId ? scores.byId[a.id] : null;
+      const ch = e ? scores.latestRaw - e.raw : null;
+      totTxt = e ? ` (Overall ROM score ${e.dial}/100, ${ch >= 0 ? "+" : ""}${ch} to latest)` : "";
+    } else {
+      const total = num(a.rom_total);
+      const totNow = num(latestRomTotal);
+      totTxt = total != null
+        ? ` (Overall ROM score ${total}/100${totNow != null ? `, ${totNow - total >= 0 ? "+" : ""}${totNow - total} to latest` : ""})`
+        : "";
+    }
     out.push(`  Assessment on ${when}${totTxt}`);
     for (const row of scoredOnly(a.joint_scores) ?? []) {
       const k = jointKeyOf(row);
@@ -1079,6 +1174,12 @@ async function V(n) {
             } catch { tz = null; }
           }
           ctx.today_dow = fg17WeekdayIn(tz);
+          ctx.score_tz = tz;
+          try {
+            ctx.display_scores = await loadDisplayScores(s, d);
+          } catch {
+            ctx.display_scores = null; // no overall score line rather than the raw rom_total
+          }
         }
         if (ROMBOT_HISTORY_ON && isBaseSport(m) && j?.latest_assessment_id) {
           try {
@@ -1089,7 +1190,7 @@ async function V(n) {
               .neq("id", j.latest_assessment_id)
               .order("assessed_at", { ascending: false })
               .limit(3);
-            ctx.assessment_history = formatAssessmentHistory(j.joint_scores, hist ?? [], j.rom_total);
+            ctx.assessment_history = formatAssessmentHistory(j.joint_scores, hist ?? [], j.rom_total, ctx.display_scores ?? null);
           } catch {
             ctx.assessment_history = "";
           }
@@ -1247,4 +1348,4 @@ async function V(n) {
   }
 }
 
-export { allowListContext, fg17WeekdayIn, CONTEXT_SELECT, flagOn, FLAGS, corsOrigin, ALLOWED_ORIGINS, detectCrisis, crisisReply, CRISIS_REPLY_A, CRISIS_REPLY_B, conversationOwnedBy, loadRecentHistory, formatAssessmentHistory, postProcess, stripDashes, V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
+export { allowListContext, fg17WeekdayIn, formatProtocolBase, cardDose, computeDisplayScores, formatScoreChange, CONTEXT_SELECT, flagOn, FLAGS, corsOrigin, ALLOWED_ORIGINS, detectCrisis, crisisReply, CRISIS_REPLY_A, CRISIS_REPLY_B, conversationOwnedBy, loadRecentHistory, formatAssessmentHistory, postProcess, stripDashes, V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };

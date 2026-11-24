@@ -1,0 +1,206 @@
+{
+ "cut": "2026-05-26T15:36:17.659046+00:00",
+ "hipIds": [
+  "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+  "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+  "a9b06108-c130-4ede-8c95-567546d6408d"
+ ],
+ "latestScores": [
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 2.08,
+   "joint_key": "ankle_df",
+   "left_value": 48,
+   "right_value": 47,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": null,
+   "joint_key": "cervical_ext",
+   "left_value": 58,
+   "right_value": null,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": null,
+   "joint_key": "cervical_flex",
+   "left_value": 50,
+   "right_value": null,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 4.55,
+   "joint_key": "cervical_lat",
+   "left_value": 44,
+   "right_value": 42,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 3.7,
+   "joint_key": "hip_abd",
+   "left_value": 54,
+   "right_value": 52,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 1.79,
+   "joint_key": "hip_er",
+   "left_value": 56,
+   "right_value": 55,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 2.78,
+   "joint_key": "hip_flex",
+   "left_value": 72,
+   "right_value": 70,
+   "score": 1
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 3.85,
+   "joint_key": "hip_ir",
+   "left_value": 50,
+   "right_value": 52,
+   "score": 3
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 5.41,
+   "joint_key": "shoulder_er",
+   "left_value": 74,
+   "right_value": 70,
+   "score": 1
+  },
+  {
+   "asymmetry_flag": null,
+   "asymmetry_pct": 2.86,
+   "joint_key": "shoulder_flex",
+   "left_value": 140,
+   "right_value": 136,
+   "score": 2
+  }
+ ],
+ "rows": [
+  {
+   "ankle_df_l": 48,
+   "ankle_df_r": 47,
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "cervical_ext": 58,
+   "cervical_flex": 50,
+   "cervical_lat_l": 44,
+   "cervical_lat_r": 42,
+   "cervical_rot_l": null,
+   "cervical_rot_r": null,
+   "check_kind": "full",
+   "created_at": "2026-11-24T21:12:24.540777+00:00",
+   "hip_abd_l": 54,
+   "hip_abd_r": 52,
+   "hip_er_l": 56,
+   "hip_er_r": 55,
+   "hip_flex_l": 72,
+   "hip_flex_r": 70,
+   "hip_ir_l": 50,
+   "hip_ir_r": 52,
+   "id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "lumbar_ext": null,
+   "lumbar_flex": null,
+   "shoulder_er_l": 74,
+   "shoulder_er_r": 70,
+   "shoulder_flex_l": 140,
+   "shoulder_flex_r": 136,
+   "thoracic_rot": null,
+   "thoracic_rot_l": null,
+   "thoracic_rot_r": null,
+   "worst_joints": [
+    "hip_flex_r",
+    "hip_flex_l",
+    "shoulder_er_r",
+    "shoulder_er_l",
+    "shoulder_flex_r"
+   ]
+  },
+  {
+   "ankle_df_l": 44,
+   "ankle_df_r": 42,
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "cervical_ext": 52,
+   "cervical_flex": 46,
+   "cervical_lat_l": 40,
+   "cervical_lat_r": 38,
+   "cervical_rot_l": null,
+   "cervical_rot_r": null,
+   "check_kind": "full",
+   "created_at": "2026-11-24T21:12:24.540777+00:00",
+   "hip_abd_l": 50,
+   "hip_abd_r": 48,
+   "hip_er_l": 52,
+   "hip_er_r": 50,
+   "hip_flex_l": 60,
+   "hip_flex_r": 58,
+   "hip_ir_l": 46,
+   "hip_ir_r": 49,
+   "id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "lumbar_ext": null,
+   "lumbar_flex": null,
+   "shoulder_er_l": 62,
+   "shoulder_er_r": 58,
+   "shoulder_flex_l": 120,
+   "shoulder_flex_r": 116,
+   "thoracic_rot": null,
+   "thoracic_rot_l": null,
+   "thoracic_rot_r": null,
+   "worst_joints": [
+    "hip_flex_r",
+    "hip_flex_l",
+    "shoulder_er_r",
+    "shoulder_er_l",
+    "shoulder_flex_r"
+   ]
+  },
+  {
+   "ankle_df_l": 48,
+   "ankle_df_r": 48,
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "cervical_ext": 48,
+   "cervical_flex": 48,
+   "cervical_lat_l": 48,
+   "cervical_lat_r": 48,
+   "cervical_rot_l": null,
+   "cervical_rot_r": null,
+   "check_kind": "full",
+   "created_at": "2026-10-04T12:42:12.484858+00:00",
+   "hip_abd_l": 48,
+   "hip_abd_r": 48,
+   "hip_er_l": 48,
+   "hip_er_r": 48,
+   "hip_flex_l": 48,
+   "hip_flex_r": 48,
+   "hip_ir_l": 48,
+   "hip_ir_r": 48,
+   "id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "lumbar_ext": null,
+   "lumbar_flex": null,
+   "shoulder_er_l": 48,
+   "shoulder_er_r": 48,
+   "shoulder_flex_l": 48,
+   "shoulder_flex_r": 48,
+   "thoracic_rot": null,
+   "thoracic_rot_l": null,
+   "thoracic_rot_r": null,
+   "worst_joints": [
+    "shoulder_flex_l",
+    "shoulder_flex_r",
+    "hip_flex_l",
+    "hip_flex_r",
+    "shoulder_er_l"
+   ]
+  }
+ ]
+}
