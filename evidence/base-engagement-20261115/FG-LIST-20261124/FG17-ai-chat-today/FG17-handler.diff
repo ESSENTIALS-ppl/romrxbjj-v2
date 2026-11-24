@@ -1,0 +1,78 @@
+--- ../rollback/live-v104/ai-chat/handler.js	2026-11-24 16:26:10.043521616 -0500
++++ ai-chat/handler.js	2026-11-24 16:26:23.635052516 -0500
+@@ -355,6 +355,28 @@
+   return R(k);
+ }
+ 
++// FG-17 (Nov 24 2026): the Today card rotation from My Protocol (MyProtocol.tsx ROTATION), so "today's protocol" names the
++// same joint as the Today card. Weekday -> index into the top three problem areas. The day is the user's local day: a valid
++// IANA tz from the client if sent, else notification_preferences.timezone, else America/New_York. Only the weekday reaches the prompt.
++const FG17_ROTATION = { 1: 0, 2: 1, 3: 2, 4: 0, 5: 1, 6: 2, 0: 0 };
++const FG17_DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
++function fg17WeekdayIn(tz, now = new Date()) {
++  for (const z of [tz, "America/New_York"]) {
++    if (!z || typeof z !== "string") continue;
++    try {
++      const w = new Intl.DateTimeFormat("en-US", { timeZone: z, weekday: "short" }).format(now);
++      const i = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(w);
++      if (i >= 0) return i;
++    } catch { /* invalid tz: try the next one */ }
++  }
++  return now.getUTCDay();
++}
++function fg17TodayLine(problemAreas, dow) {
++  if (!Number.isInteger(dow) || dow < 0 || dow > 6 || !Array.isArray(problemAreas) || problemAreas.length === 0) return "";
++  const idx = Math.min(FG17_ROTATION[dow], problemAreas.length - 1);
++  return `Today's session (${FG17_DAY_NAMES[dow]}, same as the Today card on My Protocol): ${baseJointLabel(problemAreas[idx])}`;
++}
++
+ /** Base / general athlete prompt: mobility bands, no technique GREEN/YELLOW/RED. */
+ function CBase(n) {
+   const g = n.full_name ?? "Athlete";
+@@ -391,6 +413,7 @@
+   const startLine = problemAreas.length > 0
+     ? `Start here (#1 problem area, same as the #1 card on My Protocol): ${baseJointLabel(problemAreas[0])}`
+     : "Start here (#1 problem area): not available yet";
++  const todayLine = fg17TodayLine(problemAreas, n.today_dow);
+ 
+   return `You are ROMBot, the AI mobility intelligence assistant for ROMRx.
+ 
+@@ -400,7 +423,7 @@
+ Mobility bands from joint scores (1 Needs focus / 2 Building / 3 Steady):
+ ${bandsBlock}
+ Top three problem areas: ${priorityLine}
+-${startLine}
++${startLine}${todayLine ? `\n${todayLine}` : ""}
+ 
+ ## Your measurements (this person's own numbers; OK to share with them)
+ ${formatMeasurements(jointScores, n.rom_total)}
+@@ -429,6 +452,11 @@
+ - Then you may briefly name #2 and #3 as next, in that order, one line each.
+ - Do not pick the #1 from today's rotation or the day's session card. The order is always the top three problem areas order.
+ - Do not hedge or hand the choice back. Never say "your call", "up to you", or "whichever you prefer" for these questions.
++
++## Today questions (today's protocol, today's session, what do I do today, today's plan)
++- Answer with the joint in "Today's session". It is the Today card on My Protocol for today.
++- Give that joint's exercises from the priority mobility protocol (the rows for that joint). Do not swap in the #1 problem area unless it is today's joint.
++- If "Today's session" is not listed, answer from "Start here".
+ - Never say or imply that ROMRx, the daily plan, or ROMBot prevents or reduces injury, lowers your risk, fixes or treats anything, or guarantees anything.
+ - Never say or imply that ROMRx, the daily plan, or ROMBot will improve walking, everyday function, athletic performance, or how you move, or that any result will happen.
+ - The only improvement wording allowed is: "built to help you improve your range of motion. Results vary." Use it only as a description of the daily plan's design, never as a promise. Otherwise say what the plan includes and what the person's results show, using 'matched to your results' and 'built around your results'.
+@@ -1041,6 +1069,17 @@
+           .maybeSingle();
+         // FG-05: earlier assessments (up to 3 before the latest). Reads only this user's rows, no schema change. Flag-gated.
+         const ctx = allowListContext(j);
++        // FG-17: the user's local weekday for the Today card rotation (weekday only; the timezone itself never reaches the prompt).
++        if (isBaseSport(m)) {
++          let tz = typeof o.tz === "string" ? o.tz : null;
++          if (!tz) {
++            try {
++              const { data: np } = await s.from("notification_preferences").select("timezone").eq("user_id", d).maybeSingle();
++              tz = np?.timezone ?? null;
++            } catch { tz = null; }
++          }
++          ctx.today_dow = fg17WeekdayIn(tz);
++        }
+         if (ROMBOT_HISTORY_ON && isBaseSport(m) && j?.latest_assessment_id) {
+           try {
+             const { data: hist } = await s

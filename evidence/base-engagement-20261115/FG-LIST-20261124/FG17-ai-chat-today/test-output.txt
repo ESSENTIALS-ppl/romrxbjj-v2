@@ -1,0 +1,4 @@
+fg17_today: all pass; Tuesday -> right shoulder external rotation
+OPTIONS 200
+{"code":"UNAUTHORIZED_NO_AUTH_HEADER","message":"Missing authorization header"} POST-noauth 401
+existing repo tests own_numbers/hip_flex_unscored: FAIL identically on live v104 and on v105 (stale hip-flex-unscored expectation, pre-existing; not caused by FG-17)

@@ -1,0 +1,52 @@
+diff -ru a/app/src/lib/mobilityBands.ts b/app/src/lib/mobilityBands.ts
+--- a/app/src/lib/mobilityBands.ts	2026-11-24 16:29:18.897003506 -0500
++++ b/app/src/lib/mobilityBands.ts	2026-11-24 16:29:22.908865040 -0500
+@@ -618,6 +618,25 @@
+ }
+ 
+ /**
++ * Score-fix (Nov 24 2026): the same /100 average BEFORE the band clamp (0..100). Used only for the
++ * "vs <date>" change chip, so progress inside a band is not shown as 0 (two Needs focus assessments both clamp to 89).
++ */
++export function mobilityRawScoreForAssessment(assessment: object | null | undefined): number {
++  const rec = (assessment ?? {}) as Record<string, unknown>
++  let sum = 0
++  let n = 0
++  for (const j of ASSESSMENT_JOINTS) {
++    if (isUnscoredJoint(j.key)) continue
++    if (isLumbarKey(j.key)) continue
++    const p = cappedRatioPct(worseSideValue(measuredFor(rec, j)), JOINT_SCORE_TARGETS[j.key])
++    if (p == null) continue
++    sum += p
++    n += 1
++  }
++  return n === 0 ? 100 : Math.floor(sum / n)
++}
++
++/**
+  * Rank badge (#1/#2/#3 Problem area on My Protocol) is coloured by THAT joint's
+  * band (Grant's call 2026-09-24): a solid badge in the band colour. Unmeasured
+  * joints fall back to neutral slate.
+diff -ru a/app/src/pages/MyBody.tsx b/app/src/pages/MyBody.tsx
+--- a/app/src/pages/MyBody.tsx	2026-11-24 16:29:18.905003231 -0500
++++ b/app/src/pages/MyBody.tsx	2026-11-24 16:29:18.917002816 -0500
+@@ -19,6 +19,7 @@
+   formatMeasure,
+   formatScoreBand,
+   mobilityScoreForAssessment,
++  mobilityRawScoreForAssessment,
+   overallBandForAssessment,
+   topProblemAreasForAssessment,
+   BAND_TONE,
+@@ -169,8 +170,9 @@
+ 
+   // Delta vs previous assessment (index 1 = second-newest, since assessments are DESC)
+   const previousAssessment = assessments.length > 1 ? assessments[1] : null
+-  const previousPrs = previousAssessment ? mobilityScoreForAssessment(previousAssessment) : null
+-  const prsDelta = previousPrs != null ? prs - previousPrs : null
++  // Score-fix: the chip compares the unclamped averages, so a gain inside a band shows (the dial keeps the clamped /100).
++  const previousRaw = previousAssessment ? mobilityRawScoreForAssessment(previousAssessment) : null
++  const prsDelta = previousRaw != null ? mobilityRawScoreForAssessment(assessment) - previousRaw : null
+   const previousDateStr = previousAssessment
+     ? new Date(previousAssessment.assessed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+     : null

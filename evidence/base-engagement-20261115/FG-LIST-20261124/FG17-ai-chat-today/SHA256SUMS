@@ -1,0 +1,17 @@
+96e48bf785b3b71c946446e982f874715bef1b78f78f897b9cb5db17402e4536  ./AFTER-RACED-function-list.txt
+00ae4b015571b83760c1a43f1939caa3a5f9e333c2f393fcc90c83cb7aacec96  ./AFTER-function-list.txt
+3982565422bcbdf197dc08ff04b87725f314a12cd878151bef5622d6f3cb35f8  ./BEFORE-function-list.txt
+301a974de093c9bc270d4d94697aa6ab781b0e2453148ab0620399736fec0b40  ./FG17-handler.diff
+472700bfc20111a3b48c16d8ed319eb86ade489eb3654692d8b91252a7e15ec5  ./RECEIPT-FG17-AI-CHAT-TODAY-20261124.md
+f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  ./rollback/live-v104/_shared/rate_limit.ts
+cccca3fa5d0aa5e48eb17435e1a2199fa38d47805d1ba0c63004a6dc0243ca0d  ./rollback/live-v104/ai-chat/handler.js
+728ea3cc03151e9798a2ef75a2b39098f99dbe86874a78bdd9e9cc6b7ac51f70  ./rollback/live-v104/ai-chat/index.ts
+3f6edd253c3b3124c882ed0c590ba66662754fff582dd9086afc344bc35a19ab  ./rollback/live-v104/ai-chat/romood_chat.js
+15021f4419a331abec0de5de23a77966198dfe8d49427548d6eb27526249ec0d  ./rollback/live-v104/ai-chat/romood_tips.js
+f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  ./source/_shared/rate_limit.ts
+df26d7016c1dc9e1f9dc9060698f7f9d26fbeb23411a7e788c3db60865863410  ./source/ai-chat/handler.js
+728ea3cc03151e9798a2ef75a2b39098f99dbe86874a78bdd9e9cc6b7ac51f70  ./source/ai-chat/index.ts
+3f6edd253c3b3124c882ed0c590ba66662754fff582dd9086afc344bc35a19ab  ./source/ai-chat/romood_chat.js
+15021f4419a331abec0de5de23a77966198dfe8d49427548d6eb27526249ec0d  ./source/ai-chat/romood_tips.js
+8dbaf61b9a3c2bebb2d9a8743dc61e84afb2d6da3ee0bd72c11dab65697a3db9  ./test-output.txt
+d3b280784badd0db319056eea2c556f5cb616f74ac2a74a5c6d65c800166ba36  ./test/fg17_today.test.mjs
