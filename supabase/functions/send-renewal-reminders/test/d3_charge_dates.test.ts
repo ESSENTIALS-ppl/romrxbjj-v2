@@ -83,9 +83,15 @@ Deno.test("first-charge text: trial-ending sentence, no 'renews on', cancel how-
   assertEquals(t.includes("We will charge Visa ending 4242 $60 for one more year of ROMRx Base. It renews every year at $60 until you cancel."), true);
   assertEquals(t.includes("Want to stop it? Cancel online anytime before March 1, 2027: https://romrx.io/app/dashboard/settings. You can also email hello@romrx.io with the subject \"Cancel.\""), true);
   assertEquals(/renews on/.test(t), false);
-  assertEquals(firstChargeSubject("March 1, 2027"), "Your ROMRx Base beta launch trial period ends on March 1, 2027");
+  assertEquals(firstChargeSubject("March 1, 2027"), "Your ROMRx Base beta launch trial period ends March 1, 2027");
   const h = buildFirstChargeEmail("Alex", "March 1, 2027", "$60", "Visa ending 4242", "user@example.com");
   assertEquals(h.includes("https://romrx.io/app/dashboard/settings"), true);
   assertEquals(/renews on/.test(h), false);
   assertEquals(cardPhrase(null), "the card on file");
+});
+
+Deno.test("subject equals Stacy Notice B subject (1530, 54ca69e6) exactly; no 'ends on'", () => {
+  const NOTICE_B_SUBJECT = "Your ROMRx Base beta launch trial period ends March 1, 2027";
+  assertEquals(firstChargeSubject("March 1, 2027"), NOTICE_B_SUBJECT);
+  assertEquals(firstChargeSubject("March 1, 2027").includes("ends on"), false);
 });

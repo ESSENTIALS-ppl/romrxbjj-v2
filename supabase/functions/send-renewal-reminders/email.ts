@@ -185,9 +185,9 @@ export function buildBaseText(name: string, plan: string, price: string, daysUnt
 // D3 (2026-11-24): first-charge reminder (the 45, 30 and 2 day sends before the charge that ends the beta launch trial period).
 // Words: Stacy 1414 P6 body with the first sentence replaced per Stacy 1518 concern 15:
 // "Your ROMRx Base beta launch trial period ends on {renewal_date}, and your plan starts automatically." Rest of P6 unchanged.
-// Subject: <STACY CONFIRM> (P6 subject says "renews"; 1518 does not give a first-charge subject).
+// Subject: matches Stacy Notice B subject (STACY-BASE-NOTICES-A-B-FINAL-20261124-1530.md, sha256 54ca69e6), no "on"; Grant 3:42 PM.
 export function firstChargeSubject(date: string): string {
-  return `Your ROMRx Base beta launch trial period ends on ${date}`;
+  return `Your ROMRx Base beta launch trial period ends ${date}`;
 }
 /** {card_brand} ending {last4}; "the card on file" only if Stripe returns no card (<STACY CONFIRM> fallback). */
 export function cardPhrase(card: { brand: string; last4: string } | null): string {
