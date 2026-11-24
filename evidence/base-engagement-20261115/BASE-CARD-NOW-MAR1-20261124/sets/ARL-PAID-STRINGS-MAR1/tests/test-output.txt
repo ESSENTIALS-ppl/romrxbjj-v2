@@ -1,0 +1,9 @@
+running 5 tests from ./supabase/functions/_shared/test/arl_paid_strings.test.ts
+versions are Stacy's ... ok (805µs)
+switch instant is exactly 1803920400 ... ok (189µs)
+D1 and D3 verbatim at $60 ... ok (72µs)
+D4 ack verbatim; keyed on the session version, clock only as fallback ... ok (688µs)
+no trial words in any paid string ... ok (121µs)
+
+ok | 5 passed | 0 failed (8ms)
+

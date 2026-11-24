@@ -1,0 +1,18 @@
+running 9 tests from ./test/l1487.test.ts
+constants ... ok (617µs)
+good sub: no skip flags, no warnings ... ok (300µs)
+skip: not trialing ... ok (99µs)
+skip: trial_end not Jan 1 ... ok (82µs)
+skip: other sub / test mode / cancel / schedule / excluded user ... ok (159µs)
+after check wants Mar 1 ... ok (246µs)
+summary has no PII and cuts ids ... ok (14ms)
+POST sends trial_end, proration none, the idempotency key; key never in body ... ok (6ms)
+webhook sync needs purpose base + user_id (v59 :688) ... ok (192µs)
+running 4 tests from ./test/sql_pglite.test.ts
+migration + insert: one linked row, original untouched, repeat is a no-op ... ok (1s)
+guard: no delete, frozen columns, Notice A fill-once ... ok (710ms)
+rollback is a second appended row, not a delete ... ok (690ms)
+dry-run render has placeholders and fails to run (no accidental insert) ... ok (674ms)
+
+ok | 13 passed | 0 failed (3s)
+

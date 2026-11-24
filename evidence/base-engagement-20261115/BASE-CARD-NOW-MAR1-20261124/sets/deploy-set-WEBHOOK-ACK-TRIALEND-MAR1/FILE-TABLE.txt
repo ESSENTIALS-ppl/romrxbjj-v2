@@ -1,0 +1,12 @@
+FILE-TABLE deploy-set-WEBHOOK-ACK-TRIALEND-MAR1 (stripe-webhook), BUILD ONLY. Built 2026-11-24 3:28 PM EST.
+
+path                                       sha256                                                             vs live v59
+source/index.ts                            9d7fb50282df0f9269120822101d84a8ae88da2ad1529992a87e93293b9655c3   CHANGED (live 0f895087)
+_shared/arl_copy.ts                        cd9b261741642de048a875eb807e2e5e69b67724a7f72bf0817b91b9b0162d74   CHANGED (live 6b550c27)
+_shared/email_footer.ts                    0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b   SAME (live)
+_shared/events.ts                          49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21   SAME (live)
+
+rollback-live-v59/source/index.ts          0f8950872ca0514f34faf20fb7d13733ee4bf9dc410b36c3a166c0a2a25e7a82
+rollback-live-v59/_shared/arl_copy.ts      6b550c279e6a2f7ac7ccce8ecaeee23074c1599d832fd9425b7ee614bb284a31
+rollback-live-v59/_shared/email_footer.ts  0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b
+rollback-live-v59/_shared/events.ts        49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21

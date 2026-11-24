@@ -1,0 +1,25 @@
+# run 2026-11-24 3:27 PM EST branch fix/webhook-ack-trialend-mar1-20261124 @ 7e40a10
+running 4 tests from ./_test/d3/webhook_ack_mar1.test.ts
+arl_copy in the set is exactly cd9b2617 (same bytes as create-checkout-session S1 rev2) ... ok (929µs)
+Base ack renders S8 (ca-arl-3c-2027-03-01-v5) in text and HTML; no Jan 1 / Dec 31 wording ... ok (4ms)
+consent row: trial_end 1803920400 from the subscription, disclosure version from session metadata (v5) ... ok (618µs)
+users.base_expiry on checkout.session.completed is the Stripe period end = 1803920400 ... ok (508µs)
+running 9 tests from ./_test/d3/webhook_trialend.test.ts
+baseline: harness pin is live v59 byte-exact (sha256 0f895087) ... ok (3ms)
+session whose subscription has trial_end 1803920400 writes consent trial_end 2027-03-01T17:00:00.000Z ... ok (3ms)
+live v59 on the same session writes the Jan 1 literal (what this fixes) ... ok (1ms)
+paid at sign-up (no trial) writes trial_end NULL; sport unlock too ... ok (931µs)
+Stripe retrieve fails: trial_end NULL (never a literal), row still written ...
+------- post-test output -------
+subscriptions.retrieve failed sub_mock_1 Error: no subscription mock
+guard: no period end on checkout.session.completed; used 365-day fallback (no existing future expiry) 00000000-0000-4000-8000-000000000001
+subTrialEndIso: subscriptions.retrieve failed Error: no subscription mock
+----- post-test output end -----
+Stripe retrieve fails: trial_end NULL (never a literal), row still written ... ok (1ms)
+late-window trial_end (sign-up + 48h10m) is copied exactly ... ok (351µs)
+every other column of the consent row and every other call is unchanged vs live v59 ... ok (1ms)
+customer.subscription.updated after the L1487 move sets users.base_expiry to Mar 1 (unchanged code path) ... ok (479µs)
+no 1798822800 literal left in the webhook ... ok (281µs)
+
+ok | 13 passed | 0 failed (134ms)
+

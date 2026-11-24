@@ -1,0 +1,14 @@
+SURVIVED	CONTROL (no change; must SURVIVE)
+KILLED	rr: consent first again
+KILLED	rr: past base_expiry falls back
+KILLED	rr: > to >= on base_expiry
+KILLED	rr: first_charge always false
+KILLED	rr: first-charge window 400 days
+KILLED	rr: wording renews
+KILLED	rr: cancel how-to dropped
+KILLED	rr: 45-day window 46
+KILLED	wh: literal back
+KILLED	wh: helper ignores trial_end
+KILLED	wh: failure writes Jan 1
+KILLED	wh: sport site drops trial arg
+12/12 killed (control must SURVIVE)

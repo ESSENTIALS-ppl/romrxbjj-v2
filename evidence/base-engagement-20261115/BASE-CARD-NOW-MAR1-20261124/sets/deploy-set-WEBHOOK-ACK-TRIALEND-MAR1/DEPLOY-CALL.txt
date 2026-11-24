@@ -1,0 +1,31 @@
+deploy-set-WEBHOOK-ACK-TRIALEND-MAR1: stripe-webhook. STAGED ONLY. DO NOT DEPLOY without a pin, a Vera precheck and Sable's release.
+Branch fix/webhook-ack-trialend-mar1-20261124, tip 7e40a102a484a463b40dd3804bd01f218c9dae7d (on baseline b5ae1a4 = live v59 byte-exact).
+
+MCP (Supabase) deploy_edge_function, by name, from THIS folder's files (never from main):
+  project_id: cqzvqzwwevnflinxgnpp
+  name: stripe-webhook
+  entrypoint_path: source/index.ts
+  verify_jwt: false            (same as live v59; Stripe calls it with a signature, not a JWT)
+  import_map_path: none        (live import_map false)
+  files (4, same names as live v59):
+    source/index.ts         (this folder)
+    _shared/arl_copy.ts     (this folder; sha256 cd9b2617..., identical bytes to create-checkout-session S1 rev2)
+    _shared/email_footer.ts (= live v59)
+    _shared/events.ts       (= live v59)
+
+Order: create-checkout-session S1 rev2 (same arl_copy cd9b2617) and this webhook go back to back, checkout first, webhook within minutes.
+A session created by S1 rev2 that completes before this deploy gets the v59 ack (Jan 1 wording) and a Jan 1 consent trial_end:
+post-check query below finds it.
+
+BEFORE (plan): list_edge_functions -> stripe-webhook v59, ezbr 3c60342df64e5fed71d945683faf07ec0c2a291e69f3b59d86878685a3fe43e0, verify_jwt false
+  (captured 3:24 PM ET in BEFORE-function-list.txt, 42 functions; RECAPTURE immediately before deploy and stop if anything differs).
+AFTER (plan): list_edge_functions -> stripe-webhook v60, new ezbr, verify_jwt false, still 42 functions, every other row unchanged;
+  get_edge_function stripe-webhook -> the 4 file sha256 values in FILE-TABLE.txt must match.
+Post-check (read-only SQL, no customer data printed):
+  select disclosure_text_version, count(*), min(trial_end), max(trial_end) from billing_consents where checkout_created_at > '<deploy time>' group by 1;
+  expect ca-arl-3b-2027-03-01-v5 rows with trial_end 2027-03-01 17:00 UTC (or the late-window value), never 2027-01-01.
+
+ROLLBACK: deploy_edge_function name stripe-webhook, entrypoint source/index.ts, verify_jwt false, files from rollback-live-v59/
+  (source/index.ts 0f895087, _shared/arl_copy.ts 6b550c27, _shared/email_footer.ts 0f9d1019, _shared/events.ts 49f18652)
+  = live v59 ezbr 3c60342df64e5fed71d945683faf07ec0c2a291e69f3b59d86878685a3fe43e0 (git da087bb / b5ae1a4). Verify get_edge_function hashes after.
+  Note: a redeploy gets a new version number; the file hashes are what must match v59.

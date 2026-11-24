@@ -1,0 +1,186 @@
+--- 1-send-renewal-reminders/rollback-live-v32/source/logic.ts	2026-11-24 15:25:06.033981624 -0500
++++ 1-send-renewal-reminders/source/logic.ts	2026-11-24 15:25:06.029981762 -0500
+@@ -42,6 +42,7 @@
+   charge_at: string; // ISO instant
+   charge_date: string; // YYYY-MM-DD in America/New_York; stored in renewal_reminders.subscription_expiry
+   amount_cents: number;
++  first_charge: boolean; // D3: the charge that ends the beta launch trial period (Stacy 1518 concern 15 wording)
+ }
+ 
+ export const BASE_AMOUNT_CENTS = 6000; // locked Legal terms: $60 per year
+@@ -72,17 +73,30 @@
+   return null; // more than 45 days out
+ }
+ 
+-/** Base charge instant: latest future trial_end on a consent for this subscription, else base_expiry. */
++/** Base charge instant. D3 (2026-11-24): prefer users.base_expiry, which stripe-webhook copies from the Stripe subscription
++ *  (current_period_end, then items[0], then trial_end; for a trialing sub that is Stripe's trial_end), so it follows a moved
++ *  trial_end. billing_consents.trial_end (the as-disclosed record) is used only when base_expiry is NULL. */
+ export function chargeAt(row: CandidateRow, now: Date): { at: string; amount: number } | null {
+   const mine = row.consents.filter((c) => c.stripe_subscription_id && c.stripe_subscription_id === row.base_stripe_subscription_id && c.offer !== "sport");
+   const trial = mine.filter((c) => c.trial_end && Date.parse(c.trial_end) > now.getTime())
+     .sort((a, b) => Date.parse(b.trial_end!) - Date.parse(a.trial_end!))[0];
+   const amount = (trial ?? mine[0])?.amounts?.[0] ?? BASE_AMOUNT_CENTS;
++  if (row.base_expiry) return Date.parse(row.base_expiry) > now.getTime() ? { at: new Date(row.base_expiry).toISOString(), amount } : null;
+   if (trial) return { at: new Date(trial.trial_end!).toISOString(), amount };
+-  if (row.base_expiry && Date.parse(row.base_expiry) > now.getTime()) return { at: new Date(row.base_expiry).toISOString(), amount };
+   return null;
+ }
+ 
++/** D3 (2026-11-24): true when this charge ends a free trial. The subscription's consent carries a trial_end and the charge
++ *  falls within 180 days of it (a moved trial, e.g. Jan 1 -> Mar 1, 2027, or the late window). A yearly renewal (365 days
++ *  or more after the trial ended) is not a first charge. */
++export const FIRST_CHARGE_MAX_DAYS_AFTER_CONSENT_TRIAL_END = 180;
++export function isFirstCharge(row: CandidateRow, chargeAtIso: string): boolean {
++  const at = Date.parse(chargeAtIso);
++  return row.consents.some((c) => c.stripe_subscription_id && c.stripe_subscription_id === row.base_stripe_subscription_id
++    && c.offer !== "sport" && c.trial_end && at >= Date.parse(c.trial_end) - 86400000
++    && at - Date.parse(c.trial_end) <= FIRST_CHARGE_MAX_DAYS_AFTER_CONSENT_TRIAL_END * 86400000);
++}
++
+ /** v6 (FG-35): explicit legacy check. Does not rely on base_expiry or any date being null. */
+ export function legacyReason(row: CandidateRow): string | null {
+   if (row.grandfathered_at) return "legacy_grandfathered";
+@@ -118,7 +132,7 @@
+     const w = windowFor(daysUntil);
+     if (!w) { skipped.not_in_window = (skipped.not_in_window ?? 0) + 1; continue; }
+     due.push({ user_id: r.id, email: r.email, full_name: r.full_name, active_sport: r.active_sport, type: w.type, label: w.label,
+-      days_until: daysUntil, charge_at: c.at, charge_date: chargeDate, amount_cents: c.amount });
++      days_until: daysUntil, charge_at: c.at, charge_date: chargeDate, amount_cents: c.amount, first_charge: isFirstCharge(r, c.at) });
+   }
+   return { due, skipped };
+ }
+@@ -128,6 +142,12 @@
+   return `${u.slice(0, 2)}***@${d ?? ""}`;
+ }
+ 
++/** "$60" (P6 {price}). */
++export function formatUsd(cents: number): string {
++  const d = cents / 100;
++  return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
++}
++
+ export function formatUsdYear(cents: number): string {
+   const d = cents / 100;
+   return `$${Number.isInteger(d) ? d : d.toFixed(2)}/yr`;
+--- 1-send-renewal-reminders/rollback-live-v32/source/index.ts	2026-11-24 15:25:06.029981762 -0500
++++ 1-send-renewal-reminders/source/index.ts	2026-11-24 15:25:06.025981900 -0500
+@@ -9,12 +9,25 @@
+ // so replies land in the unified inbox).
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ import { createClient } from "jsr:@supabase/supabase-js@2";
+-import { type CandidateRow, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
+-import { type Brand, brandFor, buildBaseEmail, buildBaseText, buildEmail, subjectFor } from "./email.ts";
++import { type CandidateRow, formatUsd, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
++import { type Brand, brandFor, buildBaseEmail, buildBaseText, buildEmail, subjectFor, buildFirstChargeEmail, buildFirstChargeText, cardPhrase, firstChargeSubject } from "./email.ts";
+ 
+ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
++// D3: read-only Stripe GET for the first-charge reminder's "{card_brand} ending {last4}". Same secret names as stripe-webhook; never logged.
++const STRIPE_SECRET = (Deno.env.get("STRIPE_SECRET_KEY") || Deno.env.get("stripe_secret_key") || "").trim();
++async function cardOnFile(subId: string): Promise<{ brand: string; last4: string } | null> {
++  if (!STRIPE_SECRET) return null;
++  try {
++    const r = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subId)}?expand[]=default_payment_method`, {
++      headers: { Authorization: `Bearer ${STRIPE_SECRET}` },
++    });
++    if (!r.ok) { console.error("cardOnFile: stripe status", r.status); return null; }
++    const card = (await r.json())?.default_payment_method?.card;
++    return card?.brand && card?.last4 ? { brand: String(card.brand), last4: String(card.last4) } : null;
++  } catch (e) { console.error("cardOnFile failed", String(e)); return null; }
++}
+ 
+ async function cronCallerOk(req: Request): Promise<boolean> {
+   const got = (req.headers.get("x-cron-secret") ?? "").trim();
+@@ -72,7 +85,7 @@
+   const sendOn = sendEnabled(Deno.env.get("RENEWAL_BASE_SEND"));
+   if (dryRun || !sendOn) {
+     return json({ success: true, dry_run: true, send_enabled: sendOn, date: now.toISOString(), skipped,
+-      due: due.map((d) => ({ email: maskEmail(d.email), type: d.type, days_until: d.days_until, charge_date: d.charge_date })) });
++      due: due.map((d) => ({ email: maskEmail(d.email), type: d.type, days_until: d.days_until, charge_date: d.charge_date, first_charge: d.first_charge })) });
+   }
+ 
+   for (const d of due) {
+@@ -89,11 +102,19 @@
+     const price = formatUsdYear(d.amount_cents);
+     const expiryFormatted = new Date(d.charge_at).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" });
+     const firstName = (d.full_name ?? d.email).split(" ")[0];
+-    const subject = subjectFor(brand, d.days_until, d.label);
++    const subject = d.first_charge ? firstChargeSubject(expiryFormatted) : subjectFor(brand, d.days_until, d.label);
+     // Renewal reminders are required account notices: no unsubscribe link, and marketing_opt_out never blocks them (Grant, 2026-10-04).
+     // 2026-11-15: Base-only recipients (active_sport not exactly "bjj"/"bodybuilding") get the ROMRx Base email with a text part;
+     // sport recipients get the unchanged v26 email. Base greets "there" when no name is on file (v26 used the email address).
+-    const sent = brand.key === "base"
++    // D3: the sends before the charge that ends the beta launch trial period use Stacy's first-charge wording (any brand).
++    const subId = String(users?.find((u) => u.id === d.user_id)?.base_stripe_subscription_id ?? "");
++    const card = d.first_charge ? cardPhrase(await cardOnFile(subId)) : "";
++    const greet = d.full_name ? firstName : "there";
++    const sent = d.first_charge
++      ? await sendEmail(brandFor(null), d.email, subject,
++        buildFirstChargeEmail(greet, expiryFormatted, formatUsd(d.amount_cents), card, d.email),
++        buildFirstChargeText(greet, expiryFormatted, formatUsd(d.amount_cents), card))
++      : brand.key === "base"
+       ? await sendEmail(brand, d.email, subject,
+         buildBaseEmail(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email),
+         buildBaseText(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email))
+--- 1-send-renewal-reminders/rollback-live-v32/source/email.ts	2026-11-24 15:25:06.033981624 -0500
++++ 1-send-renewal-reminders/source/email.ts	2026-11-24 15:25:06.033981624 -0500
+@@ -181,3 +181,57 @@
+     `This message was sent to ${email}.`,
+   ].join("\n");
+ }
++
++// D3 (2026-11-24): first-charge reminder (the 45, 30 and 2 day sends before the charge that ends the beta launch trial period).
++// Words: Stacy 1414 P6 body with the first sentence replaced per Stacy 1518 concern 15:
++// "Your ROMRx Base beta launch trial period ends on {renewal_date}, and your plan starts automatically." Rest of P6 unchanged.
++// Subject: <STACY CONFIRM> (P6 subject says "renews"; 1518 does not give a first-charge subject).
++export function firstChargeSubject(date: string): string {
++  return `Your ROMRx Base beta launch trial period ends on ${date}`;
++}
++/** {card_brand} ending {last4}; "the card on file" only if Stripe returns no card (<STACY CONFIRM> fallback). */
++export function cardPhrase(card: { brand: string; last4: string } | null): string {
++  if (!card) return "the card on file";
++  const b = card.brand.toLowerCase() === "amex" ? "American Express" : card.brand.charAt(0).toUpperCase() + card.brand.slice(1);
++  return `${b} ending ${card.last4}`;
++}
++export function firstChargeParagraphs(firstName: string, date: string, price: string, card: string): string[] {
++  return [
++    `Hi ${firstName},`,
++    `Your ROMRx Base beta launch trial period ends on ${date}, and your plan starts automatically. We will charge ${card} ${price} for one more year of ROMRx Base. It renews every year at ${price} until you cancel.`,
++    `Want to stop it? Cancel online anytime before ${date}: ${BASE_MANAGE_URL}. You can also email ${BASE_SUPPORT_EMAIL} with the subject "Cancel."`,
++    "Canceling ends your access right away. All sales are final. We do not refund charges already made, except where the law requires a refund.",
++    `Questions? Reply to this email or write to ${BASE_SUPPORT_EMAIL}.`,
++    `${POSTAL_LINE}. Full terms: ${BASE_LEGAL_URL}`,
++  ];
++}
++export function buildFirstChargeText(firstName: string, date: string, price: string, card: string): string {
++  return firstChargeParagraphs(firstName, date, price, card).join("\n\n");
++}
++export function buildFirstChargeEmail(firstName: string, date: string, price: string, card: string, email: string): string {
++  const link = (t: string) => t.replace(BASE_MANAGE_URL, `<a href="${BASE_MANAGE_URL}" style="color:#0047AB;">${BASE_MANAGE_URL}</a>`)
++    .replace(`Full terms: ${BASE_LEGAL_URL}`, `Full terms: <a href="${BASE_LEGAL_URL}" style="color:#0047AB;">${BASE_LEGAL_URL}</a>`);
++  const ps = firstChargeParagraphs(esc(firstName), esc(date), esc(price), esc(card)).map(link);
++  const last = ps.pop()!;
++  return `<!DOCTYPE html>
++<html lang="en">
++<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${esc(firstChargeSubject(date))}</title></head>
++<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
++  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:32px 0;">
++    <tr><td align="center">
++      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;max-width:600px;width:100%;">
++        <tr><td style="background-color:#0047AB;padding:24px 32px;">
++          <h1 style="color:#ffffff;font-size:22px;margin:0;font-weight:700;">${BRAND_BASE.brandHtml}</h1>
++        </td></tr>
++        <tr><td style="padding:32px;">
++${ps.map((p) => `          <p style="font-size:16px;color:#333333;line-height:1.55;margin:0 0 16px 0;">${p}</p>`).join("\n")}
++        </td></tr>
++        <tr><td style="background-color:#f9f9f9;padding:20px 32px;border-top:1px solid #eeeeee;">
++          <p style="font-size:12px;color:#666666;margin:0;line-height:1.6;text-align:center;">${last}<br />This message was sent to ${esc(email)}.</p>
++        </td></tr>
++      </table>
++    </td></tr>
++  </table>
++</body>
++</html>`;
++}

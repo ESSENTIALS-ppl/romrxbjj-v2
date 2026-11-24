@@ -1,0 +1,29 @@
+D3-WEBHOOK-TRIALEND: send-renewal-reminders. STAGED ONLY. DO NOT DEPLOY without a pin, a Vera precheck and Sable's release.
+(The webhook half of D3 is in the combined set ../deploy-set-WEBHOOK-ACK-TRIALEND-MAR1, per Grant 3:25 PM. The old 2-stripe-webhook folder was removed before hashing.)
+Branch fix/base-d3-webhook-trialend-20261124, tip 11821b856f801830b8ff5550abd2a6c3f4b38d91 (on main 4ea5edd7, which = live v32 for this function).
+
+MCP (Supabase) deploy_edge_function, by name, from THIS folder's 1-send-renewal-reminders/ files (never from main):
+  project_id: cqzvqzwwevnflinxgnpp
+  name: send-renewal-reminders
+  entrypoint_path: source/index.ts
+  verify_jwt: false            (same as live v32; cronCallerOk does the caller check)
+  import_map: none             (live import_map false)
+  files (4, same names as live v32): source/index.ts, source/logic.ts, source/email.ts, _shared/email_footer.ts (= live)
+
+BEFORE (plan): send-renewal-reminders v32, ezbr 3bcc783c19962ebd2ce0e0e207b37f089a79fca8e729015706010b08c50acf22, verify_jwt false
+  (BEFORE-function-list.txt, 3:24 PM ET, 42 functions; recapture right before deploy and stop on any difference).
+AFTER (plan): v33, new ezbr, verify_jwt false, 42 functions, all other rows unchanged; get_edge_function hashes = FILE-TABLE.txt.
+Post-check (read-only): invoke is NOT part of this step (cron job 1 caab15b0 runs 7:00 AM ET; do not hand-invoke without Sable's OK).
+  Vera reads the code by hash and the renders in renders/. After L1487 + webhook sync, read-only SQL:
+  select to_char(base_expiry at time zone 'America/New_York','YYYY-MM-DD HH24:MI') from users where id::text like '21647e5a%';  -> 2027-03-01 12:00
+  and renewal_reminders has no new row for 2027-01-01 after the next 7:00 AM ET run.
+
+ROLLBACK: deploy_edge_function name send-renewal-reminders, entrypoint source/index.ts, verify_jwt false, files from
+  1-send-renewal-reminders/rollback-live-v32/ (index 6979f0da, logic 1741f4b7, email e629702b, email_footer 0f9d1019)
+  = live v32 ezbr 3bcc783c19962ebd2ce0e0e207b37f089a79fca8e729015706010b08c50acf22 (= main 4ea5edd7, PR #96).
+
+REQUIRED ORDER (Grant 3:16 PM; deadline Mon Nov 30, 2026, 6:00 PM ET, all live AND Vera post-checked):
+  1. this set (D3 renewal)   2. deploy-set-WEBHOOK-ACK-TRIALEND-MAR1 (with create-checkout-session S1 rev2 right before it)
+  3. Vera trial_end post-check   4. L1487-SUB-MOVE (live sub only)   5. Vera post-check of L1487 (base_expiry Mar 1; no Dec 2 send)
+  If step 4 slips past Wed Dec 2, 7:00 AM ET with this set live, the 30-day email to the live sub would go out with the NEW
+  trial-ending wording but still name January 1, 2027 (base_expiry not yet moved). So L1487 must precede Dec 2, 7:00 AM ET.

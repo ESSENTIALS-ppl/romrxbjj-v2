@@ -1,0 +1,33 @@
+# run 2026-11-24 3:25 PM EST branch fix/base-d3-webhook-trialend-20261124 @ 11821b8; deno 2.9.7
+running 9 tests from ./_test/d3/webhook_trialend.test.ts
+baseline: harness pin is live v59 byte-exact (sha256 0f895087) ... ok (4ms)
+session whose subscription has trial_end 1803920400 writes consent trial_end 2027-03-01T17:00:00.000Z ... ok (5ms)
+live v59 on the same session writes the Jan 1 literal (what this fixes) ... ok (3ms)
+paid at sign-up (no trial) writes trial_end NULL; sport unlock too ... ok (1ms)
+Stripe retrieve fails: trial_end NULL (never a literal), row still written ...
+------- output -------
+subscriptions.retrieve failed sub_mock_1 Error: no subscription mock
+guard: no period end on checkout.session.completed; used 365-day fallback (no existing future expiry) 00000000-0000-4000-8000-000000000001
+subTrialEndIso: subscriptions.retrieve failed Error: no subscription mock
+----- output end -----
+Stripe retrieve fails: trial_end NULL (never a literal), row still written ... ok (4ms)
+late-window trial_end (sign-up + 48h10m) is copied exactly ... ok (746µs)
+every other column of the consent row and every other call is unchanged vs live v59 ... ok (2ms)
+customer.subscription.updated after the L1487 move sets users.base_expiry to Mar 1 (unchanged code path) ... ok (508µs)
+no 1798822800 literal left in the webhook ... ok (351µs)
+running 10 tests from ./send-renewal-reminders/test/d3_charge_dates.test.ts
+moved sub (base_expiry Mar 1 from webhook, consent still Jan 1): sends Jan 15, Jan 30, Feb 27, 2027 at 7:00 AM ET, NOT Dec 2 ... ok (25ms)
+control: unmoved sub (base_expiry Jan 1) still sends Dec 2 and Dec 30, 2026 ... ok (4ms)
+new checkout from D3 webhook: consent 1803920400 and base_expiry 1803920400 give the same three dates ... ok (12ms)
+fallback: base_expiry NULL uses consent trial_end ... ok (135µs)
+base_expiry wins over a future consent trial_end, and a past base_expiry means no date (no consent fallback) ... ok (213µs)
+amount stays $60 (6000) from the consent ... ok (135µs)
+boundary: 45-day window opens on Jan 15 (46 days out on Jan 14 = none), 2-day on Feb 27 ... ok (769µs)
+P6 renewal Mar 1, 2028 (1835542800): Jan 16, Jan 31, Feb 28, 2028 ... ok (10ms)
+the three moved sends are first_charge; the Mar 1, 2028 renewal is not ... ok (933µs)
+first-charge text: trial-ending sentence, no 'renews on', cancel how-to, $60, March 1, 2027 ... ok (293µs)
+running 1 test from ./send-renewal-reminders/test/live_v32_bug.test.ts
+live v32: moved sub (base_expiry Mar 1, consent Jan 1) still sends Dec 2, 2026 (the bug D3 fixes) ... ok (6ms)
+
+ok | 20 passed | 0 failed (273ms)
+

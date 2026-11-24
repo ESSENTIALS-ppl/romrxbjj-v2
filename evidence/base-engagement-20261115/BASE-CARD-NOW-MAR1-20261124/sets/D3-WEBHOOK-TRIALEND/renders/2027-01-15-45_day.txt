@@ -1,0 +1,16 @@
+To: user@example.com
+From: ROMRx <hello@romrx.io>
+Subject: Your ROMRx Base beta launch trial period ends on March 1, 2027
+Send: 2027-01-15 7:00 AM ET (cron 12:00 UTC)
+
+Hi Alex,
+
+Your ROMRx Base beta launch trial period ends on March 1, 2027, and your plan starts automatically. We will charge Visa ending 4242 $60 for one more year of ROMRx Base. It renews every year at $60 until you cancel.
+
+Want to stop it? Cancel online anytime before March 1, 2027: https://romrx.io/app/dashboard/settings. You can also email hello@romrx.io with the subject "Cancel."
+
+Canceling ends your access right away. All sales are final. We do not refund charges already made, except where the law requires a refund.
+
+Questions? Reply to this email or write to hello@romrx.io.
+
+ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774. Full terms: https://romrx.io/legal

@@ -1,0 +1,9 @@
+SURVIVED	CONTROL (no change; must SURVIVE)
+KILLED	wh: literal back
+KILLED	wh: helper ignores trial_end
+KILLED	wh: failure writes Jan 1
+KILLED	wh: sport site literal
+KILLED	arl: ack version v3
+KILLED	arl: S8 first-charge line
+KILLED	arl: S8 reminders line old
+7/7 killed (control must SURVIVE)
