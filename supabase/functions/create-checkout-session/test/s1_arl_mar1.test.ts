@@ -65,9 +65,9 @@ Deno.test("S1 Stacy rule: free-until line carries charge, renewal, and cancel", 
   assert(t.includes("Cancel online anytime in Settings"));
 });
 
-Deno.test("S1 does not change pack lines, consent, ack version, or trial_end", () => {
+Deno.test("S1/rev2: pack lines, consent, and trial_end unchanged", () => {
   assertEquals(ARL_CONSENT_TEXT, "I agree that my plan renews automatically at the price shown until I cancel.");
-  assertEquals(ARL_ACK_VERSION, "ca-arl-3c-2026-09-29-v3");
+  assertEquals(ARL_ACK_VERSION, "ca-arl-3c-2027-03-01-v5");
   assertEquals(BETA_TRIAL_END_UNIX, 1803920400);
   assertEquals(PACKS_EARLIEST_OPEN_UNIX, 1803920400);
   const combo = disclosureCombo("$60", "$149", "ROMRx+BJJ");

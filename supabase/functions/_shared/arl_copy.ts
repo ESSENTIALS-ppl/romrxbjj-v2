@@ -10,7 +10,7 @@
 import { POSTAL_LINE } from "./email_footer.ts";
 
 export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2027-03-01-v5";
-export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
+export const ARL_ACK_VERSION = "ca-arl-3c-2027-03-01-v5";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
 export const BETA_TRIAL_END_UNIX = 1803920400;
@@ -63,16 +63,32 @@ export function ackSubject(): string {
 
 export function ackLines(basePrice: string, sportPack?: string | null, sportPrice?: string | null): string[] {
   const combo = !!(sportPack && sportPrice);
+  // Pack/combo ack output is unchanged (packs closed; pack lines out of this rev).
+  if (combo) {
+    return [
+      `Plan: ROMRx Base + ${sportPack}`,
+      "Free period: now through December 31, 2026. You will not be charged during the free period.",
+      `After the free period: ${basePrice} per year for Base plus ${sportPrice} per year for ${sportPack}, charged to your card on file on January 1, 2027.`,
+      "Renewal: your plan renews automatically every year at the same price until you cancel. We will tell you before any price change.",
+      `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
+      "Cancel before January 1, 2027 and you will not be charged anything.",
+      "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+      "Canceling Base also cancels any sport packs.",
+      "Reminders: we will email you before your free period ends and before each yearly renewal.",
+    ];
+  }
+  // S8 Base ack, verbatim from Stacy string set (ca-arl-3c-2027-03-01-v5, fixed-date).
+  // Cascade line stays: code still cascades Base cancel to packs (Stacy: may stay while true).
   return [
-    `Plan: ROMRx Base${combo ? ` + ${sportPack}` : ""}`,
-    "Free period: now through December 31, 2026. You will not be charged during the free period.",
-    `After the free period: ${basePrice} per year for Base${combo ? ` plus ${sportPrice} per year for ${sportPack}` : ""}, charged to your card on file on January 1, 2027.`,
-    "Renewal: your plan renews automatically every year at the same price until you cancel. We will tell you before any price change.",
-    `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
-    "Cancel before January 1, 2027 and you will not be charged anything.",
+    "Plan: ROMRx Base",
+    "Beta launch trial period: free until March 1, 2027.",
+    `First charge: ${basePrice} on March 1, 2027, for one year of ROMRx Base. No charge before then.`,
+    `Renewal: your plan renews automatically every year on March 1 at ${basePrice} until you cancel. We will tell you before any price change.`,
+    "How to cancel: cancel online anytime at https://romrx.io/app/dashboard/settings or in the app under Settings > Subscription > Cancel subscription. You can also email hello@romrx.io with the subject \"Cancel.\"",
+    "Cancel before March 1, 2027 and you will not be charged anything.",
     "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
     "Canceling Base also cancels any sport packs.",
-    "Reminders: we will email you before your free period ends and before each yearly renewal.",
+    "Reminders: we will email you before your first charge and before each yearly renewal.",
   ];
 }
 
