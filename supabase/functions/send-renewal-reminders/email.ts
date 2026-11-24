@@ -181,3 +181,57 @@ export function buildBaseText(name: string, plan: string, price: string, daysUnt
     `This message was sent to ${email}.`,
   ].join("\n");
 }
+
+// D3 (2026-11-24): first-charge reminder (the 45, 30 and 2 day sends before the charge that ends the beta launch trial period).
+// Words: Stacy 1414 P6 body with the first sentence replaced per Stacy 1518 concern 15:
+// "Your ROMRx Base beta launch trial period ends on {renewal_date}, and your plan starts automatically." Rest of P6 unchanged.
+// Subject: <STACY CONFIRM> (P6 subject says "renews"; 1518 does not give a first-charge subject).
+export function firstChargeSubject(date: string): string {
+  return `Your ROMRx Base beta launch trial period ends on ${date}`;
+}
+/** {card_brand} ending {last4}; "the card on file" only if Stripe returns no card (<STACY CONFIRM> fallback). */
+export function cardPhrase(card: { brand: string; last4: string } | null): string {
+  if (!card) return "the card on file";
+  const b = card.brand.toLowerCase() === "amex" ? "American Express" : card.brand.charAt(0).toUpperCase() + card.brand.slice(1);
+  return `${b} ending ${card.last4}`;
+}
+export function firstChargeParagraphs(firstName: string, date: string, price: string, card: string): string[] {
+  return [
+    `Hi ${firstName},`,
+    `Your ROMRx Base beta launch trial period ends on ${date}, and your plan starts automatically. We will charge ${card} ${price} for one more year of ROMRx Base. It renews every year at ${price} until you cancel.`,
+    `Want to stop it? Cancel online anytime before ${date}: ${BASE_MANAGE_URL}. You can also email ${BASE_SUPPORT_EMAIL} with the subject "Cancel."`,
+    "Canceling ends your access right away. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+    `Questions? Reply to this email or write to ${BASE_SUPPORT_EMAIL}.`,
+    `${POSTAL_LINE}. Full terms: ${BASE_LEGAL_URL}`,
+  ];
+}
+export function buildFirstChargeText(firstName: string, date: string, price: string, card: string): string {
+  return firstChargeParagraphs(firstName, date, price, card).join("\n\n");
+}
+export function buildFirstChargeEmail(firstName: string, date: string, price: string, card: string, email: string): string {
+  const link = (t: string) => t.replace(BASE_MANAGE_URL, `<a href="${BASE_MANAGE_URL}" style="color:#0047AB;">${BASE_MANAGE_URL}</a>`)
+    .replace(`Full terms: ${BASE_LEGAL_URL}`, `Full terms: <a href="${BASE_LEGAL_URL}" style="color:#0047AB;">${BASE_LEGAL_URL}</a>`);
+  const ps = firstChargeParagraphs(esc(firstName), esc(date), esc(price), esc(card)).map(link);
+  const last = ps.pop()!;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${esc(firstChargeSubject(date))}</title></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;max-width:600px;width:100%;">
+        <tr><td style="background-color:#0047AB;padding:24px 32px;">
+          <h1 style="color:#ffffff;font-size:22px;margin:0;font-weight:700;">${BRAND_BASE.brandHtml}</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+${ps.map((p) => `          <p style="font-size:16px;color:#333333;line-height:1.55;margin:0 0 16px 0;">${p}</p>`).join("\n")}
+        </td></tr>
+        <tr><td style="background-color:#f9f9f9;padding:20px 32px;border-top:1px solid #eeeeee;">
+          <p style="font-size:12px;color:#666666;margin:0;line-height:1.6;text-align:center;">${last}<br />This message was sent to ${esc(email)}.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}

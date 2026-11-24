@@ -42,6 +42,7 @@ export interface Reminder {
   charge_at: string; // ISO instant
   charge_date: string; // YYYY-MM-DD in America/New_York; stored in renewal_reminders.subscription_expiry
   amount_cents: number;
+  first_charge: boolean; // D3: the charge that ends the beta launch trial period (Stacy 1518 concern 15 wording)
 }
 
 export const BASE_AMOUNT_CENTS = 6000; // locked Legal terms: $60 per year
@@ -72,15 +73,28 @@ export function windowFor(daysUntil: number) {
   return null; // more than 45 days out
 }
 
-/** Base charge instant: latest future trial_end on a consent for this subscription, else base_expiry. */
+/** Base charge instant. D3 (2026-11-24): prefer users.base_expiry, which stripe-webhook copies from the Stripe subscription
+ *  (current_period_end, then items[0], then trial_end; for a trialing sub that is Stripe's trial_end), so it follows a moved
+ *  trial_end. billing_consents.trial_end (the as-disclosed record) is used only when base_expiry is NULL. */
 export function chargeAt(row: CandidateRow, now: Date): { at: string; amount: number } | null {
   const mine = row.consents.filter((c) => c.stripe_subscription_id && c.stripe_subscription_id === row.base_stripe_subscription_id && c.offer !== "sport");
   const trial = mine.filter((c) => c.trial_end && Date.parse(c.trial_end) > now.getTime())
     .sort((a, b) => Date.parse(b.trial_end!) - Date.parse(a.trial_end!))[0];
   const amount = (trial ?? mine[0])?.amounts?.[0] ?? BASE_AMOUNT_CENTS;
+  if (row.base_expiry) return Date.parse(row.base_expiry) > now.getTime() ? { at: new Date(row.base_expiry).toISOString(), amount } : null;
   if (trial) return { at: new Date(trial.trial_end!).toISOString(), amount };
-  if (row.base_expiry && Date.parse(row.base_expiry) > now.getTime()) return { at: new Date(row.base_expiry).toISOString(), amount };
   return null;
+}
+
+/** D3 (2026-11-24): true when this charge ends a free trial. The subscription's consent carries a trial_end and the charge
+ *  falls within 180 days of it (a moved trial, e.g. Jan 1 -> Mar 1, 2027, or the late window). A yearly renewal (365 days
+ *  or more after the trial ended) is not a first charge. */
+export const FIRST_CHARGE_MAX_DAYS_AFTER_CONSENT_TRIAL_END = 180;
+export function isFirstCharge(row: CandidateRow, chargeAtIso: string): boolean {
+  const at = Date.parse(chargeAtIso);
+  return row.consents.some((c) => c.stripe_subscription_id && c.stripe_subscription_id === row.base_stripe_subscription_id
+    && c.offer !== "sport" && c.trial_end && at >= Date.parse(c.trial_end) - 86400000
+    && at - Date.parse(c.trial_end) <= FIRST_CHARGE_MAX_DAYS_AFTER_CONSENT_TRIAL_END * 86400000);
 }
 
 /** v6 (FG-35): explicit legacy check. Does not rely on base_expiry or any date being null. */
@@ -118,7 +132,7 @@ export function planReminders(rows: CandidateRow[], now: Date): { due: Reminder[
     const w = windowFor(daysUntil);
     if (!w) { skipped.not_in_window = (skipped.not_in_window ?? 0) + 1; continue; }
     due.push({ user_id: r.id, email: r.email, full_name: r.full_name, active_sport: r.active_sport, type: w.type, label: w.label,
-      days_until: daysUntil, charge_at: c.at, charge_date: chargeDate, amount_cents: c.amount });
+      days_until: daysUntil, charge_at: c.at, charge_date: chargeDate, amount_cents: c.amount, first_charge: isFirstCharge(r, c.at) });
   }
   return { due, skipped };
 }
@@ -126,6 +140,12 @@ export function planReminders(rows: CandidateRow[], now: Date): { due: Reminder[
 export function maskEmail(e: string): string {
   const [u, d] = e.split("@");
   return `${u.slice(0, 2)}***@${d ?? ""}`;
+}
+
+/** "$60" (P6 {price}). */
+export function formatUsd(cents: number): string {
+  const d = cents / 100;
+  return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
 }
 
 export function formatUsdYear(cents: number): string {

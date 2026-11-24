@@ -9,12 +9,25 @@
 // so replies land in the unified inbox).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { type CandidateRow, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
-import { type Brand, brandFor, buildBaseEmail, buildBaseText, buildEmail, subjectFor } from "./email.ts";
+import { type CandidateRow, formatUsd, formatUsdYear, maskEmail, planReminders, sendEnabled } from "./logic.ts";
+import { type Brand, brandFor, buildBaseEmail, buildBaseText, buildEmail, subjectFor, buildFirstChargeEmail, buildFirstChargeText, cardPhrase, firstChargeSubject } from "./email.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+// D3: read-only Stripe GET for the first-charge reminder's "{card_brand} ending {last4}". Same secret names as stripe-webhook; never logged.
+const STRIPE_SECRET = (Deno.env.get("STRIPE_SECRET_KEY") || Deno.env.get("stripe_secret_key") || "").trim();
+async function cardOnFile(subId: string): Promise<{ brand: string; last4: string } | null> {
+  if (!STRIPE_SECRET) return null;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subId)}?expand[]=default_payment_method`, {
+      headers: { Authorization: `Bearer ${STRIPE_SECRET}` },
+    });
+    if (!r.ok) { console.error("cardOnFile: stripe status", r.status); return null; }
+    const card = (await r.json())?.default_payment_method?.card;
+    return card?.brand && card?.last4 ? { brand: String(card.brand), last4: String(card.last4) } : null;
+  } catch (e) { console.error("cardOnFile failed", String(e)); return null; }
+}
 
 async function cronCallerOk(req: Request): Promise<boolean> {
   const got = (req.headers.get("x-cron-secret") ?? "").trim();
@@ -72,7 +85,7 @@ Deno.serve(async (req: Request) => {
   const sendOn = sendEnabled(Deno.env.get("RENEWAL_BASE_SEND"));
   if (dryRun || !sendOn) {
     return json({ success: true, dry_run: true, send_enabled: sendOn, date: now.toISOString(), skipped,
-      due: due.map((d) => ({ email: maskEmail(d.email), type: d.type, days_until: d.days_until, charge_date: d.charge_date })) });
+      due: due.map((d) => ({ email: maskEmail(d.email), type: d.type, days_until: d.days_until, charge_date: d.charge_date, first_charge: d.first_charge })) });
   }
 
   for (const d of due) {
@@ -89,11 +102,19 @@ Deno.serve(async (req: Request) => {
     const price = formatUsdYear(d.amount_cents);
     const expiryFormatted = new Date(d.charge_at).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" });
     const firstName = (d.full_name ?? d.email).split(" ")[0];
-    const subject = subjectFor(brand, d.days_until, d.label);
+    const subject = d.first_charge ? firstChargeSubject(expiryFormatted) : subjectFor(brand, d.days_until, d.label);
     // Renewal reminders are required account notices: no unsubscribe link, and marketing_opt_out never blocks them (Grant, 2026-10-04).
     // 2026-11-15: Base-only recipients (active_sport not exactly "bjj"/"bodybuilding") get the ROMRx Base email with a text part;
     // sport recipients get the unchanged v26 email. Base greets "there" when no name is on file (v26 used the email address).
-    const sent = brand.key === "base"
+    // D3: the sends before the charge that ends the beta launch trial period use Stacy's first-charge wording (any brand).
+    const subId = String(users?.find((u) => u.id === d.user_id)?.base_stripe_subscription_id ?? "");
+    const card = d.first_charge ? cardPhrase(await cardOnFile(subId)) : "";
+    const greet = d.full_name ? firstName : "there";
+    const sent = d.first_charge
+      ? await sendEmail(brandFor(null), d.email, subject,
+        buildFirstChargeEmail(greet, expiryFormatted, formatUsd(d.amount_cents), card, d.email),
+        buildFirstChargeText(greet, expiryFormatted, formatUsd(d.amount_cents), card))
+      : brand.key === "base"
       ? await sendEmail(brand, d.email, subject,
         buildBaseEmail(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email),
         buildBaseText(d.full_name ? firstName : "there", "ROMRx Base", price, d.days_until, expiryFormatted, d.label, d.email))
