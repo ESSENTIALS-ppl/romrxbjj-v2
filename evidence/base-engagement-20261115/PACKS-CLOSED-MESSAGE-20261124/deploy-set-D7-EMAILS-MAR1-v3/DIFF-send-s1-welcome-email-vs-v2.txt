@@ -1,0 +1,13 @@
+--- a/deploy-set-D7-EMAILS-MAR1-v2/send-s1-welcome-email/source/index.ts
++++ b/deploy-set-D7-EMAILS-MAR1-v3/send-s1-welcome-email/source/index.ts
+@@ -152,4 +152,4 @@
+     brandName: "ROMRx",
+-    fromName: "Jim Scott",
+-    fromEmail: "jim@romrx.io",
++    fromName: "ROMRx",
++    fromEmail: "hello@romrx.io",
+     domain: "https://romrx.io",
+@@ -323,2 +323,3 @@
+         to: [email],
++        reply_to: b.fromEmail,
+         subject: b.subject,

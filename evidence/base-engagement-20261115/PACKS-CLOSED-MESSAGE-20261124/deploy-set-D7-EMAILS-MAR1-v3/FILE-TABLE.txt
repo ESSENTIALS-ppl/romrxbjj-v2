@@ -1,0 +1,17 @@
+FILE-TABLE — deploy-set-D7-EMAILS-MAR1-v3 (BUILD ONLY, not deployed)
+v1 (9cee9f44) and v2 (58ca4361) were left untouched.
+v3 source changes vs v2: welcome and assessment Base From/Reply-To only. mood_block and lead cancel stay as in v2.
+
+path                                                                                         sha256                                                           sha8    note
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+send-s1-welcome-email/source/index.ts                                                        68da5e9b30150e877f0f2810affcdf71cbbdba00b70091ccea7d423a32ff5d7d 68da5e9b  CHANGED vs live and v2: Base From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io; betaLine is S9 + short cancel (same as v2)
+submit-assessment/functions/submit-assessment/index.ts                                       58c759f8c01fc3f6cf93a96cc1e511cbdf20e889066046cf8b0ad9674c97a259 58c759f8  CHANGED vs live and v2: Base From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io; betaLine same as v2
+submit-assessment/functions/submit-assessment/mood_block.ts                                  dc510a72b8b7b1ab78939d0b9e9808f97f3740b28bf517d50246c9c66f75debd dc510a72  UNCHANGED vs v2: consent_version accepts v2-email-20261026 OR v3-rombot-20261028
+submit-lead-assessment/source/email.ts                                                       5ae2cb848d6a28472a1522cce8baaca5353ef4e9abec465b546edffbe1141128 5ae2cb84  UNCHANGED vs v2: S9 + lead cancel line
+submit-lead-assessment/source/index.ts                                                       7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1 7132917a  UNCHANGED vs live v36: From already ROMRx <hello@romrx.io>
+renders/welcome-general.html                                                                 5a4b5641714f2e287a7eccd5f61960421c8abb3b86567cf9062140ede3a6c8d3 5a4b5641  v3 welcome render; fixture user@example.com
+renders/welcome-general.txt                                                                  57a238bd7494aee036913e867da710dd9267d7ebb56ee50e48db24995780cc0c 57a238bd  v3 welcome render; fixture user@example.com
+renders/assessment-general.html                                                              552d966452083c47bef3f4574b0ffde0e9a0465a189efe7b4721fb2136bd8428 552d9664  v3 assessment render; fixture user@example.com
+renders/assessment-general.txt                                                               985283a98ce70169c4f5d149e7b36e3af96a99f8f23109a933292e9792245b70 985283a9  v3 assessment render; fixture user@example.com
+renders/lead-results.html                                                                    ed751b3fceacfba162d66fd30c30cbbed09498af6c2ab6228c8efdc4f5bed53f ed751b3f  v3 lead render; fixture user@example.com
+renders/lead-results.txt                                                                     78ac89e94aac65e6da73ce83cbc970fe9142a3b70fcc7559a6faa5475d3c285e 78ac89e9  v3 lead render; fixture user@example.com

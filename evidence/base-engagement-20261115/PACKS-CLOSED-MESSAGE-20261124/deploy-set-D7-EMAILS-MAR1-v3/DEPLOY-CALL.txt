@@ -1,0 +1,52 @@
+D7-EMAILS-MAR1-v3 deploy call — NOT RUN. STAGE ONLY. DO NOT DEPLOY.
+Another live deploy is running. Do not send these calls until a fresh BEFORE list is recaptured and the go to deploy is given.
+v1 (9cee9f44) and v2 (58ca4361) were left untouched.
+
+v3 vs live (the three functions only):
+- send-s1-welcome-email: Base From is ROMRx <hello@romrx.io>, Reply-To hello@romrx.io (customer send); Base betaLine is S9 + the Q2/F27 short cancel line. BJJ/BB from lines unchanged.
+- submit-assessment: Base From is ROMRx <hello@romrx.io>, Reply-To hello@romrx.io; Base betaLine is S9 + the Q2/F27 short cancel line; mood_block.ts accepts consent_version v2-email-20261026 OR v3-rombot-20261028. BJJ/BB from lines unchanged.
+- submit-lead-assessment: S9 plus the lead cancel line "Once you subscribe, you can cancel online anytime in Settings: https://romrx.io/app/dashboard/settings". From already defaults to ROMRx <hello@romrx.io>. index.ts unchanged vs live.
+
+MCP is capable: user-Supabase deploy_edge_function. verify_jwt as live.
+
+BEFORE will be recaptured at deploy (a prior live deploy is in flight). Last staged baseline: 2026-11-24 3:39 PM ET, 42 functions; send-s1-welcome-email v40 ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85 verify_jwt=false; submit-assessment v50 ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296 verify_jwt=true; submit-lead-assessment v36 ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf verify_jwt=false. create-checkout-session was reported v53 ezbr cebd7638 as of 3:47 PM ET; do not use that as the deploy BEFORE.
+
+1) send-s1-welcome-email
+  project_id: "cqzvqzwwevnflinxgnpp"
+  name: "send-s1-welcome-email"
+  entrypoint_path: "source/index.ts"
+  verify_jwt: false
+  files:
+    - source/index.ts sha256 68da5e9b30150e877f0f2810affcdf71cbbdba00b70091ccea7d423a32ff5d7d
+    - _shared/events.ts sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21
+    - _shared/email_footer.ts sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b
+  Rollback (not run): rollback-live-v40/, verify_jwt false, expect ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85.
+
+2) submit-assessment
+  project_id: "cqzvqzwwevnflinxgnpp"
+  name: "submit-assessment"
+  entrypoint_path: "functions/submit-assessment/index.ts"
+  verify_jwt: true
+  files:
+    - functions/submit-assessment/index.ts sha256 58c759f8c01fc3f6cf93a96cc1e511cbdf20e889066046cf8b0ad9674c97a259
+    - functions/submit-assessment/mood_block.ts sha256 dc510a72b8b7b1ab78939d0b9e9808f97f3740b28bf517d50246c9c66f75debd
+    - functions/submit-assessment/schedule.ts sha256 c28532c8f029ea9e96eb9f7f5cfdc78ce1db5230b9bf4056f3f40e902b015962
+    - functions/_shared/capture_methods.ts sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e
+    - functions/_shared/email_footer.ts sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b
+    - functions/_shared/events.ts sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21
+    - functions/_shared/rate_limit.ts sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8
+  Rollback (not run): rollback-live-v50/, verify_jwt true, expect ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296.
+
+3) submit-lead-assessment
+  project_id: "cqzvqzwwevnflinxgnpp"
+  name: "submit-lead-assessment"
+  entrypoint_path: "source/index.ts"
+  verify_jwt: false
+  files:
+    - source/index.ts sha256 7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1
+    - source/email.ts sha256 5ae2cb848d6a28472a1522cce8baaca5353ef4e9abec465b546edffbe1141128
+    - _shared/capture_methods.ts sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e
+    - _shared/events.ts sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21
+    - _shared/rate_limit.ts sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8
+    - _shared/t1_narrow_bands.ts sha256 007cbe26a4664ae89aec791c7c1f19ce29a6f4dc682096f64b901932f7515127
+  Rollback (not run): rollback-live-v36/, verify_jwt false, expect ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf.

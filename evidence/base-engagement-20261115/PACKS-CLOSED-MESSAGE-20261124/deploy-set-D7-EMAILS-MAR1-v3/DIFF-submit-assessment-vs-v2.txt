@@ -1,0 +1,9 @@
+--- a/deploy-set-D7-EMAILS-MAR1-v2/submit-assessment/functions/submit-assessment/index.ts
++++ b/deploy-set-D7-EMAILS-MAR1-v3/submit-assessment/functions/submit-assessment/index.ts
+@@ -85,4 +85,4 @@
+     brand: "ROMRx",
+-    from: "Jim Scott <jim@romrx.io>",
+-    replyTo: "jim@romrx.io",
++    from: "ROMRx <hello@romrx.io>",
++    replyTo: "hello@romrx.io",
+     domain: "https://romrx.io",

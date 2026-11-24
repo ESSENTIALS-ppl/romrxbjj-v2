@@ -1,0 +1,7 @@
+--- a/submit-assessment/functions/submit-assessment/mood_block.ts
++++ b/submit-assessment/functions/submit-assessment/mood_block.ts
+@@ -17,3 +17,3 @@
+   return envFlag === "on" && !!s && s.saving_on === true && isValidTickTime(s.opted_in_at) &&
+-    s.consent_version === ROMOOD_CONSENT_VERSION;
++    (s.consent_version === ROMOOD_CONSENT_VERSION || s.consent_version === "v3-rombot-20261028");
+ }

@@ -1,0 +1,7 @@
+--- a/submit-lead-assessment/source/email.ts
++++ b/submit-lead-assessment/source/email.ts
+@@ -174,3 +174,3 @@
+       <a href="${unlockUrl}" style="display:inline-block;padding:14px 28px;background:#1D4ED8;color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;">Unlock My Dashboard</a>
+-      <div style="font-size:11px;color:#64748B;margin-top:10px;">ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.</div>
++      <div style="font-size:11px;color:#64748B;margin-top:10px;">ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel. Once you subscribe, you can cancel online anytime in Settings: https://romrx.io/app/dashboard/settings</div>
+     </div>

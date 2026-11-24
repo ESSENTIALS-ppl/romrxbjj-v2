@@ -1,0 +1,20 @@
+EXPECTED-AFTER — deploy-set-D7-EMAILS-MAR1-v3 (not run; no deploy)
+
+Do not deploy until a fresh BEFORE list is recaptured. A live deploy is in flight. Independently, create-checkout-session was reported v53 (ezbr cebd7638) at 3:47 PM ET; the 3:39 PM ET list still showed v52 / 36abc3ba. D7 itself still changes only these three email functions.
+
+1. send-s1-welcome-email
+   Last staged BEFORE: v40, ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85, verify_jwt false.
+   AFTER: new version, new ezbr, new updated_at, verify_jwt false, entrypoint still source/index.ts.
+   Staged source/index.ts sha256 68da5e9b30150e877f0f2810affcdf71cbbdba00b70091ccea7d423a32ff5d7d (68da5e9b). Rollback ezbr 99f5d36b.
+
+2. submit-assessment
+   Last staged BEFORE: v50, ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296, verify_jwt true.
+   AFTER: new version, new ezbr, new updated_at, verify_jwt true, entrypoint still functions/submit-assessment/index.ts.
+   Staged index.ts sha256 58c759f8c01fc3f6cf93a96cc1e511cbdf20e889066046cf8b0ad9674c97a259 (58c759f8). Staged mood_block.ts sha256 dc510a72b8b7b1ab78939d0b9e9808f97f3740b28bf517d50246c9c66f75debd (dc510a72). Rollback ezbr edb16eb4.
+
+3. submit-lead-assessment
+   Last staged BEFORE: v36, ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf, verify_jwt false.
+   AFTER: new version, new ezbr, new updated_at, verify_jwt false, entrypoint still source/index.ts.
+   Staged source/email.ts sha256 5ae2cb848d6a28472a1522cce8baaca5353ef4e9abec465b546edffbe1141128 (5ae2cb84). index.ts unchanged vs live. Rollback ezbr 48c6f464.
+
+Vera: renders/ HTML and text of each email; $60 and March 1, 2027; fixture recipient user@example.com only; From ROMRx <hello@romrx.io>, Reply-To hello@romrx.io in the text headers.

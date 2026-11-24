@@ -1,0 +1,14 @@
+--- a/submit-assessment/functions/submit-assessment/index.ts
++++ b/submit-assessment/functions/submit-assessment/index.ts
+@@ -85,4 +85,4 @@
+     brand: "ROMRx",
+-    from: "Jim Scott <jim@romrx.io>",
+-    replyTo: "jim@romrx.io",
++    from: "ROMRx <hello@romrx.io>",
++    replyTo: "hello@romrx.io",
+     domain: "https://romrx.io",
+@@ -99,3 +99,3 @@
+     proud: "",
+-    betaLine: "ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.",
++    betaLine: "ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel. Cancel online anytime in Settings: https://romrx.io/app/dashboard/settings",
+   };
