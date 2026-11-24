@@ -47,7 +47,7 @@ import {
   disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
   ARL_BASE_PAID_DISCLOSURE_VERSION, consentTextBasePaid, disclosureBasePaid,
 } from "../_shared/arl_copy.ts";
-import { BASE_PAID_ALLOW_PROMOTION_CODES, baseCheckoutPhase, baseSubscriptionData } from "./base_cutover.ts";
+import { BASE_PAID_ALLOW_PROMOTION_CODES, baseCheckoutConfig, baseCheckoutPhase, baseSubscriptionData } from "./base_cutover.ts";
 import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS, planBaseCheckout, planUnlockTrialEndUnix } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -176,7 +176,7 @@ Deno.serve(async (req: Request) => {
     if (limited) return limited;
   }
   let body: {
-    mode?: "base" | "unlock" | "coach";
+    mode?: "base" | "unlock" | "coach" | "config";
     plan?: string;
     user_id?: string;
     email?: string;
@@ -194,6 +194,9 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   const testRequested = body.stripe_test_mode === true;
   const mode = body.mode ?? (String(body.plan ?? "").toLowerCase() === "coach" ? "coach" : undefined);
+  // BASE-IMMEDIATE-CHARGE-20261124: public read of the ONE Base cutover so client copy flips with checkout (server is
+  // the source of truth). No auth beyond the gateway anon key, no DB, no Stripe, no user data. Before the pack gate.
+  if (mode === "config") return json(200, baseCheckoutConfig(Date.now()));
   // v40 sport pack kill switch (default closed). Read per request so a secret change needs no code change.
   // Lead-email unlock (base + lead_token) naming a sport: sport dropped, continues as Base-only (logged after the claim).
   let packSportDropped: string | null = null;

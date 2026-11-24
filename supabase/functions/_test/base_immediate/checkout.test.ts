@@ -162,7 +162,35 @@ for (const o of ["B", "C"] as Opt[]) {
   });
 }
 
-// 4. Promo flag: false applies to the paid path only; the trial path stays true (live).
+// 4. mode=config: the client's read of the SAME cutover. Flips with checkout at -1 s / 0 / +1 s for every option.
+for (const o of OPTS) {
+  Deno.test(`option ${o}: mode=config base_paid_now flips with checkout (1 s either side)`, async () => {
+    const T = OPTIONS[o] * 1000;
+    for (const t of [T - 1000, T - 1, T, T + 1, T + 1000]) {
+      const cfg = await run(H[`${o}On`], { name: "config", body: { mode: "config" }, jwt: "anon" }, t);
+      assertEquals(cfg.status, 200);
+      const b = cfg.body as Record<string, unknown>;
+      const chk = await run(H[`${o}On`], SCENARIOS[0], t);
+      const paidCheckout = chk.status === 200 && creates(chk)[0]?.params.metadata.arl_period === "paid";
+      assertEquals(b.base_paid_now, paidCheckout, `${o} @ ${t - T} ms`);
+      assertEquals(b.base_paid_now, t >= T);
+      assertEquals(b.cutover_unix, OPTIONS[o]);
+      assertEquals(b.server_now_unix, Math.floor(t / 1000));
+      assertEquals(b.base_phase, t >= T ? "paid" : (t > CLOSE_MS ? "closed" : "trial"));
+      assertEquals((cfg.calls as Record<string, unknown>[]).filter((c) => c.kind !== "event").length, 0, "no DB, Stripe or auth call");
+    }
+  });
+}
+Deno.test("mode=config is the only pre-cutover difference from 643e27f0 (which answers 400 Invalid mode)", async () => {
+  const t = Date.UTC(2026, 10, 24, 19);
+  const a = await run(H.pinOn, { name: "config", body: { mode: "config" } }, t);
+  assertEquals(a.status, 400);
+  const b = await run(H.AOn, { name: "config", body: { mode: "config" } }, t);
+  assertEquals(b.status, 200);
+  assertEquals((b.body as Record<string, unknown>).base_paid_now, false);
+});
+
+// 5. Promo flag: false applies to the paid path only; the trial path stays true (live).
 Deno.test("promo flag false: paid session has allow_promotion_codes false, trial session unchanged (true)", async () => {
   const paid = await run(H.AnoPromo, SCENARIOS[0], OPTIONS.A * 1000 + 1000);
   assertEquals(creates(paid)[0].params.allow_promotion_codes, false);

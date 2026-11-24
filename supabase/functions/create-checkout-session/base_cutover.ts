@@ -30,3 +30,12 @@ export function baseSubscriptionData(phase: BasePhase, meta: Record<string, stri
   if (phase === "paid" || trialEndUnix == null) return { metadata: meta };
   return { metadata: meta, trial_end: trialEndUnix };
 }
+
+/** BASE-IMMEDIATE-CHARGE-20261124: body of POST {"mode":"config"}. base_paid_now is true exactly when Base checkout is
+ *  on the paid path (same baseCheckoutPhase call), so client copy keyed on it flips at the same instant as checkout. */
+export function baseCheckoutConfig(nowMs: number): {
+  base_paid_now: boolean; base_phase: BasePhase; cutover_unix: number; server_now_unix: number;
+} {
+  const phase = baseCheckoutPhase(nowMs);
+  return { base_paid_now: phase === "paid", base_phase: phase, cutover_unix: BASE_PAID_CUTOVER_UNIX, server_now_unix: Math.floor(nowMs / 1000) };
+}
