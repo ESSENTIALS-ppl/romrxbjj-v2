@@ -1,0 +1,2 @@
+get_edge_function get-coach-roster v27 ezbr a61ad780c7b7ca8d1b04010212db1d56d267b60b24d251469a9f44b2ef5975c0 verify_jwt True
+index.ts sha256 f39e7a1971116960c6f87437e56a3248b523409a1c5ebca04382abcd035f58fc bytes 5195

@@ -1,0 +1,15 @@
+# RECEIPT FG-21: drain cron 8827ec3f + W2 fix APPLIED, Tue Nov 24 2026 (ET)
+Authority: Jim 3:55 PM ET (Sable 1:1 pos 12643), Grant 4:00 PM ET rulings (cron first, then W2). Sable spot-check replaces Vera. Tool: MCP apply_migration only.
+
+BEFORE (4:08:25 PM ET, read-only): cron 16 jobs md5 40f1bf17f5b12e0cd32c190f928ef609; job 1 md5(command) caab15b0a3b771bccfd127f7c3db4df2; job 14 'purge-deleted-accounts-daily' '23 4 * * *' active, full-row md5 878facd2eb45df25e7d8e8dd5cb56213; jobid_seq 16; queue 0. purge_deleted_accounts prosrc cb7bde65b246fd50e107f5dcb6571641, def 062fa5a33166f62fb8b6c8e357004880. Migrations 201, head 20261124210022.
+
+STEP 1 cron: file 20261124120000_p1_25_storage_drain_cron.sql sha256 8827ec3fd57b8c02d4839533aecd2c6087c85f513c67516e3deaee0646d3991a (= repo bytes). Applied as 20261124210834 p1_25_storage_drain_cron (4:08:34 PM ET).
+AFTER (4:08:40 PM ET): 17 jobs md5 a7c6a5b37fa67489b9cc365075db5adc (= planned); jobs 1-16 md5 40f1bf17 (unchanged); job 1 caab15b0 (unchanged); job 14 878facd2 (unchanged). New job 17 p1-25-storage-drain-daily '53 4 * * *' active true, username postgres, cmd md5 5e3f10149cd99c6225e906ab5d5fac81. First run Tue Nov 24 11:53 PM ET (EST); calls the drain only when the queue has rows.
+Rollback (not run): 20261124120000_p1_25_storage_drain_cron_rollback.sql sha256 8cc4759a6db5e204d8145db2d16c8e7fe76b45ff22474817fb6e3ebc60adeddf (cron.unschedule by name only) -> 16 jobs, 40f1bf17.
+
+STEP 2 W2: file 20261124213000_p1_25_purge_w2_queue_from_backup.sql (folder purge-fix-W2-v2-20261124, SUMS 2fcec809). One change: the queue INSERT reads this run's backup table <backup_schema>.storage__objects (written before progress_photos rows are deleted) instead of re-matching storage.objects after the delete loop, so files linked only by a progress_photos path are queued. Tests: PGlite 0 fails; control reproduces W2 on the live body; mutants 3/3 killed. Applied as 20261124210845 p1_25_purge_w2_queue_from_backup (4:08:45 PM ET).
+AFTER (4:08:51 PM ET): prosrc 3fa909bff71d1553418bb7edc1cc6b3f (= md5 of the file body, MATCH); def 53654eff54951a66f32731bc6009e192; SECURITY DEFINER, owner postgres, ACL {postgres=X/postgres,service_role=X/postgres} (unchanged). Exclusion lines 30, md5 98e9912b614910e7a66561106a56ed40 (byte-identical to before; 7c71e421 and fixture 076ce453 exclusions unchanged, neither account read or touched). Dry run (no writes): ok true, qualifying 0, written false. Cron still 17 / a7c6a5b3; queue 0.
+Rollback (not run): 20261124213000_p1_25_purge_w2_queue_from_backup_rollback.sql (restores prosrc cb7bde65; tested R1) via apply_migration.
+
+Repo: romrxbjj-v2 fix/p1-25-purge-storage-queue-20261117 commit 5e1f484fb465620d227fbd7a964d34309ec4ea5a (parent f6b0c54b), plain push, ls-remote = 5e1f484f. Cron files pure-renamed to supabase/migrations/20261124210834_* (bytes unchanged); W2 + rollback added as supabase/migrations/20261124210845_*. Never re-apply.
+Not done: no cron job 1/14 change, no drain invoke, no Notion edit, no sends. Tonight 11:23 PM job 14 + 11:53 PM drain go in the morning receipt.

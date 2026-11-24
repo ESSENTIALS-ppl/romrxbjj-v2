@@ -1,0 +1,12 @@
+CONSENT_ANON_HMAC_KEY ['builds', 'functions', 'post_processing', 'runtime'] ['all']
+META_CAPI_TOKEN ['builds', 'functions', 'runtime'] ['production'] secret
+META_PIXEL_ID ['builds', 'functions', 'post_processing', 'runtime'] ['production']
+SUPABASE_SERVICE_ROLE_KEY ['builds', 'functions', 'runtime'] ['branch-deploy', 'deploy-preview', 'dev', 'dev-server', 'production'] secret
+SUPABASE_URL ['builds', 'functions', 'post_processing', 'runtime'] ['all']
+VITE_BASE_LUMBAR_REMOVED ['builds', 'functions', 'post_processing', 'runtime'] ['production']
+VITE_META_PIXEL_ID ['builds', 'functions', 'post_processing', 'runtime'] ['production']
+VITE_ROMOOD_SAVE ['builds', 'functions', 'post_processing', 'runtime'] ['production']
+VITE_SUPABASE_ANON_KEY ['builds', 'functions', 'post_processing', 'runtime'] ['all']
+VITE_SUPABASE_URL ['builds', 'functions', 'post_processing', 'runtime'] ['all']
+VITE_TERMS_REACCEPT_GATE ['builds', 'functions', 'post_processing', 'runtime'] ['production']
+VITE_VAPID_PUBLIC_KEY ['builds', 'functions', 'post_processing', 'runtime'] ['production']

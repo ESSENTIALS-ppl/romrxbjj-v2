@@ -1,0 +1,31 @@
+PASS C1 control: live body misses the path-only object (W2 reproduced) {"q":3}
+PASS MAIN W1 path-only photo object is queued {"qq":["00000000-0000-4000-8000-000000000201/back.jpg","00000000-0000-4000-8000-000000000201/front.jpg","00000000-0000-4000-8000-000000000201/legacy.jpg","00000000-0000-4000-8000-000000000201/pathonly.jpg"]}
+PASS MAIN W2 all 4 qualifying objects queued, queued == table_counts storage.objects {"q":4,"c":4}
+PASS MAIN W3 7c71e421 and other-account objects not queued; files not deleted by SQL
+PASS MAIN W4 rerun: 0 qualifying, queue unchanged {}
+PASS MAIN W5 0 qualifying, 0 objects: ok, queued 0 {}
+PASS MAIN W6 dry_run identical to live body
+PASS R1 rollback restores live prosrc md5 cb7bde65 {"m":"cb7bde65b246fd50e107f5dcb6571641"}
+PASS R0 base = live prosrc md5 cb7bde65
+FAIL M1 W1 path-only photo object is queued {"qq":["00000000-0000-4000-8000-000000000201/back.jpg","00000000-0000-4000-8000-000000000201/front.jpg"]}
+FAIL M1 W2 all 4 qualifying objects queued, queued == table_counts storage.objects {"q":2,"c":4}
+PASS M1 W3 7c71e421 and other-account objects not queued; files not deleted by SQL
+FAIL M1 W4 rerun: 0 qualifying, queue unchanged {}
+PASS M1 W5 0 qualifying, 0 objects: ok, queued 0 {}
+PASS M1 W6 dry_run identical to live body
+MUTANT M1 queue from live storage.objects after delete (old body): KILLED
+FAIL M2 W1 path-only photo object is queued {"qq":[]}
+FAIL M2 W2 all 4 qualifying objects queued, queued == table_counts storage.objects {"q":0,"c":4}
+PASS M2 W3 7c71e421 and other-account objects not queued; files not deleted by SQL
+FAIL M2 W4 rerun: 0 qualifying, queue unchanged {}
+PASS M2 W5 0 qualifying, 0 objects: ok, queued 0 {}
+PASS M2 W6 dry_run identical to live body
+MUTANT M2 guard > 0 changed to > 10: KILLED
+PASS M3 W1 path-only photo object is queued {"qq":["00000000-0000-4000-8000-000000000201/back.jpg","00000000-0000-4000-8000-000000000201/front.jpg","00000000-0000-4000-8000-000000000201/legacy.jpg","00000000-0000-4000-8000-000000000201/pathonly.jpg"]}
+FAIL M3 W2 all 4 qualifying objects queued, queued == table_counts storage.objects {"q":0,"c":4}
+PASS M3 W3 7c71e421 and other-account objects not queued; files not deleted by SQL
+PASS M3 W4 rerun: 0 qualifying, queue unchanged {}
+PASS M3 W5 0 qualifying, 0 objects: ok, queued 0 {}
+PASS M3 W6 dry_run identical to live body
+MUTANT M3 queued count not captured: KILLED
+TOTAL fails 0
