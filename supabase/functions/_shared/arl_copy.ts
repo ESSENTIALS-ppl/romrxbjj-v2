@@ -9,7 +9,7 @@
 
 import { POSTAL_LINE } from "./email_footer.ts";
 
-export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v3";
+export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2027-03-01-v5";
 export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
@@ -38,7 +38,7 @@ export function formatUsd(unitAmountCents: number): string {
 
 /** 3b, Base only. */
 export function disclosureBase(basePrice: string): string {
-  return `Free through December 31, 2026. Then ${basePrice} per year, charged to your card on January 1, 2027 and every year after until you cancel. Cancel online anytime in Settings. Canceling ends your access right away. Cancel before January 1, 2027 and you pay nothing.`;
+  return `ROMRx Base is free until March 1, 2027, our beta launch trial period. Then ${basePrice} per year, charged to your card on March 1, 2027 and on March 1 every year after until you cancel. Your plan renews automatically for one year at a time. Cancel online anytime in Settings at https://romrx.io/app/dashboard/settings, or email hello@romrx.io. Cancel before March 1, 2027 and you pay nothing. Canceling ends your access right away and stops future charges. All sales are final. We do not refund charges already made, except where the law requires a refund. We will email you before your first charge and before each yearly renewal.`;
 }
 
 /** 3b, Base plus sport pack. */
