@@ -1,0 +1,7 @@
+--- a/send-s1-welcome-email/source/index.ts
++++ b/send-s1-welcome-email/source/index.ts
+@@ -166,3 +166,3 @@
+     psLine: "P.S. The assessment is free. You'll need your phone, a chair, a wall, a tape measure or ruler, and a little floor space.",
+-    betaLine: "ROMRx Base is free through December 31, 2026. Billing starts January 1, 2027.",
++    betaLine: "ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel. Cancel online anytime in Settings: https://romrx.io/app/dashboard/settings",
+     closeLine: "This is my personal email. Save it. If anything's confusing, reply and I'll help.",

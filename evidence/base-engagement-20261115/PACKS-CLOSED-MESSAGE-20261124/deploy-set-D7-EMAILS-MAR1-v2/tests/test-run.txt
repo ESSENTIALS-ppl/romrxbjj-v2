@@ -1,0 +1,16 @@
+deno test --allow-read tests/d7_emails_mar1.test.ts tests/mood_block_consent.test.ts
+2026-11-24, America/New_York (ET)
+
+running 5 tests from ./tests/d7_emails_mar1.test.ts
+verbatim S9 + signed-up cancel, and S9 + lead cancel, are exact ... ok
+send-s1-welcome-email is unchanged from v1 (S9 + short cancel; BJJ and BB stay empty) ... ok
+submit-assessment is unchanged from v1 (S9 + short cancel; BJJ and BB stay empty) ... ok
+submit-lead-assessment email.ts: S9 + v2 lead cancel only; index.ts unchanged ... ok
+lead renderEmail contains S9, $60, March 1, 2027, and the v2 lead cancel line; no Jan 1 / Dec 31 / free through / v1 short cancel ... ok
+running 4 tests from ./tests/mood_block_consent.test.ts
+v2 value comes from current ROMOOD_CONSENT_VERSION ... ok
+consent v2 includes the block ... ok
+consent v3 (v3-rombot-20261028) includes the block ... ok
+any other consent_version or a missing value excludes the block ... ok
+
+ok | 9 passed | 0 failed

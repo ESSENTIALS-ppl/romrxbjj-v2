@@ -1,0 +1,81 @@
+D7-EMAILS-MAR1-v2 deploy call — NOT RUN. STAGE ONLY. DO NOT DEPLOY.
+v1 folder (SHA256SUMS 9cee9f44) was left untouched. This is a new set.
+The fast-track is also on HOLD. Three functions, from live bytes. verify_jwt left as live. No secrets.
+
+v2 source changes vs live:
+- send-s1-welcome-email: Base betaLine is S9 + the Q2/F27 short cancel line (same bytes as v1).
+- submit-assessment: Base betaLine is S9 + the Q2/F27 short cancel line (index.ts same bytes as v1); mood_block.ts now accepts consent_version v2-email-20261026 OR v3-rombot-20261028 (live was v2 only).
+- submit-lead-assessment: S9 plus the v2 lead cancel line, verbatim: "Once you subscribe, you can cancel online anytime in Settings: https://romrx.io/app/dashboard/settings"
+
+MCP is capable: user-Supabase deploy_edge_function. Do not send until pin, Vera precheck, and Sable release.
+
+BEFORE was captured 2026-11-24 3:39 PM ET (EST) and was not recaptured for this v2 rebuild. Recapture at deploy.
+  42 functions at that capture. send-s1-welcome-email v40 ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85 verify_jwt=false.
+  submit-assessment v50 ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296 verify_jwt=true.
+  submit-lead-assessment v36 ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf verify_jwt=false.
+  Status (Grant, 3:47–3:49 PM ET): create-checkout-session is now v53, ezbr cebd7638. This set does not touch checkout. See EXPECTED-AFTER.
+
+1) send-s1-welcome-email
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "send-s1-welcome-email"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: false
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes of send-s1-welcome-email/source/index.ts, sha256 4501ab10af456e0924d689ce71ed6f85e47d7a9fd38d16790e4b674dba00e004>
+      - name: "_shared/events.ts"
+        content: <exact bytes, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "_shared/email_footer.ts"
+        content: <exact bytes, sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b>
+  Rollback (not run): same call, verify_jwt false, files from send-s1-welcome-email/rollback-live-v40/. Expect ezbr back to 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85, verify_jwt false.
+
+2) submit-assessment
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "submit-assessment"
+    entrypoint_path: "functions/submit-assessment/index.ts"
+    verify_jwt: true
+    files:
+      - name: "functions/submit-assessment/index.ts"
+        content: <exact bytes, sha256 a962a1e29017fb0afa6a44522b263d070c63e62d698b003259a46eb973c656c8>
+      - name: "functions/submit-assessment/mood_block.ts"
+        content: <exact bytes of submit-assessment/functions/submit-assessment/mood_block.ts, sha256 dc510a72b8b7b1ab78939d0b9e9808f97f3740b28bf517d50246c9c66f75debd>
+      - name: "functions/submit-assessment/schedule.ts"
+        content: <exact bytes, sha256 c28532c8f029ea9e96eb9f7f5cfdc78ce1db5230b9bf4056f3f40e902b015962>
+      - name: "functions/_shared/capture_methods.ts"
+        content: <exact bytes, sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e>
+      - name: "functions/_shared/email_footer.ts"
+        content: <exact bytes, sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b>
+      - name: "functions/_shared/events.ts"
+        content: <exact bytes, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "functions/_shared/rate_limit.ts"
+        content: <exact bytes, sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8>
+  Rollback (not run): same call, verify_jwt true, files from submit-assessment/rollback-live-v50/. Expect ezbr back to edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296, verify_jwt true.
+
+3) submit-lead-assessment
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "submit-lead-assessment"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: false
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes, sha256 7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1>
+      - name: "source/email.ts"
+        content: <exact bytes of submit-lead-assessment/source/email.ts, sha256 5ae2cb848d6a28472a1522cce8baaca5353ef4e9abec465b546edffbe1141128>
+      - name: "_shared/capture_methods.ts"
+        content: <exact bytes, sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e>
+      - name: "_shared/events.ts"
+        content: <exact bytes, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "_shared/rate_limit.ts"
+        content: <exact bytes, sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8>
+      - name: "_shared/t1_narrow_bands.ts"
+        content: <exact bytes, sha256 007cbe26a4664ae89aec791c7c1f19ce29a6f4dc682096f64b901932f7515127>
+  Rollback (not run): same call, verify_jwt false, files from submit-lead-assessment/rollback-live-v36/. Expect ezbr back to 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf, verify_jwt false.
