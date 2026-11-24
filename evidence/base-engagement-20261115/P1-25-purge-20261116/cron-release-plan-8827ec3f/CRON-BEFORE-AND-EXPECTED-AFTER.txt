@@ -1,0 +1,24 @@
+cron.job inventory for the held drain cron 8827ec3f (read-only MCP execute_sql SELECT, Tue Nov 24 2026 3:36:17 PM ET)
+Inventory md5 formula: md5(string_agg(jobid||'|'||schedule||'|'||command||'|'||active::text, E'\n' ORDER BY jobid)) from cron.job
+
+BEFORE (live now)
+  count 16, md5 40f1bf17f5b12e0cd32c190f928ef609
+  job 1  send-renewal-reminders-daily  '0 12 * * *'  md5(command) caab15b0a3b771bccfd127f7c3db4df2  (must not change)
+  job 14 purge-deleted-accounts-daily  '23 4 * * *'  row md5 ad429871553a0f38ef8d530e9bbd2cde      (must not change)
+  jobs 1 to 15 md5 aecaf67e4f55a55d557256e8cf8b9763; job 16 send-push-notification-hourly '45 * * * *'
+  cron.jobid_seq last_value 16. No job named p1-25-storage-drain-daily (0 rows). 0 jobs mention storage, p1_25 or drain.
+  ids/names/schedules/active: 1 send-renewal-reminders-daily 0 12 * * * true; 2 s1-2-followup-email-hourly 0 * * * * false; 3 s1-3-masters-email-hourly 0 * * * * false; 4 s1-4-stillhere-email-hourly 0 * * * * false; 5 bb-s1-2-followup-email-hourly 0 * * * * false; 6 bb-s1-3-followup-email-hourly 0 * * * * false; 7 bb-s1-4-stillhere-email-hourly 0 * * * * false; 8 conversion-drip-hourly 15 * * * * true; 9 consent-events-retention-daily 17 4 * * * true; 10 ai-chat-retention-90d-daily 17 8 * * * true; 11 lifecycle-emails-hourly 30 * * * * true; 12 assessment-drafts-purge-hourly 17 * * * * true; 13 roll-next-check-at-hourly 20 * * * * true; 14 purge-deleted-accounts-daily 23 4 * * * true; 15 rombot-checkin-hourly 30 * * * * true; 16 send-push-notification-hourly 45 * * * * true
+
+EXPECTED AFTER (read-only simulation: live 16 rows UNION the one new row; nothing written)
+  count 17, md5 a7c6a5b37fa67489b9cc365075db5adc
+  new row: jobid 17 (= jobid_seq + 1), jobname p1-25-storage-drain-daily, schedule '53 4 * * *', active true,
+  command (byte-identical to the $cmd$ text in 8827ec3f):
+    select public.cron_call_edge('p1-25-storage-drain', 120000) where exists (select 1 from public.p1_25_storage_delete_queue)
+  jobs 1 to 16 unchanged: md5 40f1bf17 over jobs 1 to 16; job 1 caab15b0; job 14 ad429871.
+  If the sequence has moved before the apply (any other cron.schedule in between), the new jobid differs and the after-md5 must be recomputed with the same formula; jobs 1 to 16 must still hash 40f1bf17.
+
+Post-apply read-only check (after the gate):
+  select count(*), md5(string_agg(jobid||'|'||schedule||'|'||command||'|'||active::text, E'\n' order by jobid)) from cron.job;   -- expect 17, a7c6a5b3...
+  select md5(string_agg(jobid||'|'||schedule||'|'||command||'|'||active::text, E'\n' order by jobid)) from cron.job where jobid <= 16;   -- expect 40f1bf17...
+  select md5(command) from cron.job where jobid = 1;   -- expect caab15b0...
+  select jobid, jobname, schedule, active, username from cron.job where jobname = 'p1-25-storage-drain-daily';
