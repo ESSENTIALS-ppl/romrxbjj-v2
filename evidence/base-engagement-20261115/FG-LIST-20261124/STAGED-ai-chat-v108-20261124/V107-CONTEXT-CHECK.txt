@@ -1,0 +1,4 @@
+  shoulder_er: Posterior Shoulder/Infraspinatus Release with Ball - 60-90 sec each side (<cue>)
+  shoulder_er: Band Face Pull with External Rotation - 3 sets of 10 (<cue>)
+  shoulder_er: Doorway Pec Stretch - 30 sec, 3-5 sets daily (90-150 sec total) (<cue>)
+rom-row reps in DB: "30 sec, 3-5 sets daily (90-150 sec total)"
