@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
     return json(402, {
       error: "beta_ended",
       checkout_required: true,
-      message: "Free Unlock has ended. Use Stripe checkout.",
+      message: "Base sign-up is temporarily unavailable. Please check back soon.", // Stacy clear 2:32 PM ET Nov 24 (Sable item b)
     });
   }
 

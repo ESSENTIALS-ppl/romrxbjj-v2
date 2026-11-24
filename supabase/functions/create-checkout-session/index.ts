@@ -238,7 +238,7 @@ Deno.serve(async (req: Request) => {
       const heldStatus = (held as { base_status?: string } | null)?.base_status;
       if (heldStatus === "active" || heldStatus === "past_due") {
         await logEvent("checkout_base_already_active", { userId: body.user_id, props: { mode, base_status: heldStatus } });
-        return json(409, { error: "base_already_active", message: "You already have ROMRx Base. Manage it in Settings." });
+        return json(409, { error: "base_already_active", message: "Base sign-up is temporarily unavailable. Please check back soon." }); // Stacy clear 2:32 PM ET Nov 24 (Sable item b)
       }
     }
     if (body.lead_token) {

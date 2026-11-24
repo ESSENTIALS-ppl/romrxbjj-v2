@@ -71,7 +71,7 @@ for (const o of ["A", "C"] as Opt[]) {
           continue;
         }
         assertEquals(r.status, 402, label);
-        assertEquals(JSON.stringify(r.body), JSON.stringify({ error: "beta_ended", checkout_required: true, message: "Free Unlock has ended. Use Stripe checkout." }), label);
+        assertEquals(JSON.stringify(r.body), JSON.stringify({ error: "beta_ended", checkout_required: true, message: "Base sign-up is temporarily unavailable. Please check back soon." }), label);
         assertEquals(r.calls.length, 0, `${label}: no rate-limit hit, auth, flag read or users write`);
       }
     }

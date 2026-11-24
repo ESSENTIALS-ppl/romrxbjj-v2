@@ -78,6 +78,7 @@ for (const o of OPTS) {
         const r = await checkout(CK[`${o}On`], BODIES[0], t, held);
         assertEquals(r.status, 409, `${held} @ ${t}`);
         assertEquals((r.body as C).error, "base_already_active");
+        assertEquals((r.body as C).message, "Base sign-up is temporarily unavailable. Please check back soon.", "user-facing message is Stacy's line; code stays in error");
         assertEquals(creates(r).length, 0);
         assert((r.calls as C[]).some((c) => c.kind === "event" && c.name === "checkout_base_already_active"));
       }
