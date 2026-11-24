@@ -205,8 +205,24 @@ async function arlAmounts(stripe: Stripe, meta: Record<string, string>, subId: s
   }
 }
 
+/** D3 (2026-11-24): the consent row's trial_end is the Stripe subscription's own trial_end, never a literal.
+ *  NULL when the subscription has no trial (paid at sign-up) or the retrieve fails. */
+function trialEndIsoFromSub(sub: unknown): string | null {
+  const t = ((sub ?? {}) as Record<string, unknown>).trial_end;
+  return typeof t === "number" && Number.isFinite(t) && t > 0 ? new Date(t * 1000).toISOString() : null;
+}
+async function subTrialEndIso(stripe: Stripe, subId: string | undefined): Promise<string | null> {
+  if (!subId) return null;
+  try {
+    return trialEndIsoFromSub(await stripe.subscriptions.retrieve(subId));
+  } catch (e) {
+    console.error("subTrialEndIso: subscriptions.retrieve failed", String(e));
+    return null;
+  }
+}
+
 /** v40: one consent record per Checkout Session (spec 4C). Service role only; never stores IP. */
-async function writeBillingConsent(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>, meta: Record<string, string>, userId: string, livemode: boolean, amounts: number[]) {
+async function writeBillingConsent(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>, meta: Record<string, string>, userId: string, livemode: boolean, amounts: number[], trialEndIso: string | null) {
   const customText = (obj.custom_text ?? {}) as Record<string, { message?: string } | null>;
   const consent = (obj.consent ?? {}) as Record<string, string | null>;
   const consentCollection = (obj.consent_collection ?? {}) as Record<string, string | null>;
@@ -223,7 +239,7 @@ async function writeBillingConsent(supabase: ReturnType<typeof createClient>, ob
     amounts,
     currency: (obj.currency as string | undefined) ?? "usd",
     interval: "year",
-    trial_end: new Date(1798822800 * 1000).toISOString(),
+    trial_end: trialEndIso,
     disclosure_text_version: meta.arl_version ?? "none (pre-ARL session)",
     disclosure_text: customText.submit?.message ?? null,
     consent_text: customText.terms_of_service_acceptance?.message ?? null,
@@ -491,7 +507,7 @@ Deno.serve(async (req: Request) => {
 
       // v40: consent record + 3c acknowledgment (replaces "You didn't buy a subscription...").
       const amounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
-      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
+      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts, await subTrialEndIso(stripe, subId));
       if (arlOn && email && amounts.length) {
         const sportPack = pendingSport && amounts.length > 1 ? SPORT_PACK_NAMES[pendingSport] : null;
         const sportPrice = sportPack ? formatUsd(amounts[1]) : null;
@@ -551,7 +567,7 @@ Deno.serve(async (req: Request) => {
       const brand = brandFor(meta.sport);
 
       // v40: consent record for sport unlock sessions too.
-      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId));
+      if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, await arlAmounts(stripe, meta, subId), await subTrialEndIso(stripe, subId));
 
       // v40: 3c-2 acknowledgment replaces "Your {sport} pack is unlocked" (Legal: the old email alone does not comply).
       const sportAmounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
