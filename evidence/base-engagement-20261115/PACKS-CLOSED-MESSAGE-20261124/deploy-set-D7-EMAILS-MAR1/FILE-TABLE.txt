@@ -1,0 +1,38 @@
+FILE-TABLE — deploy-set-D7-EMAILS-MAR1 (BUILD ONLY, not deployed)
+Started from live bytes via get_edge_function (welcome v40 99f5d36b, assessment v50 edb16eb4, lead v36 48c6f464).
+Only change: replace the Jan 1 / Dec 31 Base price line with Stacy S9 verbatim plus the Q2/F27 marketing cancel how-to, also verbatim.
+
+path                                                                                     sha256                                                           sha8    note
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+send-s1-welcome-email/source/index.ts                                                    4501ab10af456e0924d689ce71ed6f85e47d7a9fd38d16790e4b674dba00e004 4501ab10  CHANGED: Base betaLine only (S9 + Q2/F27 cancel line, verbatim)
+send-s1-welcome-email/_shared/events.ts                                                  49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  UNCHANGED vs live v40
+send-s1-welcome-email/_shared/email_footer.ts                                            0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b 0f9d1019  UNCHANGED vs live v40
+send-s1-welcome-email/rollback-live-v40/source/index.ts                                  4c143bcb742fea4748cda5c73dfa0720feb047a9eaf6dd8bd8979af06884f681 4c143bcb  live v40 rollback; ezbr 99f5d36b
+send-s1-welcome-email/rollback-live-v40/_shared/events.ts                                49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  live v40
+send-s1-welcome-email/rollback-live-v40/_shared/email_footer.ts                          0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b 0f9d1019  live v40
+submit-assessment/functions/submit-assessment/index.ts                                   a962a1e29017fb0afa6a44522b263d070c63e62d698b003259a46eb973c656c8 a962a1e2  CHANGED: Base betaLine only (S9 + Q2/F27 cancel line, verbatim)
+submit-assessment/functions/submit-assessment/mood_block.ts                              763ca702c1692ab443c95bc9af5185f70d30da88ee8cdc4fe8715af14509885d 763ca702  UNCHANGED vs live v50
+submit-assessment/functions/submit-assessment/schedule.ts                                c28532c8f029ea9e96eb9f7f5cfdc78ce1db5230b9bf4056f3f40e902b015962 c28532c8  UNCHANGED vs live v50
+submit-assessment/functions/_shared/capture_methods.ts                                   d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e d14764c6  UNCHANGED vs live v50
+submit-assessment/functions/_shared/email_footer.ts                                      0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b 0f9d1019  UNCHANGED vs live v50
+submit-assessment/functions/_shared/events.ts                                            49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  UNCHANGED vs live v50
+submit-assessment/functions/_shared/rate_limit.ts                                        f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  UNCHANGED vs live v50
+submit-assessment/rollback-live-v50/functions/submit-assessment/index.ts                 ef5f8407987fd79ea6c67a2f8b6e7761d1832eb8094d330a117bda798f6bc1b2 ef5f8407  live v50 rollback; ezbr edb16eb4
+submit-assessment/rollback-live-v50/functions/submit-assessment/mood_block.ts            763ca702c1692ab443c95bc9af5185f70d30da88ee8cdc4fe8715af14509885d 763ca702  live v50
+submit-assessment/rollback-live-v50/functions/submit-assessment/schedule.ts              c28532c8f029ea9e96eb9f7f5cfdc78ce1db5230b9bf4056f3f40e902b015962 c28532c8  live v50
+submit-assessment/rollback-live-v50/functions/_shared/capture_methods.ts                 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e d14764c6  live v50
+submit-assessment/rollback-live-v50/functions/_shared/email_footer.ts                    0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b 0f9d1019  live v50
+submit-assessment/rollback-live-v50/functions/_shared/events.ts                          49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  live v50
+submit-assessment/rollback-live-v50/functions/_shared/rate_limit.ts                      f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  live v50
+submit-lead-assessment/source/email.ts                                                   243c04dffe1d60c2580491c11c270dd4c5f3ba3d33e392c7dbf24b9f922d417a 243c04df  CHANGED: results footnote only (S9 + Q2/F27 cancel line, verbatim)
+submit-lead-assessment/source/index.ts                                                   7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1 7132917a  UNCHANGED vs live v36
+submit-lead-assessment/_shared/capture_methods.ts                                        d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e d14764c6  UNCHANGED vs live v36
+submit-lead-assessment/_shared/events.ts                                                 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  UNCHANGED vs live v36
+submit-lead-assessment/_shared/rate_limit.ts                                             f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  UNCHANGED vs live v36
+submit-lead-assessment/_shared/t1_narrow_bands.ts                                        007cbe26a4664ae89aec791c7c1f19ce29a6f4dc682096f64b901932f7515127 007cbe26  UNCHANGED vs live v36
+submit-lead-assessment/rollback-live-v36/source/email.ts                                 419709d278ef958fe5337ca62238f141f66d8b715273e4dbf9713c6614d23c22 419709d2  live v36 rollback; ezbr 48c6f464
+submit-lead-assessment/rollback-live-v36/source/index.ts                                 7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1 7132917a  live v36
+submit-lead-assessment/rollback-live-v36/_shared/capture_methods.ts                      d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e d14764c6  live v36
+submit-lead-assessment/rollback-live-v36/_shared/events.ts                               49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  live v36
+submit-lead-assessment/rollback-live-v36/_shared/rate_limit.ts                           f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  live v36
+submit-lead-assessment/rollback-live-v36/_shared/t1_narrow_bands.ts                      007cbe26a4664ae89aec791c7c1f19ce29a6f4dc682096f64b901932f7515127 007cbe26  live v36

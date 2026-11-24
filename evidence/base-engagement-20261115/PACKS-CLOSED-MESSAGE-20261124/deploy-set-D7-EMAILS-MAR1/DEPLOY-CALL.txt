@@ -1,0 +1,88 @@
+D7-EMAILS-MAR1 deploy call — NOT RUN. STAGE ONLY. DO NOT DEPLOY.
+Sable accepted D7 as its own set (via Grant, 3:36 PM ET Nov 24). The fast-track is also on HOLD.
+Three functions, each from live bytes, smallest change only. verify_jwt left as live. No secrets. No other functions.
+
+Stacy S9 (55c49a8c, first-hand): "ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel."
+Q2/F27 marketing cancel how-to (66272c03, first-hand): "Cancel online anytime in Settings: https://romrx.io/app/dashboard/settings"
+Combined as one line, S9 then a space then the cancel line, both verbatim. No other wording.
+
+Lead note: the lead results email goes to an anonymous lead who has not signed up yet (CTA is Unlock My Dashboard). S9 and this cancel line still go on it because Q2 of 66272c03 names "the welcome, post-assessment and lead emails that carry the F27 line" and gives this exact short marketing line. The line was not rewritten for the lead context.
+
+MCP is capable: user-Supabase deploy_edge_function, project_id, name, entrypoint_path, verify_jwt, files[{name,content}]. Do not send until pin, Vera precheck (renders in renders/), and Sable release.
+
+BEFORE (captured, read-only, nothing deployed):
+  list_edge_functions project_id=cqzvqzwwevnflinxgnpp at 2026-11-24 3:39 PM ET (EST).
+  42 functions. Identity matches BEFORE-v2 2248d016 (3:23 PM ET) for all 42 (name, version, ezbr, updated_at, verify_jwt).
+  send-s1-welcome-email v40, ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85, verify_jwt=false.
+  submit-assessment v50, ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296, verify_jwt=true.
+  submit-lead-assessment v36, ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf, verify_jwt=false.
+
+1) send-s1-welcome-email
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "send-s1-welcome-email"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: false
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes of send-s1-welcome-email/source/index.ts, sha256 4501ab10af456e0924d689ce71ed6f85e47d7a9fd38d16790e4b674dba00e004>
+      - name: "_shared/events.ts"
+        content: <exact bytes of send-s1-welcome-email/_shared/events.ts, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "_shared/email_footer.ts"
+        content: <exact bytes of send-s1-welcome-email/_shared/email_footer.ts, sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b>
+  Rollback (not run): same call, verify_jwt false, files from send-s1-welcome-email/rollback-live-v40/. Expect ezbr back to 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85, verify_jwt false.
+
+2) submit-assessment
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "submit-assessment"
+    entrypoint_path: "functions/submit-assessment/index.ts"
+    verify_jwt: true
+    files:
+      - name: "functions/submit-assessment/index.ts"
+        content: <exact bytes of submit-assessment/functions/submit-assessment/index.ts, sha256 a962a1e29017fb0afa6a44522b263d070c63e62d698b003259a46eb973c656c8>
+      - name: "functions/submit-assessment/mood_block.ts"
+        content: <exact bytes, sha256 763ca702c1692ab443c95bc9af5185f70d30da88ee8cdc4fe8715af14509885d>
+      - name: "functions/submit-assessment/schedule.ts"
+        content: <exact bytes, sha256 c28532c8f029ea9e96eb9f7f5cfdc78ce1db5230b9bf4056f3f40e902b015962>
+      - name: "functions/_shared/capture_methods.ts"
+        content: <exact bytes, sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e>
+      - name: "functions/_shared/email_footer.ts"
+        content: <exact bytes, sha256 0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b>
+      - name: "functions/_shared/events.ts"
+        content: <exact bytes, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "functions/_shared/rate_limit.ts"
+        content: <exact bytes, sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8>
+  Rollback (not run): same call, verify_jwt true, files from submit-assessment/rollback-live-v50/. Expect ezbr back to edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296, verify_jwt true.
+
+3) submit-lead-assessment
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "submit-lead-assessment"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: false
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes of submit-lead-assessment/source/index.ts, sha256 7132917ae2d4e43d6e2b850c1117d6f02e831d13d3d5b9ce7e227ad11cc295a1>
+      - name: "source/email.ts"
+        content: <exact bytes of submit-lead-assessment/source/email.ts, sha256 243c04dffe1d60c2580491c11c270dd4c5f3ba3d33e392c7dbf24b9f922d417a>
+      - name: "_shared/capture_methods.ts"
+        content: <exact bytes, sha256 d14764c60e06cb82853b2d16aca203e188c227fe6544dae9f266054fab282c4e>
+      - name: "_shared/events.ts"
+        content: <exact bytes, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "_shared/rate_limit.ts"
+        content: <exact bytes, sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8>
+      - name: "_shared/t1_narrow_bands.ts"
+        content: <exact bytes, sha256 007cbe26a4664ae89aec791c7c1f19ce29a6f4dc682096f64b901932f7515127>
+  Rollback (not run): same call, verify_jwt false, files from submit-lead-assessment/rollback-live-v36/. Expect ezbr back to 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf, verify_jwt false.
+
+After check (not run):
+  list_edge_functions and get_edge_function for the three names.
+  Expect only those three to change: new version, new ezbr, new updated_at; verify_jwt unchanged (false / true / false); entrypoints unchanged.
+  The other 39 functions must be unchanged (same name, version, ezbr, updated_at, verify_jwt as this BEFORE list).

@@ -1,0 +1,20 @@
+EXPECTED-AFTER — deploy-set-D7-EMAILS-MAR1 (not run; no deploy)
+
+Only these three functions change. The other 39 stay at the BEFORE list (42 total).
+
+1. send-s1-welcome-email
+   BEFORE: v40, ezbr 99f5d36bcefd3ffb08b99c5570a757077bc0ac7fd6a66af8319ec38706c80d85, verify_jwt false, updated 2026-10-06 01:01:47 PM EDT
+   AFTER:  new version (v41 if nothing else ships in between), new ezbr, new updated_at, verify_jwt false, entrypoint still source/index.ts.
+   Staged source/index.ts sha256 4501ab10af456e0924d689ce71ed6f85e47d7a9fd38d16790e4b674dba00e004 (4501ab10). Rollback ezbr 99f5d36b.
+
+2. submit-assessment
+   BEFORE: v50, ezbr edb16eb4a277349df487359f8e087f3f99ecf0c3ebaedadf2b738bc5014d1296, verify_jwt true, updated 2026-11-16 09:42:39 AM EST
+   AFTER:  new version (v51 if nothing else ships in between), new ezbr, new updated_at, verify_jwt true, entrypoint still functions/submit-assessment/index.ts.
+   Staged functions/submit-assessment/index.ts sha256 a962a1e29017fb0afa6a44522b263d070c63e62d698b003259a46eb973c656c8 (a962a1e2). Rollback ezbr edb16eb4.
+
+3. submit-lead-assessment
+   BEFORE: v36, ezbr 48c6f464cbff37e67c3e0a60fb450b2e6a949fb9ab59475da5190e2df5a1dddf, verify_jwt false, updated 2026-10-26 05:52:22 PM EDT
+   AFTER:  new version (v37 if nothing else ships in between), new ezbr, new updated_at, verify_jwt false, entrypoint still source/index.ts.
+   Staged source/email.ts sha256 243c04dffe1d60c2580491c11c270dd4c5f3ba3d33e392c7dbf24b9f922d417a (243c04df). index.ts unchanged. Rollback ezbr 48c6f464.
+
+Vera: read the staged renders in renders/ (HTML and text of each email; $60 and March 1, 2027; fixture recipient user@example.com only).

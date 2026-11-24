@@ -1,0 +1,40 @@
+Fixture for Vera live-text read. Recipient: user@example.com. Subject: Your ROMRx account is ready. Here's your first move.
+
+Your ROMRx account is ready.
+
+              ROMRx
+
+              Personalized Readiness Profile™
+
+              Hey Example,
+
+              You're in.
+
+              Most people who get real results with ROMRx do one thing first: complete the Personalized Readiness Profile™ assessment.
+
+              It takes about 15 minutes on your phone. You'll see your top three problem areas and a clear next step for longevity, self-care, and mobility.
+
+              You don't need to train a sport. Base is for taking care of your body for the long run.
+
+                      → Start My Assessment
+                     (https://romrx.io/app/onboarding/assessment)
+
+              Talk soon,
+
+              Jim Scott
+
+              Founder, ROMRx
+
+              P.S. The assessment is free. You'll need your phone, a chair, a wall, a tape measure or ruler, and a little floor space.
+
+              ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel. Cancel online anytime in Settings: https://romrx.io/app/dashboard/settings
+
+              This is my personal email. Save it. If anything's confusing, reply and I'll help.
+
+                ROMRx LLC, 6605 Longshore Street, Suite 240, Dublin, OH 43017-2774
+
+                You're receiving this because you created a ROMRx account.
+
+                hello@romrx.io (mailto:hello@romrx.io)
+
+                unsubscribe (https://romrx.io/app/unsubscribe?email=user%40example.com)

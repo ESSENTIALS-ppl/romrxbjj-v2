@@ -1,0 +1,29 @@
+Fixture for Vera live-text read. Recipient: user@example.com. Subject: Your ROM score: 85/100 · Building.
+
+ROMRx
+
+    Your Assessment Results
+
+      Your ROM Score
+
+      85/100
+
+      Building
+
+    Hey there,
+
+    Your ROM score is 85/100 · Building.
+
+    Progress needed on key joints. Continue to your dashboard for your individualized plan and stay consistent with it.
+
+    This is the start of your Personalized Readiness Protocol for longevity, self-care, and mobility. Unlock your dashboard to see your joints, your top three problem areas, and your next step.
+
+      Unlock My Dashboard (https://romrx.io/app/unlock/example-unlock-token)
+      ROMRx Base is free until March 1, 2027, our beta launch trial period. Then $60 a year, charged to your card on March 1, 2027 and every year until you cancel. Cancel online anytime in Settings: https://romrx.io/app/dashboard/settings
+
+      Why this matters:
+      Peer-reviewed research links functional mobility to long-term health outcomes. Recent work from the European Journal of Preventive Cardiology shows that low sit-rise scores predict natural and cardiovascular mortality independent of other risk factors. Your ROM Readiness Protocol is a modifiable proxy for that risk.
+
+      Araujo CGS et al. "Sitting-rising test scores predict natural and cardiovascular causes of deaths." European Journal of Preventive Cardiology, June 2025. DOI: 10.1093/eurjpc/zwaf325 (https://academic.oup.com/eurjpc/advance-article/doi/10.1093/eurjpc/zwaf325/8163161)
+
+  You received this because you completed a ROMRx assessment. Unsubscribe (https://romrx.io/app/unsubscribe?email=user%40example.com).

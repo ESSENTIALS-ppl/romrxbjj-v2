@@ -1,0 +1,11 @@
+deno test --allow-read tests/d7_emails_mar1.test.ts
+2026-11-24, America/New_York (ET)
+
+running 5 tests from ./tests/d7_emails_mar1.test.ts
+verbatim S9 + cancel how-to are exact ... ok
+send-s1-welcome-email: Base betaLine only, BJJ and BB stay empty ... ok
+submit-assessment: Base betaLine only, BJJ and BB stay empty ... ok
+submit-lead-assessment email.ts: footnote only, index.ts unchanged ... ok
+lead renderEmail contains S9, $60, March 1, 2027, and the cancel how-to; no Jan 1 / Dec 31 / free through ... ok
+
+ok | 5 passed | 0 failed
