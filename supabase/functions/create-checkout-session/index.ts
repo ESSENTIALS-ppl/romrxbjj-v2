@@ -5,7 +5,7 @@
 //   Base-only trial_end and the Dec 30, 2026 12:00 PM ET 503 are unchanged.
 // v40 (Jim, 2026-10-06 12:32 PM ET): sport pack checkout kill switch. Unless env PACKS_CHECKOUT_OPEN is "true",
 //   mode=unlock and any mode=base request naming a sport (pending_sport/add/sport) or a non-Base price_id returns
-//   403 {error/message:"Sport packs open in January 2027.", code:"packs_closed"} before any auth, lead claim or Stripe
+//   403 {error/message:"Sport packs are coming Spring 2027.", code:"packs_closed"} before any auth, lead claim or Stripe
 //   call. Exception (Base must keep working): a lead-email unlock (mode=base WITH lead_token) that names a sport has
 //   the sport dropped and continues as Base-only (Base price, no pending_sport metadata); logged as
 //   checkout_packs_closed_sport_dropped. Plain Base, coach, webhook, portal and existing subscriptions unchanged.

@@ -6,7 +6,7 @@
 //
 // Scope: only NEW checkout sessions in create-checkout-session. stripe-webhook, create-portal-session, renewals and
 // sport_entitlements are untouched, so existing subscriptions and access are unaffected.
-export const PACKS_CLOSED_MESSAGE = "Sport packs open in January 2027.";
+export const PACKS_CLOSED_MESSAGE = "Sport packs are coming Spring 2027.";
 export const PACKS_CLOSED_CODE = "packs_closed";
 export const PACKS_CLOSED_STATUS = 403;
 

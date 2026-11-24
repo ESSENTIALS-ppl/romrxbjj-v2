@@ -1,6 +1,6 @@
 // JAN1-PACK-CHARGE fix tests. Run: deno test supabase/functions/create-checkout-session/test/packs_gate_jan1.test.ts
 import { assertEquals } from "jsr:@std/assert@1";
-import { packsCheckoutOpen, packGateDecision, PACKS_EARLIEST_OPEN_UNIX } from "../packs_gate.ts";
+import { packsCheckoutOpen, packGateDecision, packsClosedBody, PACKS_CLOSED_MESSAGE, PACKS_CLOSED_CODE, PACKS_EARLIEST_OPEN_UNIX } from "../packs_gate.ts";
 import { BETA_TRIAL_END_UNIX } from "../../_shared/arl_copy.ts";
 
 const BASE = "price_1TpvnqDou9Iktbw0GMayhIQ7";
@@ -36,4 +36,13 @@ Deno.test("gate decisions unchanged: unlock and combo blocked, lead combo drops 
   assertEquals(packGateDecision("base", { pending_sport: "bodybuilding", lead_token: "t" }, BASE).action, "drop_sport");
   assertEquals(packGateDecision("base", {}, BASE).action, "pass");
   assertEquals(packGateDecision("base", { price_id: BASE }, BASE).action, "pass");
+});
+
+Deno.test("PACKS_CLOSED_MESSAGE is Stacy's 2026-11-24 2:17 PM ET cleared text", () => {
+  assertEquals(PACKS_CLOSED_MESSAGE, "Sport packs are coming Spring 2027.");
+  assertEquals(packsClosedBody(), {
+    error: "Sport packs are coming Spring 2027.",
+    message: "Sport packs are coming Spring 2027.",
+    code: PACKS_CLOSED_CODE,
+  });
 });
