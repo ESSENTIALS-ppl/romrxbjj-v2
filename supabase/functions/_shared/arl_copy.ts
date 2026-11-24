@@ -178,3 +178,62 @@ ${items}
 export function ackText(basePrice: string, sportPack?: string | null, sportPrice?: string | null): string {
   return ["Your subscription terms", ...ackLines(basePrice, sportPack, sportPrice).map((l) => `- ${l}`), "", ackFooter()].join("\n");
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// ARL-PAID-STRINGS-MAR1 (append only; every line above is byte-unchanged). Stacy 1518 Part D (sha 66272c03), D1, D3, D4,
+// verbatim. From 1803920400 (Mar 1, 2027 12:00 PM ET) checkout charges at sign-up: no trial, no closure (Sable L1487/L1489).
+// Keyed on now >= BETA_TRIAL_END_UNIX for checkout; the ack is keyed on the session's recorded arl_version (falls back
+// to the clock only when the session has none), so a delayed webhook across noon still gets the matching text.
+export const ARL_DISCLOSURE_VERSION_PAID = "ca-arl-3b-2027-03-01-paid-v1";
+export const ARL_ACK_VERSION_PAID = "ca-arl-3c-2027-03-01-paid-v1";
+
+/** true from 1803920400 on (the same instant inFreePeriod() turns false). */
+export function inPaidPeriod(nowMs: number = Date.now()): boolean {
+  return !inFreePeriod(nowMs);
+}
+
+/** D1 checkout disclosure (Stripe custom_text.submit), Base only, paid. */
+export function disclosureBasePaid(basePrice: string): string {
+  return `${basePrice} per year for ROMRx Base, charged to your card today and on this date every year until you cancel. Your plan renews automatically for one year at a time. Cancel online anytime in Settings at https://romrx.io/app/dashboard/settings, or email hello@romrx.io. Canceling ends your access right away and stops future charges. All sales are final. We do not refund charges already made, except where the law requires a refund. We will email you before each yearly renewal.`;
+}
+
+/** D3 consent box (Stripe terms_of_service_acceptance), paid. */
+export function consentTextBasePaid(basePrice: string): string {
+  return `I agree that ROMRx Base renews automatically every year at ${basePrice} until I cancel, and I agree to the [Terms](https://romrx.io/legal).`;
+}
+
+/** D4 ack lines, paid (1414 P5 verbatim). Subject is ackSubject(). */
+export function ackLinesBasePaid(basePrice: string): string[] {
+  return [
+    "Plan: ROMRx Base",
+    `Charged today: ${basePrice} for one year of ROMRx Base.`,
+    `Renewal: your plan renews automatically every year on this date at ${basePrice} until you cancel. We will tell you before any price change.`,
+    "How to cancel: cancel online anytime at https://romrx.io/app/dashboard/settings or in the app under Settings > Subscription > Cancel subscription. You can also email hello@romrx.io with the subject \"Cancel.\"",
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+    "Reminders: we will email you before each yearly renewal.",
+  ];
+}
+export function ackHtmlBasePaid(basePrice: string): string {
+  return renderAckHtml(ackSubject(), null, ackLinesBasePaid(basePrice));
+}
+export function ackTextBasePaid(basePrice: string): string {
+  return ["Your subscription terms", ...ackLinesBasePaid(basePrice).map((l) => `- ${l}`), "", ackFooter()].join("\n");
+}
+
+/** Checkout selector (Base only): version + disclosure + consent + whether to send trial_end. */
+export function baseCheckoutCopy(basePrice: string, nowMs: number = Date.now()):
+  { version: string; disclosure: string; consent: string; trialEndUnix: number | null } {
+  return inPaidPeriod(nowMs)
+    ? { version: ARL_DISCLOSURE_VERSION_PAID, disclosure: disclosureBasePaid(basePrice), consent: consentTextBasePaid(basePrice), trialEndUnix: null }
+    : { version: ARL_DISCLOSURE_VERSION, disclosure: disclosureBase(basePrice), consent: ARL_CONSENT_TEXT, trialEndUnix: BETA_TRIAL_END_UNIX };
+}
+
+/** Webhook ack selector (Base only). sessionVersion = the Checkout Session's metadata.arl_version. */
+export function baseAckCopy(basePrice: string, sessionVersion: string | null | undefined, nowMs: number = Date.now()):
+  { version: string; html: string; text: string } {
+  const paid = sessionVersion === ARL_DISCLOSURE_VERSION_PAID ||
+    (!sessionVersion && inPaidPeriod(nowMs));
+  return paid
+    ? { version: ARL_ACK_VERSION_PAID, html: ackHtmlBasePaid(basePrice), text: ackTextBasePaid(basePrice) }
+    : { version: ARL_ACK_VERSION, html: ackHtml(basePrice), text: ackText(basePrice) };
+}
