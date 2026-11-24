@@ -1,0 +1,17 @@
+run_7am_et	logic	selected	type	charge_date	first_charge	dedupe_blocked
+2026-12-02	live_v32	YES	30_day	2027-01-01	-	false
+2026-12-02	d3_v2	no	-	-	-	-
+2026-12-30	live_v32	YES	2_day	2027-01-01	-	false
+2026-12-30	d3_v2	no	-	-	-	-
+2027-01-15	live_v32	YES	45_day	2027-03-01	-	false
+2027-01-15	d3_v2	YES	45_day	2027-03-01	true	false
+2027-01-30	live_v32	YES	30_day	2027-03-01	-	false
+2027-01-30	d3_v2	YES	30_day	2027-03-01	true	false
+2027-02-27	live_v32	YES	2_day	2027-03-01	-	false
+2027-02-27	d3_v2	YES	2_day	2027-03-01	true	false
+2026-11-25	live_v32	YES	45_day	2027-01-01	-	true
+2026-11-25	d3_v2	no	-	-	-	-
+2027-01-16	live_v32	YES	45_day	2027-03-01	-	false
+2027-01-16	d3_v2	YES	45_day	2027-03-01	true	false
+2027-02-28	live_v32	YES	2_day	2027-03-01	-	false
+2027-02-28	d3_v2	YES	2_day	2027-03-01	true	false
