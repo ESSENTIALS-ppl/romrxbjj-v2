@@ -1,0 +1,133 @@
+--- rollback/live-v107/ai-chat/handler.js	2026-11-24 16:45:28.643533573 -0500
++++ source/ai-chat/handler.js	2026-11-24 16:46:31.909350010 -0500
+@@ -1,7 +1,7 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+ import { createClient as N } from "jsr:@supabase/supabase-js@2";
+ import { isCrisisMessage, isMoodQuestion, loadMoodForAi, moodPromptBlock, composeMoodReply, stripMoodHistory, isMoodTipRequest, tipRequestReply, MOOD_CONSENT_OFF_REPLY, MOOD_NO_DATA_REPLY, MOOD_ERROR_REPLY, MOOD_PROVIDER_REPLY } from "./romood_chat.js";
+-import { mobilityScoreForAssessment, mobilityRawScoreForAssessment, gateAssessment, gateJointScores, setHipFlexScoredAtMs } from "./mobility_score.js";
++import { mobilityScoreForAssessment, mobilityRawScoreForAssessment, bodyScoreChange, gateAssessment, gateJointScores, setHipFlexScoredAtMs } from "./mobility_score.js";
+ 
+ const q = Deno.env.get("SUPABASE_URL");
+ const x = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+@@ -386,25 +386,43 @@
+ // (scoring_cutovers.hip_flex_scored) plus per-assessment hip flexion scores, and the latest assessment's joint_scores.
+ const SCORE_ASSESSMENT_COLS =
+   "id, assessed_at, created_at, check_kind, hip_er_l, hip_er_r, hip_ir_l, hip_ir_r, hip_abd_l, hip_abd_r, hip_flex_l, hip_flex_r, shoulder_er_l, shoulder_er_r, shoulder_flex_l, shoulder_flex_r, ankle_df_l, ankle_df_r, lumbar_flex, lumbar_ext, cervical_rot_l, cervical_rot_r, cervical_lat_l, cervical_lat_r, cervical_flex, cervical_ext, thoracic_rot, thoracic_rot_l, thoracic_rot_r, worst_joints";
+-/** Pure: rows = newest first (already non-quick); latestScores = joint_scores rows of rows[0]; cutMs = cutover ms or null. */
+-function computeDisplayScores(rows, latestScores, cutMs, hipScoredIds) {
++/**
++ * Pure: rows = newest first (already non-quick); latestScores = joint_scores rows of rows[0]; cutMs = cutover ms or null;
++ * firstRow = the user's first full assessment by assessed_at (or null). v108: every change is bodyScoreChange (romrx-io-web
++ * tag fg-08-mybody-progress-v2, lib/jointHistory.ts), the ONE function behind the My Body "vs <date>" chip and the
++ * "Where you started / Where you are now" Body score row, so ROMBot and the app always show the same numbers.
++ * Selection mirrors MyBody.tsx at that tag: earlier = the other rows assessed at or before the latest; previous = earlier[0];
++ * first = earlier row with the first's id, else the gated first row, else the oldest earlier row; no first-to-latest when
++ * first is the latest or not strictly older (buildStartedVsNow).
++ */
++function computeDisplayScores(rows, latestScores, cutMs, hipScoredIds, firstRow = null) {
+   if (!Array.isArray(rows) || rows.length === 0) return null;
+   setHipFlexScoredAtMs(Number.isFinite(cutMs) ? cutMs : null); // same state the client loads; null = pre-cutover (client default)
+   const ids = hipScoredIds instanceof Set ? hipScoredIds : new Set(hipScoredIds ?? []);
+   const gated = rows.map((a) => gateAssessment(a, ids));
+   const latest = gated[0];
+   const js = gateJointScores(rows[0], Array.isArray(latestScores) ? latestScores : []);
++  const ms = (a) => { const t = Date.parse(String(a?.assessed_at ?? "")); return Number.isFinite(t) ? t : null; };
++  const latestMs = ms(latest);
++  const earlier = gated.filter((a) => a.id !== latest.id && (latestMs == null || (ms(a) ?? -Infinity) <= latestMs));
+   const byId = {};
+   gated.forEach((a, i) => {
+     byId[a.id] = { dial: i === 0 ? mobilityScoreForAssessment(latest, js) : mobilityScoreForAssessment(a), raw: mobilityRawScoreForAssessment(a), assessed_at: a.assessed_at };
+   });
+-  const prev = gated[1] ?? null;
++  const prev = earlier[0] ?? null;
++  const first = (firstRow && earlier.find((a) => a.id === firstRow.id)) ?? (firstRow ? gateAssessment(firstRow, ids) : null) ?? earlier[earlier.length - 1] ?? null;
++  const firstOk = !!first && first.id !== latest.id && ms(first) != null && latestMs != null && ms(first) < latestMs;
+   return {
+     dial: byId[latest.id].dial,
+     latestRaw: byId[latest.id].raw,
+     previousAt: prev ? prev.assessed_at : null,
+-    change: prev ? byId[latest.id].raw - byId[prev.id].raw : null,
++    change: prev ? bodyScoreChange(prev, latest).delta : null,
++    firstAt: firstOk ? first.assessed_at : null,
++    changeSinceFirst: firstOk ? bodyScoreChange(first, latest).delta : null,
++    firstIsPrevious: firstOk && !!prev && first.id === prev.id,
+     byId,
++    gatedById: Object.fromEntries(gated.map((a) => [a.id, a])),
++    latestId: latest.id,
+   };
+ }
+ async function loadDisplayScores(s, userId) {
+@@ -416,7 +434,19 @@
+     .order("assessed_at", { ascending: false })
+     .limit(4);
+   if (error || !Array.isArray(rows) || rows.length === 0) return null;
+-  const ids = rows.map((r) => r.id);
++  let firstRow = null;
++  try {
++    const { data: f, error: fe } = await s
++      .from("assessments")
++      .select(SCORE_ASSESSMENT_COLS)
++      .eq("user_id", userId)
++      .or("check_kind.is.null,check_kind.neq.quick")
++      .order("assessed_at", { ascending: true })
++      .limit(1)
++      .maybeSingle();
++    if (!fe && f) firstRow = f;
++  } catch { firstRow = null; } // client fallback: the oldest loaded assessment
++  const ids = [...new Set([...rows.map((r) => r.id), ...(firstRow ? [firstRow.id] : [])])];
+   const [cut, hip, js] = await Promise.all([
+     s.from("scoring_cutovers").select("effective_at").eq("key", "hip_flex_scored").maybeSingle(),
+     s.from("joint_scores").select("assessment_id").eq("joint_key", "hip_flex").not("score", "is", null).in("assessment_id", ids),
+@@ -424,7 +454,7 @@
+   ]);
+   const cutMs = !cut.error && cut.data?.effective_at ? Date.parse(String(cut.data.effective_at)) : NaN;
+   const hipIds = new Set(!hip.error && Array.isArray(hip.data) ? hip.data.map((r) => r.assessment_id) : []);
+-  return computeDisplayScores(rows, js.error ? [] : js.data, cutMs, hipIds);
++  return computeDisplayScores(rows, js.error ? [] : js.data, cutMs, hipIds, firstRow);
+ }
+ /** "Nov 10", the same short date as the chip, in the user's time zone (default New York). */
+ function scoreShortDate(iso, tz) {
+@@ -435,9 +465,16 @@
+   return String(iso ?? "").slice(0, 10);
+ }
+ function formatScoreChange(sc, tz) {
+-  if (!sc || sc.change == null || !sc.previousAt) return "";
+-  const d = sc.change;
+-  return `  Change vs previous assessment (${scoreShortDate(sc.previousAt, tz)}): ${d > 0 ? "+" : ""}${d} (same as the change shown next to the score in the app)`;
++  if (!sc) return "";
++  const sign = (d) => `${d > 0 ? "+" : ""}${d}`;
++  const out = [];
++  if (sc.change != null && sc.previousAt) {
++    out.push(`  Change since previous assessment (${scoreShortDate(sc.previousAt, tz)} to latest): ${sign(sc.change)} (same as the "vs ${scoreShortDate(sc.previousAt, tz)}" change next to the Body score in the app)`);
++  }
++  if (sc.changeSinceFirst != null && sc.firstAt && !sc.firstIsPrevious) {
++    out.push(`  Change since first assessment (${scoreShortDate(sc.firstAt, tz)} to latest): ${sign(sc.changeSinceFirst)} (same as the Body score row in "Where you started / Where you are now" in the app)`);
++  }
++  return out.join("\n");
+ }
+ 
+ /** Base / general athlete prompt: mobility bands, no technique GREEN/YELLOW/RED. */
+@@ -490,10 +527,11 @@
+ 
+ ## Your measurements (this person's own numbers; OK to share with them)
+ ${formatMeasurements(jointScores, n.display_scores ? n.display_scores.dial : null)}${n.display_scores && formatScoreChange(n.display_scores, n.score_tz) ? `\n${formatScoreChange(n.display_scores, n.score_tz)}` : ""}
+-Overall ROM score rules: quote only the "Overall ROM score" above (it is the score on the My Body dial). If asked whether they improved, use only the "Change vs previous assessment" number. Never compute a score or a change yourself.
++Overall ROM score rules: quote only the "Overall ROM score" above (it is the score on the My Body dial). If asked whether they improved, use the "Change since previous assessment" number and say it is since that date; if asked about since they started, use the "Change since first assessment" number and say it is since their first assessment. Never compute a score or a change yourself, and never give any other overall number.
+ 
+ ## Priority mobility protocol
+ ${formatProtocol(m)}
++Dose rule: a timed or hold dose (seconds, minutes, holds) is quoted exactly as written in its line above, word for word, including anything in parentheses (for example "30 sec, 3-5 sets daily (90-150 sec total)"). Do not shorten, round or reword it. Rep-based lines stay "3 sets of 10".
+ ${n.assessment_history ? `
+ ## Earlier assessments (this person's own history, changes already worked out versus the latest assessment)
+ ${n.assessment_history}
+@@ -899,8 +937,8 @@
+     if (scores !== undefined) {
+       // SCORE (staged): the dial score that assessment had and the uncapped change to the latest; never rom_total.
+       const e = scores && scores.byId ? scores.byId[a.id] : null;
+-      const ch = e ? scores.latestRaw - e.raw : null;
+-      totTxt = e ? ` (Overall ROM score ${e.dial}/100, ${ch >= 0 ? "+" : ""}${ch} to latest)` : "";
++      const ch = e && scores.gatedById && scores.gatedById[a.id] && scores.gatedById[scores.latestId] ? bodyScoreChange(scores.gatedById[a.id], scores.gatedById[scores.latestId]).delta : null;
++      totTxt = e && ch != null ? ` (Overall ROM score ${e.dial}/100, ${ch >= 0 ? "+" : ""}${ch} to latest)` : "";
+     } else {
+       const total = num(a.rom_total);
+       const totNow = num(latestRomTotal);

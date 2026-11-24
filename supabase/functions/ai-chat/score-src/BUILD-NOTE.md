@@ -1,4 +1,6 @@
 # ai-chat combined build: dial score + card sets/reps (Base only), 2026-11-24
+
+> SUPERSEDED (v107, 4:40 PM ET Nov 24 2026): Item 2 (card sets/reps) was reverted. Live Base ROMBot says "3 sets of 10" again (Jim ledger L997); only the score part below is live.
 Built on: live ai-chat v105 (rollback/live-v105/, CLI-downloaded readback of v105, ezbr 78dbcb38).
 Changed: source/ai-chat/handler.js (COMBINED-handler.diff) and the new supabase/functions/ai-chat/mobility_score.js. index.ts, romood_chat.js, romood_tips.js and _shared/rate_limit.ts are byte-identical to v105.
 
