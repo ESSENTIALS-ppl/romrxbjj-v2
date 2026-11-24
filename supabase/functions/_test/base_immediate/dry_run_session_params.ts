@@ -1,6 +1,6 @@
 // DRY RUN (read-only): prints the exact Stripe Checkout Session params the branch's create-checkout-session would send for a
 // plain Base request, before and after the cutover, for options A and C. Stripe, Supabase and fetch are mocks: nothing is
-// created, nothing leaves this machine. No Stripe call, no test checkout, no billing test.
+// created, nothing leaves this machine, and no request ever reaches Stripe.
 // Run from supabase/functions:
 //   deno run --no-check --allow-read --allow-write=/tmp --allow-env --allow-run=git \
 //     --import-map=_test/base_immediate/import_map.json _test/base_immediate/dry_run_session_params.ts
