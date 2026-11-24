@@ -12,11 +12,12 @@ const T = PACKS_EARLIEST_OPEN_UNIX * 1000;
 const NOV17 = Date.UTC(2026, 10, 17, 12);
 const SPRING = Date.UTC(2027, 2, 20, 12);
 
-Deno.test("Base only: no pack item, Jan 1 trial kept", () => {
+Deno.test("Base only: no pack item, March 1 2027 noon ET trial kept", () => {
   for (const open of [false, true]) {
     const p = planBaseCheckout(false, open);
     assertEquals(p.includePack, false);
     assertEquals(p.trialEndUnix, PACKS_EARLIEST_OPEN_UNIX);
+    assertEquals(p.trialEndUnix, 1803920400);
   }
 });
 

@@ -9,9 +9,11 @@ const DEC31 = Date.UTC(2026, 11, 31, 23, 59);
 const T = PACKS_EARLIEST_OPEN_UNIX * 1000;
 const SPRING = Date.UTC(2027, 2, 20, 12);
 
-Deno.test("floor equals the Base trial end (Jan 1, 2027 noon ET)", () => {
+Deno.test("floor equals the Base trial end (March 1, 2027 noon ET)", () => {
   assertEquals(PACKS_EARLIEST_OPEN_UNIX, BETA_TRIAL_END_UNIX);
-  assertEquals(new Date(T).toISOString(), "2027-01-01T17:00:00.000Z");
+  assertEquals(PACKS_EARLIEST_OPEN_UNIX, 1803920400);
+  assertEquals(BETA_TRIAL_END_UNIX, 1803920400);
+  assertEquals(new Date(T).toISOString(), "2027-03-01T17:00:00.000Z");
 });
 Deno.test("env true is ignored before and at the trial end", () => {
   for (const now of [NOV17, DEC31, T - 1, T]) assertEquals(packsCheckoutOpen("true", now), false);

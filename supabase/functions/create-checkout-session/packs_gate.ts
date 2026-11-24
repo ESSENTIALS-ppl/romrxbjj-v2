@@ -19,7 +19,7 @@ export const PACKS_CLOSED_STATUS = 403;
 // index.ts also refuses to add a pack line item unless packsCheckoutOpen is true, and never sets trial_end
 // on a pack-bearing subscription (combo or unlock). After the floor, a pack is charged only when bought.
 // Must equal BETA_TRIAL_END_UNIX in _shared/arl_copy.ts (asserted in test/packs_gate_jan1.test.ts).
-export const PACKS_EARLIEST_OPEN_UNIX = 1798822800;
+export const PACKS_EARLIEST_OPEN_UNIX = 1803920400;
 
 export function packsCheckoutOpen(raw: string | undefined | null, nowMs: number = Date.now()): boolean {
   if (nowMs <= PACKS_EARLIEST_OPEN_UNIX * 1000) return false;

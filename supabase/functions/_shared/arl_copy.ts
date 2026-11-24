@@ -13,7 +13,7 @@ export const ARL_DISCLOSURE_VERSION = "ca-arl-3b-2026-09-29-v3";
 export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
-export const BETA_TRIAL_END_UNIX = 1798822800;
+export const BETA_TRIAL_END_UNIX = 1803920400;
 export function inFreePeriod(nowMs: number = Date.now()): boolean {
   return nowMs < BETA_TRIAL_END_UNIX * 1000;
 }
