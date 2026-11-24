@@ -1,0 +1,59 @@
+TRIALEND-MAR1 deploy call — NOT RUN. STAGE ONLY. DO NOT DEPLOY.
+Fast-track: move Base trial_end / BETA_TRIAL_END_UNIX from 1798822800 (2027-01-01 12:00 PM ET) to 1803920400 (2027-03-01 12:00 PM ET / 2027-03-01T17:00:00Z).
+Jim's 2:55 PM ET Nov 24 line, relayed by Sable and Grant: "Base should take a card now but not charge until let's say March 1 2027".
+Do not deploy until pin, Vera precheck, and Sable release.
+
+Started from deploy-set-L1468 bytes. Live create-checkout-session is still v52, ezbr 36abc3ba418b2b0a10b65cc0d0aaad23fed5151b8adb8491adb3fb995cc717d9, verify_jwt true, updated 2026-11-24 2:43:33 PM ET (EST). Confirmed by MCP get_edge_function and list_edge_functions at ~3:01 PM ET Nov 24. That matches the L1468 receipt.
+
+MCP is capable: user-Supabase deploy_edge_function, project_id, name, entrypoint_path, verify_jwt, files[{name,content}].
+entrypoint_path is source/index.ts (matches live). verify_jwt is true (matches live; do not change it). import_map_path is omitted (live import_map is false). The call would replace the live function immediately, so it must not be sent until Sable releases this file set.
+
+Exact MCP call (not run):
+
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "create-checkout-session"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: true
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes of deploy-set-TRIALEND-MAR1/source/index.ts, sha256 3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666>
+      - name: "source/packs_gate.ts"
+        content: <exact bytes of deploy-set-TRIALEND-MAR1/source/packs_gate.ts, sha256 328ea953b5dc06735790681922632c561b600391beb1a14970aac0a422df6b65>
+      - name: "_shared/arl_copy.ts"
+        content: <exact bytes of deploy-set-TRIALEND-MAR1/_shared/arl_copy.ts, sha256 f713fc4a6f11523a7d00cc4897dfc6edfc094f95f8422d860a2d7ac32f97a230>
+      - name: "_shared/events.ts"
+        content: <exact bytes of deploy-set-TRIALEND-MAR1/_shared/events.ts, sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21>
+      - name: "_shared/rate_limit.ts"
+        content: <exact bytes of deploy-set-TRIALEND-MAR1/_shared/rate_limit.ts, sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8>
+
+BEFORE (captured, read-only, nothing deployed):
+  list_edge_functions project_id=cqzvqzwwevnflinxgnpp
+  41 functions. create-checkout-session v52, ezbr 36abc3ba418b2b0a10b65cc0d0aaad23fed5151b8adb8491adb3fb995cc717d9, verify_jwt=true, updated 2026-11-24 2:43:33 PM ET (EST).
+  BEFORE-function-list.txt sha256 6dfc9d4d3ec37503e8dff90c32e86b849232ad4f4eb6ff873a4e5748e280afad
+
+After check (not run):
+  list_edge_functions and get_edge_function for create-checkout-session.
+  Expect only create-checkout-session to change: new version, new ezbr, new updated_at; verify_jwt remains true; entrypoint still source/index.ts; staged file shas must match the upload (index 3b706ba8, packs_gate 328ea953, arl_copy f713fc4a, events 49f18652, rate_limit f3a82f1d).
+  The other 40 functions must be unchanged (same name, version, ezbr, updated_at, verify_jwt as this BEFORE list).
+
+Rollback (not run): same deploy_edge_function call, entrypoint_path source/index.ts, verify_jwt true, files = the L1468 / live v52 set in rollback/L1468-v52/:
+  - source/index.ts       sha256 3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666
+  - source/packs_gate.ts  sha256 21bc6a5fae3e325a97fce7ab4efd9e2c846d8db4b17e588e9b78fa4b589b4ed5
+  - _shared/arl_copy.ts   sha256 c06bd3153d91dbcd4c9ba9458e7c601dbbb763a3cd07322757ddf7046408b3f3
+  - _shared/events.ts     sha256 49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21
+  - _shared/rate_limit.ts sha256 f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8
+  Confirm after rollback: create-checkout-session returns to v-after-redeploy with ezbr 36abc3ba418b2b0a10b65cc0d0aaad23fed5151b8adb8491adb3fb995cc717d9, verify_jwt=true.
+
+503 cutover behavior (logic not changed):
+  index.ts still returns 503 base_checkout_unavailable when Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000.
+  After this deploy, that instant moves from Dec 30, 2026 12:00 PM ET (1798650000) to Feb 27, 2027 12:00 PM ET (1803747600). It does not block sign-ups today, and it will no longer block them on Dec 30 after this change.
+
+Copy mismatch (not changed in this set):
+  arl_copy.ts customer lines still say "Free through December 31, 2026" and "January 1, 2027". The JSDoc above BETA_TRIAL_END_UNIX still says "(2027-01-01 12:00 ET)". Those belong to the separate March 1 copy plan.
+
+Trial_end is a code constant, not a Supabase secret. There is no BETA_TRIAL_END_UNIX env override. The value actually sent as subscription_data.trial_end on Base-only sessions is PACKS_EARLIEST_OPEN_UNIX in packs_gate.ts, which must equal BETA_TRIAL_END_UNIX. Both are 1803920400 in this set. Packs remain refused; the env flag PACKS_CHECKOUT_OPEN stays ignored until after Mar 1, 2027 12:00 PM ET.
+
+Repo note: supabase/functions/_shared/arl_copy.ts on 643e27f0 is sha256 6b550c27 (imports POSTAL_LINE from email_footer.ts). Live/L1468 is c06bd315 (inlines "ROMRx LLC, Dublin, Ohio"). This deploy set uses the live bytes plus the one numeric change. Do not deploy the repo file.

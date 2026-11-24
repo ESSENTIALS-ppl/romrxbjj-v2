@@ -1,0 +1,27 @@
+DIFF vs deploy-set-L1468 (= live create-checkout-session v52, ezbr 36abc3ba).
+Only two numeric constants change. index.ts, _shared/events.ts, and _shared/rate_limit.ts are byte-identical.
+Customer-facing copy in arl_copy.ts is unchanged and still names January 1, 2027 / December 31, 2026.
+503 logic in index.ts is unchanged.
+
+--- a/_shared/arl_copy.ts	2026-11-24 14:26:52.510557456 -0500
++++ b/_shared/arl_copy.ts	2026-11-24 15:09:20.174627112 -0500
+@@ -11,7 +11,7 @@
+ export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
+ 
+ /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
+-export const BETA_TRIAL_END_UNIX = 1798822800;
++export const BETA_TRIAL_END_UNIX = 1803920400;
+ export function inFreePeriod(nowMs: number = Date.now()): boolean {
+   return nowMs < BETA_TRIAL_END_UNIX * 1000;
+ }
+--- a/source/packs_gate.ts	2026-11-24 14:31:45.088459392 -0500
++++ b/source/packs_gate.ts	2026-11-24 15:09:20.174627112 -0500
+@@ -19,7 +19,7 @@
+ // index.ts also refuses to add a pack line item unless packsCheckoutOpen is true, and never sets trial_end
+ // on a pack-bearing subscription (combo or unlock). After the floor, a pack is charged only when bought.
+ // Must equal BETA_TRIAL_END_UNIX in _shared/arl_copy.ts (asserted in test/packs_gate_jan1.test.ts).
+-export const PACKS_EARLIEST_OPEN_UNIX = 1798822800;
++export const PACKS_EARLIEST_OPEN_UNIX = 1803920400;
+ 
+ export function packsCheckoutOpen(raw: string | undefined | null, nowMs: number = Date.now()): boolean {
+   if (nowMs <= PACKS_EARLIEST_OPEN_UNIX * 1000) return false;

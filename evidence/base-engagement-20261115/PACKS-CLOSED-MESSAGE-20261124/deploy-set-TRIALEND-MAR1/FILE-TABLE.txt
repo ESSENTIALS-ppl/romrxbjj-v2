@@ -1,0 +1,21 @@
+FILE-TABLE — deploy-set-TRIALEND-MAR1 (BUILD ONLY, not deployed)
+Started from deploy-set-L1468 bytes, confirmed still matching live create-checkout-session v52 ezbr 36abc3ba418b2b0a10b65cc0d0aaad23fed5151b8adb8491adb3fb995cc717d9 (get_edge_function + list_edge_functions, 2026-11-24 3:01 PM ET / EST).
+Changes: BETA_TRIAL_END_UNIX and PACKS_EARLIEST_OPEN_UNIX only, both 1803920400 (2027-03-01 12:00:00 PM ET / 2027-03-01T17:00:00Z).
+No customer copy edits. No 503 logic edits. Rollback = the L1468/v52 set (ezbr 36abc3ba).
+
+path                                         sha256                                                           sha8     vs L1468
+----------------------------------------------------------------------------------------------------------------------------------
+source/index.ts                              3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666 3b706ba8  MATCH  UNCHANGED (live v52 / 3b706ba8)
+source/packs_gate.ts                         328ea953b5dc06735790681922632c561b600391beb1a14970aac0a422df6b65 328ea953  changed from 21bc6a5f  PACKS_EARLIEST_OPEN_UNIX 1798822800 -> 1803920400 only
+_shared/arl_copy.ts                          f713fc4a6f11523a7d00cc4897dfc6edfc094f95f8422d860a2d7ac32f97a230 f713fc4a  changed from c06bd315  BETA_TRIAL_END_UNIX 1798822800 -> 1803920400 only; from live c06bd315, not repo 6b550c27
+_shared/events.ts                            49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  MATCH  UNCHANGED (live / 49f18652)
+_shared/rate_limit.ts                        f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  MATCH  UNCHANGED (live / f3a82f1d)
+rollback/L1468-v52/source/index.ts           3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666 3b706ba8  MATCH  rollback = L1468/live v52
+rollback/L1468-v52/source/packs_gate.ts      21bc6a5fae3e325a97fce7ab4efd9e2c846d8db4b17e588e9b78fa4b589b4ed5 21bc6a5f  MATCH  rollback = L1468/live v52
+rollback/L1468-v52/_shared/arl_copy.ts       c06bd3153d91dbcd4c9ba9458e7c601dbbb763a3cd07322757ddf7046408b3f3 c06bd315  MATCH  rollback = L1468/live v52
+rollback/L1468-v52/_shared/events.ts         49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21 49f18652  MATCH  rollback = L1468/live v52
+rollback/L1468-v52/_shared/rate_limit.ts     f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8 f3a82f1d  MATCH  rollback = L1468/live v52
+BEFORE-function-list.txt                     6dfc9d4d3ec37503e8dff90c32e86b849232ad4f4eb6ff873a4e5748e280afad 6dfc9d4d  new
+BEFORE-function-list.json                    b9cdf655b1f33cb951f2b1d25a5f2190018c0e3e111b33f5e8d2f9814812f720 b9cdf655  new
+DIFF.txt                                     eaf7429ef328ccd94381f6ea90f5e8e877c9f7c274fcd3da4fc43fab07c1024d eaf7429e  new
+test-run-deno-12.txt                         b9438e074941f946326cc84eeb92e08a4b4006d811b7d5c933c072db7d3a6b22 b9438e07  new
