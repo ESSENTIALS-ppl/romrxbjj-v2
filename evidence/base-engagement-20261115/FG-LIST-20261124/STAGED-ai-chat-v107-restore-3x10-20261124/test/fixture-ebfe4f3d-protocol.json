@@ -1,0 +1,149 @@
+{
+ "exercises": [
+  {
+   "exercise_type": "resistance",
+   "id": "d11f41e3-d83a-4475-882d-8649dc5be2c6",
+   "joint_key": "hip_flexion",
+   "name": "90/90 Hip Lift (Front Leg Focus)",
+   "reps": "8-10 reps each side",
+   "sets": 3
+  },
+  {
+   "exercise_type": "stretch",
+   "id": "82b5d769-992b-4d65-92d8-1138c4c5bf3a",
+   "joint_key": "hip_flexion",
+   "name": "Supine Knee-to-Chest Stretch",
+   "reps": "30-60 sec each side",
+   "sets": null
+  },
+  {
+   "exercise_type": "resistance",
+   "id": "c5d092fc-c5df-494e-8e50-3bd2475d6165",
+   "joint_key": "shoulder_er",
+   "name": "Band Face Pull with External Rotation",
+   "reps": "12-15 reps",
+   "sets": 3
+  },
+  {
+   "exercise_type": "stretch",
+   "id": "f6fd28fb-b13b-4540-87f3-24a9cc3e7f70",
+   "joint_key": "shoulder_er",
+   "name": "Doorway Pec Stretch",
+   "reps": "30 sec, 3-5 sets daily (90-150 sec total)",
+   "sets": null
+  },
+  {
+   "exercise_type": "foam_roll",
+   "id": "e15f7c6a-ac44-4e1a-8b46-84efc3064f2d",
+   "joint_key": "shoulder_er",
+   "name": "Posterior Shoulder/Infraspinatus Release with Ball",
+   "reps": "60-90 sec each side",
+   "sets": null
+  },
+  {
+   "exercise_type": "resistance",
+   "id": "380403d9-ed34-4fdb-b003-2980cf6081e8",
+   "joint_key": "shoulder_flexion",
+   "name": "Kettlebell Arm Bar",
+   "reps": "20-30 sec each side",
+   "sets": 3
+  },
+  {
+   "exercise_type": "foam_roll",
+   "id": "ca864c77-9555-406d-aaae-68fd5f076dd7",
+   "joint_key": "shoulder_flex",
+   "name": "Lat Foam Roll",
+   "reps": "60-90 sec per side",
+   "sets": null
+  },
+  {
+   "exercise_type": "stretch",
+   "id": "8b1e0c41-f428-41d5-b2a0-9dc6cd716efe",
+   "joint_key": "shoulder_flexion",
+   "name": "Supine Overhead Stretch with Band",
+   "reps": "30-45 sec",
+   "sets": 3
+  }
+ ],
+ "protocol": [
+  {
+   "cue": "Sit in the 90/90 position and lean toward your front shin. Lift your front foot a little off the floor and hold for 5 seconds. Keep your upper body tall.",
+   "exercise": "90/90 Hip Lift (Front Leg Focus)",
+   "joint": "hip_flex",
+   "rank": 1,
+   "reps": "8-10 reps each side",
+   "sets": 3,
+   "type": "resistance"
+  },
+  {
+   "cue": "Lie on your back and pull one knee toward your chest with both hands. Keep your low back flat on the floor. Hold, then switch sides.",
+   "exercise": "Supine Knee-to-Chest Stretch",
+   "joint": "hip_flex",
+   "rank": 1,
+   "reps": "30-60 sec each side",
+   "sets": null,
+   "type": "stretch"
+  },
+  {
+   "cue": "Lie on a ball placed behind your shoulder, between the shoulder blade and the arm. Make small arm circles and move slowly.",
+   "exercise": "Posterior Shoulder/Infraspinatus Release with Ball",
+   "joint": "shoulder_er",
+   "rank": 2,
+   "reps": "60-90 sec each side",
+   "sets": null,
+   "type": "foam_roll"
+  },
+  {
+   "cue": "Anchor a band at face height. Pull the band toward your face and turn your hands up and back so your thumbs point behind you. Pause, then return slowly.",
+   "exercise": "Band Face Pull with External Rotation",
+   "joint": "shoulder_er",
+   "rank": 2,
+   "reps": "12-15 reps",
+   "sets": 3,
+   "type": "resistance"
+  },
+  {
+   "cue": "Forearms on doorframe, elbows at shoulder height. Step through, lean chest forward. Adjust arm height for different pec fibers.",
+   "exercise": "Doorway Pec Stretch",
+   "joint": "shoulder_er",
+   "rank": 2,
+   "reps": "30 sec, 3-5 sets daily (90-150 sec total)",
+   "sets": null,
+   "type": "stretch"
+  },
+  {
+   "cue": "Side-lying, roller under armpit/lateral rib. Bottom arm extended overhead. Roll from armpit toward mid-back. Rotate body slightly forward for different fibers.",
+   "exercise": "Lat Foam Roll",
+   "joint": "shoulder_flex",
+   "rank": 3,
+   "reps": "60-90 sec per side",
+   "sets": null,
+   "type": "foam_roll"
+  },
+  {
+   "cue": "Lie on your back holding a light kettlebell straight up toward the ceiling. Bend the knee on the same side and roll toward the straight arm side. Keep your eyes on the weight.",
+   "exercise": "Kettlebell Arm Bar",
+   "joint": "shoulder_flex",
+   "rank": 3,
+   "reps": "20-30 sec each side",
+   "sets": 3,
+   "type": "resistance"
+  },
+  {
+   "cue": "Lie on your back holding a band with your hands shoulder-width apart. Start at your chest and raise your arms overhead toward the floor behind you. Return slowly.",
+   "exercise": "Supine Overhead Stretch with Band",
+   "joint": "shoulder_flex",
+   "rank": 3,
+   "reps": "30-45 sec",
+   "sets": 3,
+   "type": "stretch"
+  }
+ ],
+ "worst_joints": [
+  "hip_flex_r",
+  "hip_flex_l",
+  "shoulder_er_r",
+  "shoulder_er_l",
+  "shoulder_flex_r"
+ ]
+}

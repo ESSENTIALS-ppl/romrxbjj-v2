@@ -1,0 +1,47 @@
+--- rollback/live-v106/ai-chat/handler.js	2026-11-24 16:38:54.601133594 -0500
++++ source/ai-chat/handler.js	2026-11-24 16:38:54.617133042 -0500
+@@ -157,28 +157,6 @@
+   return lines.join("\n");
+ }
+ 
+-// SETS/REPS (Grant 4:32 PM ET Nov 24 2026): Base takes the dose from the same source and rule as the My Protocol card
+-// (MyProtocol.tsx toRx: sets AND reps -> "<sets> sets x <reps>", else reps, else nothing), read from the same
+-// protocols -> exercises rows (rombot_context.protocol). This replaces the v96d "3 sets of 10" default for Base only;
+-// the sport apps keep formatProtocol unchanged.
+-function cardDose(t) {
+-  const sets = t.sets;
+-  const reps = t.reps;
+-  return sets && reps ? `${sets} sets x ${reps}` : (reps ?? "");
+-}
+-function formatProtocolBase(protocol) {
+-  if (protocol && protocol.length > 0) {
+-    return protocol
+-      .map((t) => {
+-        const dose = String(cardDose(t) ?? "").trim();
+-        const cue = t.cue ?? t.coaching_cue;
+-        return `  ${t.joint ?? t.jointKey ?? t.joint_key}: ${t.exercise}${dose ? ` - ${dose}` : ""}${cue ? ` (${cue})` : ""}`;
+-      })
+-      .join("\n");
+-  }
+-  return "  Daily plan pending generation for this assessment (or no assessment yet).";
+-}
+-
+ function formatProtocol(protocol) {
+   if (protocol && protocol.length > 0) {
+     return protocol
+@@ -515,8 +493,7 @@
+ Overall ROM score rules: quote only the "Overall ROM score" above (it is the score on the My Body dial). If asked whether they improved, use only the "Change vs previous assessment" number. Never compute a score or a change yourself.
+ 
+ ## Priority mobility protocol
+-${formatProtocolBase(m)}
+-Sets and reps rule: give each movement's sets and reps exactly as written in the protocol rows above (they are the My Protocol card's dose). Never change them and never use a default such as 3 sets of 10.
++${formatProtocol(m)}
+ ${n.assessment_history ? `
+ ## Earlier assessments (this person's own history, changes already worked out versus the latest assessment)
+ ${n.assessment_history}
+@@ -1348,4 +1325,4 @@
+   }
+ }
+ 
+-export { allowListContext, fg17WeekdayIn, formatProtocolBase, cardDose, computeDisplayScores, formatScoreChange, CONTEXT_SELECT, flagOn, FLAGS, corsOrigin, ALLOWED_ORIGINS, detectCrisis, crisisReply, CRISIS_REPLY_A, CRISIS_REPLY_B, conversationOwnedBy, loadRecentHistory, formatAssessmentHistory, postProcess, stripDashes, V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
++export { allowListContext, fg17WeekdayIn, computeDisplayScores, formatScoreChange, CONTEXT_SELECT, flagOn, FLAGS, corsOrigin, ALLOWED_ORIGINS, detectCrisis, crisisReply, CRISIS_REPLY_A, CRISIS_REPLY_B, conversationOwnedBy, loadRecentHistory, formatAssessmentHistory, postProcess, stripDashes, V as handleRequest, CBase, CSport, formatMeasurements, scoredOnly, isUnscoredJoint, overallBandFromJointScores, formatMobilityBands, topThreeProblemAreas };
