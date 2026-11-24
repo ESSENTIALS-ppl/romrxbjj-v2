@@ -1,0 +1,12 @@
+AFTER get_edge_function file hashes vs staged deploy-set-TRIALEND-MAR1, 2026-11-24 3:40:18 PM ET (EST).
+create-checkout-session v53 ezbr cebd7638b4237e18922ef972c8d3a4db2eaf9398b9069b351d16748e15349b8b verify_jwt=true
+
+path                      after sha256                                                       sha8      vs staged
+source/index.ts         3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666  3b706ba8   MATCH
+source/packs_gate.ts    328ea953b5dc06735790681922632c561b600391beb1a14970aac0a422df6b65  328ea953   MATCH
+_shared/arl_copy.ts     f713fc4a6f11523a7d00cc4897dfc6edfc094f95f8422d860a2d7ac32f97a230  f713fc4a   MATCH
+_shared/events.ts       49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  49f18652   MATCH
+_shared/rate_limit.ts   f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  f3a82f1d   MATCH
+
+packs_gate.ts: PACKS_EARLIEST_OPEN_UNIX = 1803920400 (trialEndUnix). No 1798822800.
+arl_copy.ts: BETA_TRIAL_END_UNIX = 1803920400. No 1798822800.
