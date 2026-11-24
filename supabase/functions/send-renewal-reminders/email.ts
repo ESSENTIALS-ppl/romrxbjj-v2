@@ -198,7 +198,7 @@ export function cardPhrase(card: { brand: string; last4: string } | null): strin
 export function firstChargeParagraphs(firstName: string, date: string, price: string, card: string): string[] {
   return [
     `Hi ${firstName},`,
-    `Your ROMRx Base beta launch trial period ends on ${date}, and your plan starts automatically. We will charge ${card} ${price} for one more year of ROMRx Base. It renews every year at ${price} until you cancel.`,
+    `Your ROMRx Base beta launch trial period ends on ${date}, and your plan starts automatically. We will charge ${card} ${price} for one year of ROMRx Base. It renews every year at ${price} until you cancel.`,
     `Want to stop it? Cancel online anytime before ${date}: ${BASE_MANAGE_URL}. You can also email ${BASE_SUPPORT_EMAIL} with the subject "Cancel."`,
     "Canceling ends your access right away. All sales are final. We do not refund charges already made, except where the law requires a refund.",
     `Questions? Reply to this email or write to ${BASE_SUPPORT_EMAIL}.`,

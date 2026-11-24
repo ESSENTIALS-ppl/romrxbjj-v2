@@ -80,7 +80,7 @@ Deno.test("the three moved sends are first_charge; the Mar 1, 2028 renewal is no
 Deno.test("first-charge text: trial-ending sentence, no 'renews on', cancel how-to, $60, March 1, 2027", () => {
   const t = buildFirstChargeText("Alex", "March 1, 2027", "$60", cardPhrase({ brand: "visa", last4: "4242" }));
   assertEquals(t.includes("Your ROMRx Base beta launch trial period ends on March 1, 2027, and your plan starts automatically."), true);
-  assertEquals(t.includes("We will charge Visa ending 4242 $60 for one more year of ROMRx Base. It renews every year at $60 until you cancel."), true);
+  assertEquals(t.includes("We will charge Visa ending 4242 $60 for one year of ROMRx Base. It renews every year at $60 until you cancel."), true);
   assertEquals(t.includes("Want to stop it? Cancel online anytime before March 1, 2027: https://romrx.io/app/dashboard/settings. You can also email hello@romrx.io with the subject \"Cancel.\""), true);
   assertEquals(/renews on/.test(t), false);
   assertEquals(firstChargeSubject("March 1, 2027"), "Your ROMRx Base beta launch trial period ends March 1, 2027");
@@ -94,4 +94,17 @@ Deno.test("subject equals Stacy Notice B subject (1530, 54ca69e6) exactly; no 'e
   const NOTICE_B_SUBJECT = "Your ROMRx Base beta launch trial period ends March 1, 2027";
   assertEquals(firstChargeSubject("March 1, 2027"), NOTICE_B_SUBJECT);
   assertEquals(firstChargeSubject("March 1, 2027").includes("ends on"), false);
+});
+
+Deno.test("v3 (Sable 3:57 PM): no 'one more year' anywhere in the renewal function source or first-charge output", () => {
+  const dir = new URL("../", import.meta.url);
+  for (const f of ["email.ts", "logic.ts", "index.ts"]) {
+    assertEquals(Deno.readTextFileSync(new URL(f, dir)).includes("one more year"), false, f);
+  }
+  const out = buildFirstChargeText("Alex", "March 1, 2027", "$60", "Visa ending 4242") + buildFirstChargeEmail("Alex", "March 1, 2027", "$60", "Visa ending 4242", "user@example.com");
+  assertEquals(out.includes("one more year"), false);
+  assertEquals(out.includes("for one year of ROMRx Base"), true);
+  assertEquals(cardPhrase(null), "the card on file");
+  const rd = Deno.env.get("D3_RENDERS_DIR");
+  if (rd) for (const e of Deno.readDirSync(rd)) assertEquals(Deno.readTextFileSync(`${rd}/${e.name}`).includes("one more year"), false, e.name);
 });
