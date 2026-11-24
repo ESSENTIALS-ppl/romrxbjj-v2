@@ -1,0 +1,107 @@
+{
+ "commit": "50b92ee37947465108be143ffd82512985cdfade",
+ "dial": 89,
+ "chip": 4,
+ "chipVs": "Nov 10",
+ "startedVsNow": {
+  "started": "Oct 4, 2026",
+  "now": "Nov 17, 2026",
+  "bodyScoreChange": 10,
+  "joints": [
+   "Hip ER 100% -> 100%",
+   "Hip IR 100% -> 100%",
+   "Hip Abduction 100% -> 100%",
+   "Hip Flexion 40% -> 58%",
+   "Shoulder ER 56% -> 82%",
+   "Shoulder Flex 34% -> 96%",
+   "Ankle DF 100% -> 100%",
+   "Cervical Lat Flex 100% -> 100%",
+   "Cervical Flex 100% -> 100%",
+   "Cervical Ext 100% -> 100%"
+  ]
+ },
+ "trendSource": "my_joint_history rpc",
+ "trends": [
+  {
+   "joint": "Hip ER",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Hip IR",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Hip Abduction",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Hip Flexion",
+   "points": [
+    "Oct 4, 2026 40%",
+    "Nov 10, 2026 48%",
+    "Nov 17, 2026 58%"
+   ]
+  },
+  {
+   "joint": "Shoulder ER",
+   "points": [
+    "Oct 4, 2026 56%",
+    "Nov 10, 2026 68%",
+    "Nov 17, 2026 82%"
+   ]
+  },
+  {
+   "joint": "Shoulder Flex",
+   "points": [
+    "Oct 4, 2026 34%",
+    "Nov 10, 2026 82%",
+    "Nov 17, 2026 96%"
+   ]
+  },
+  {
+   "joint": "Ankle DF",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Cervical Lat Flex",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Cervical Flex",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  },
+  {
+   "joint": "Cervical Ext",
+   "points": [
+    "Oct 4, 2026 100%",
+    "Nov 10, 2026 100%",
+    "Nov 17, 2026 100%"
+   ]
+  }
+ ]
+}
+MYBODY CHECK PASS on 50b92ee3: dial 89; chip +4 vs Nov 10; started Oct 4, 2026 -> now Nov 17, 2026 Body score +10; 10 joint trends with dated values (my_joint_history rpc)

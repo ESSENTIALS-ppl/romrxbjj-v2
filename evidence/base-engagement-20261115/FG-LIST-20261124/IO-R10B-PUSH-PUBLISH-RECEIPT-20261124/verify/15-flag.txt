@@ -1,0 +1,12 @@
+6:57:51 PM ET
+Target: project romrxbjj-v2 (cqzvqzwwevnflinxgnpp) · production
+Confirmed by --yes: Set 1 secret on project romrxbjj-v2 (cqzvqzwwevnflinxgnpp) · production
+{"project_ref":"cqzvqzwwevnflinxgnpp","count":1,"message":"Finished supabase secrets set.","target":{"kind":"linked","project_ref":"cqzvqzwwevnflinxgnpp","project_name":"romrxbjj-v2","environment":"production"}}
+LIFECYCLE_EMAILS_SEND digest b8d31e852725
+RENEWAL_BASE_SEND digest b8d31e852725
+ROMBOT_CHECKIN_SEND digest b8d31e852725
+VAPID_PRIVATE_KEY digest 7ebfe089744b
+VAPID_PUBLIC_KEY digest 8dcb59b66162
+VAPID_SUBJECT digest 5a8b650bd2ba
+WEB_PUSH_SEND digest b8d31e852725
+secret count 36

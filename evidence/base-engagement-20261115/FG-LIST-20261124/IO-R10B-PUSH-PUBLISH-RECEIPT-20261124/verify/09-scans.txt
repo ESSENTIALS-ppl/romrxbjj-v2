@@ -1,0 +1,4 @@
+build log: JWT-shaped 0, service_role 0, sk_live/sk_test 0, private key 0, VAPID public value 0
+dist files with: JWT-shaped 0, service_role 0, sk_live/sk_test 0, VAPID_PRIVATE 0, private key 0
+bundle index-ClqnSsyf.js: VAPID public copies 4; Notification.requestPermission 1; pushManager 6; save-push-subscription 1; 'Reminder notifications' 1; 'Where you started' 1
+sw.js push handlers: 1 push, 1 notificationclick

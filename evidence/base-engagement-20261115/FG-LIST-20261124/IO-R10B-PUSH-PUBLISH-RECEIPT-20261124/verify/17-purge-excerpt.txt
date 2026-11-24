@@ -1,0 +1,17 @@
+    ('public', 'user_mobility_schedule', 'user_id', 'col'),
+    ('public', 'body_metrics', 'user_id', 'col'),
+    ('public', 'progress_photos', 'user_id', 'col'),
+    ('public', 'push_subscriptions', 'user_id', 'col'),
+    ('public', 'push_sends', 'user_id', 'col'),
+    ('public', 'email_sends', 'user_id', 'col'),
+  END IF;
+
+  -- Final: remove the auth row when it is still present. Cascades public.users and ON DELETE CASCADE children
+  -- not already removed above. The hardcoded / internal / fixture ids are not in the qualifying set.
+  -- Emails were captured into _qual_emails before this delete.
+  IF to_regclass('auth.users') IS NOT NULL THEN
+    EXECUTE $q$
+      DELETE FROM auth.users u
+      WHERE u.id IN (SELECT user_id FROM _classed WHERE class = 'qualifying')
+    $q$;
+  END IF;

@@ -1,0 +1,6 @@
+draft /app/ 200
+draft bundle /app/assets/index-ClqnSsyf.js sha256 e3e588567fa0f4cf local e3e588567fa0f4cf
+draft sw.js sha256 bff352dd03d7a8ec local bff352dd03d7a8ec
+draft legal 'push' paragraph: 0
+live still 6b0621cab87dcb66dccff633
+legal.html on draft equals local build (sha256 452ea130); push paragraph present ('If you turn on notifications...')

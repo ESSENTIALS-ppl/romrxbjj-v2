@@ -1,0 +1,12 @@
+M	app/public/sw.js
+A	app/src/lib/legalPushParagraph.test.ts
+M	app/src/lib/p1ReminderOptIn.test.ts
+A	app/src/lib/pushCopy.ts
+D	app/src/lib/pushSubscribe.test.ts
+A	app/src/lib/pushSubscribe.test.tsx
+M	app/src/lib/pushSubscribe.ts
+A	app/src/lib/swPush.test.ts
+A	app/src/pages/Settings.pushFlag.test.tsx
+M	app/src/pages/Settings.tsx
+M	legal.html
+files vs live: r10b push files only: OK

@@ -1,0 +1,6 @@
+50b92ee37947465108be143ffd82512985cdfade P1-14 toggle shows ON only on a device that subscribed (Grant, Nov 17). It is ON only when saved push_reminde
+2ff5230157ddeb4a15a4d3c45bbc20c396252414 P1-14 Privacy: Stacy's section B push paragraph, byte-exact by script from STACY-P1-14-PUSH-AND-P1-31-TITLES-
+809198bce85e5632c7779d35358eb42a4008399d P1-14 push flag on: SHOW_PUSH = true in Settings.tsx (r10 phase 1, on r8b 5366c985, Grant Nov 17). Push is op
+122a8a55279f161db1788ed452936fee77a9f4ef P1-14 words: the 6 client push strings, verbatim by script from Stacy STACY-P1-14-CLIENT-STRINGS-20261116-205
+2d31a7b34b57522dbc0c88ebee08c9036221453c P1-14 sw.js: push + notificationclick in the one P1-26 worker (/app/sw.js, netlify.toml rule unchanged, no se
+b2c9f1638e54accc06fae4326e3dd5dbe2800bf5 P1-14 web push client, behind SHOW_PUSH = false (contract P1-14-CLIENT-CONTRACT-20261116.md, sha256 d4f72a35e

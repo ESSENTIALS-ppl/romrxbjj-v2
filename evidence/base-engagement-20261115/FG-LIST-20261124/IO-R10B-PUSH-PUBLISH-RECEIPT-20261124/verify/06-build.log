@@ -1,0 +1,226 @@
+​
+Netlify Build                                                 
+────────────────────────────────────────────────────────────────
+​
+❯ Version
+  @netlify/build 37.1.0
+​
+❯ Flags
+  accountId: 6984fb3bfc908264ef97b60b
+  dry: false
+​
+❯ Current directory
+  /workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build
+​
+❯ Config file
+  /workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/netlify.toml
+​
+❯ Context
+  production
+​
+build.command from netlify.toml                               
+────────────────────────────────────────────────────────────────
+​
+$ node scripts/stamp-asset-version.mjs && cd app && npm install && npm test && npm run build && rm -f index.html
+bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8): No such file or directory
+[stamp-asset-version] v=50b92ee37947: 99 reference(s) across 38 file(s), 38 file(s) rewritten
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+
+added 287 packages, and audited 288 packages in 3s
+
+51 packages are looking for funding
+  run `npm fund` for details
+
+10 vulnerabilities (3 moderate, 5 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+> romrx-io-app@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app
+
+ ✓ src/lib/sessionFeedback.test.tsx (24 tests) 195ms
+ ✓ src/lib/romoodDaily.test.tsx (46 tests) 240ms
+ ✓ src/components/RombotCheckin.test.tsx (22 tests | 2 skipped) 210ms
+ ✓ src/lib/romood.test.tsx (48 tests) 329ms
+ ✓ src/lib/rometer.test.tsx (11 tests) 516ms
+ ✓ src/lib/offlineSubmitQueue.test.ts (17 tests) 15ms
+ ✓ src/pages/Unsubscribe.test.tsx (36 tests) 205ms
+ ✓ src/pages/Settings.pushFlag.test.tsx (12 tests) 790ms
+ ✓ src/lib/pushSubscribe.test.tsx (15 tests) 56ms
+ ✓ src/lib/resultsSurvey.test.tsx (19 tests) 222ms
+ ✓ src/components/MoodAverageCard.test.tsx (12 tests) 90ms
+ ✓ src/lib/meterUse.test.tsx (34 tests) 1720ms
+ ✓ src/pages/MyBody.fg08.test.tsx (5 tests) 343ms
+ ✓ src/lib/hideComboBaseOnly.test.tsx (4 tests) 162ms
+ ✓ src/pages/Settings.fg22.test.tsx (3 tests) 222ms
+ ✓ src/lib/meterTokens.test.tsx (9 tests) 309ms
+ ✓ src/pages/Settings.calendarFlag.test.tsx (6 tests) 488ms
+ ✓ src/lib/assessmentOutro.test.tsx (7 tests) 113ms
+ ✓ src/lib/assessmentDraftFlow.test.tsx (7 tests) 195ms
+ ✓ src/components/CrisisLine.test.tsx (11 tests) 57ms
+ ✓ src/lib/moreHelpGuard.test.tsx (14 tests) 390ms
+ ✓ src/lib/assessmentDraftCopy.test.ts (9 tests) 159ms
+ ✓ src/lib/hipErInnerCalfMeter.test.tsx (4 tests) 616ms
+ ✓ src/lib/shoulderErStandingMeter.test.tsx (4 tests) 774ms
+   ✓ shoulder_er meter, standing goal-post > left arm: zero with the forearm level and ahead, rotate up 45, 90, 105 -> locks at each; Use saves 105  420ms
+ ✓ src/lib/beforeYouStart.test.tsx (4 tests) 46ms
+ ✓ src/components/QuickCheckBanner.serverOff.test.tsx (7 tests) 35ms
+stderr | src/lib/flowCounter.test.tsx > Back navigation (Quinn Oct 26) > Back on a later measure screen goes to the previous measure
+Error: Not implemented: window.scrollTo
+    at module.exports (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at /workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/jsdom/lib/jsdom/browser/Window.js:960:7
+    at onClick (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/src/pages/AssessmentMeasureScreen.tsx:249:86)
+    at executeDispatch (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:19116:9)
+    at runWithFiberInDEV (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+    at processDispatchQueue (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:19166:19)
+    at /workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:19767:9
+    at batchedUpdates$1 (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:3255:40)
+    at dispatchEventForPluginEventSystem (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:19320:7)
+    at dispatchEvent (/workspace/process/batches/base-engagement-20261115/FG-LIST-20261124/IO-R10B-PUSH-PUBLISH-20261124/verify/build/app/node_modules/react-dom/cjs/react-dom-client.development.js:23585:11) undefined
+
+ ✓ src/lib/flowCounter.test.tsx (25 tests) 232ms
+ ✓ src/lib/shoulderFlexSittingRender.test.tsx (1 test) 74ms
+ ✓ src/lib/stepVideo.test.tsx (8 tests) 44ms
+ ✓ src/components/MyBodyProgress.test.tsx (5 tests) 73ms
+ ✓ src/pages/Settings.fg23.test.tsx (2 tests) 111ms
+ ✓ src/hooks/useAuth.signOutQueue.test.tsx (3 tests) 78ms
+ ✓ src/components/TermsReacceptGate.versions.test.tsx (4 tests) 68ms
+ ✓ src/lib/shoulderRangeHidden.test.tsx (3 tests) 49ms
+ ✓ src/components/ReminderOptIn.tz.test.tsx (1 test) 56ms
+stderr | src/lib/consentLog.test.ts > consent-log handler > rejects non-POST, bad origin, big bodies, bad JSON, bad fields; fails closed without HMAC key
+consent-log missing_config
+
+ ✓ src/lib/hipFlexCopy.test.ts (33 tests) 17ms
+ ✓ src/lib/consentLog.test.ts (39 tests) 221ms
+ ✓ src/lib/stopLine.test.tsx (11 tests) 111ms
+ ✓ src/lib/hipTargets.test.ts (25 tests) 8ms
+ ✓ src/lib/assessmentDraft.test.ts (41 tests | 1 skipped) 95ms
+ ✓ src/lib/termsConsent.test.ts (18 tests) 8ms
+ ✓ src/lib/metaAttribution.test.ts (120 tests | 3 skipped) 446ms
+ ✓ src/lib/hipErInnerCalf.test.ts (16 tests) 14ms
+ ✓ src/lib/shoulderErStanding.test.ts (17 tests) 23ms
+ ✓ src/lib/meterDirection.test.ts (83 tests) 36ms
+ ✓ src/lib/baseRadarAndSides.test.ts (25 tests) 469ms
+   ✓ My Body radar (v2: Left/Right outlines) == Joint Breakdown bars > for 500 random assessments: worse side == bar %, sides consistent with side colours  345ms
+ ✓ src/lib/fg08MyBodyProgress.test.ts (12 tests) 10ms
+ ✓ src/lib/metaCompleteRegistration.test.ts (18 tests | 1 skipped) 373ms
+ ✓ src/lib/shoulderFlexSitting.test.ts (10 tests) 31ms
+ ✓ src/lib/quickCheckWindow.test.ts (14 tests) 28ms
+ ✓ src/lib/t1NarrowBands.test.ts (39 tests) 14ms
+ ✓ src/lib/quickCheck.test.ts (11 tests) 20ms
+ ✓ src/lib/lumbarFlag.test.ts (10 tests) 32ms
+ ✓ src/lib/meterCopy.test.ts (13 tests) 22ms
+ ✓ src/lib/p1YourData.test.ts (12 tests) 27ms
+ ✓ src/lib/meterLock.test.ts (15 tests) 16ms
+ ✓ src/lib/p1ReminderOptIn.test.ts (10 tests) 29ms
+ ✓ src/lib/packReturn.test.ts (12 tests) 8ms
+ ✓ src/lib/reminderOptIn.test.ts (8 tests) 4ms
+ ✓ src/lib/mobilityBands.test.ts (180 tests) 1296ms
+   ✓ Fix A: generated assessments never contradict the band (per joint and overall) > 5000 assessments: every joint % sits in its band range; /100 sits in the overall band range  1228ms
+ ✓ src/lib/localDate.test.ts (8 tests) 6ms
+ ✓ src/lib/swPush.test.ts (6 tests) 7ms
+ ✓ src/lib/whatChanged.test.ts (7 tests) 6ms
+ ✓ src/lib/cancelSubscription.test.ts (7 tests) 12ms
+ ✓ src/lib/p1StartFromResults.test.ts (6 tests) 5ms
+ ✓ src/lib/week1Goal.test.ts (7 tests) 4ms
+ ✓ src/lib/offlineCachePolicy.test.ts (5 tests) 5ms
+ ✓ src/lib/jimCopyRemovals.test.ts (6 tests) 22ms
+ ✓ src/lib/meterFallback.test.ts (7 tests) 24ms
+ ✓ src/lib/guidedPlayer.test.ts (8 tests) 13ms
+ ✓ src/lib/signupCopy.test.ts (5 tests) 4ms
+ ✓ src/lib/signupMissing.test.ts (6 tests) 5ms
+ ✓ src/lib/exportMyData.test.ts (6 tests) 4ms
+ ✓ src/lib/accountDeletionRequest.test.ts (7 tests) 6ms
+ ✓ src/lib/progressCalendar.test.ts (5 tests) 17ms
+ ✓ src/lib/addToHomeScreen.test.ts (4 tests) 3ms
+ ✓ src/lib/ageBuckets.test.ts (7 tests) 15ms
+ ✓ src/lib/tzFallback.test.ts (7 tests) 17ms
+ ✓ src/lib/jointHistory.test.ts (4 tests) 5ms
+ ✓ src/lib/meterAudio.test.ts (8 tests) 794ms
+   ✓ playing on one AudioContext > a tone that would land too late, or after the countdown was cancelled, is dropped  759ms
+ ✓ src/lib/assessmentReads.test.ts (6 tests) 40ms
+ ✓ src/lib/addToCalendar.test.ts (4 tests) 6ms
+ ✓ src/lib/plainWording.test.ts (11 tests) 5ms
+ ✓ src/lib/weeklyGoal.test.ts (5 tests) 4ms
+ ✓ src/lib/legalChrome.test.ts (4 tests) 4ms
+ ✓ src/lib/claimsScrub.test.ts (5 tests) 4ms
+ ✓ src/lib/signupDisclosure.test.ts (4 tests) 3ms
+ ✓ src/lib/sessionLength.test.ts (3 tests) 4ms
+ ✓ src/lib/challenge.test.ts (6 tests) 5ms
+ ✓ src/lib/legalPushParagraph.test.ts (3 tests) 3ms
+ ✓ src/lib/offlineCache.test.ts (3 tests) 8ms
+ ✓ src/lib/utm.test.ts (3 tests) 3ms
+ ✓ src/lib/noEquipmentClaim.test.ts (2 tests) 20ms
+ ✓ src/lib/stripeTestMode.test.ts (5 tests) 3ms
+ ✓ src/lib/signupRedirect.test.ts (5 tests) 4ms
+ ✓ src/lib/stepVideoFiles.test.ts (13 tests) 4ms
+ ✓ src/lib/metaForbiddenKeys.test.ts (4 tests) 3ms
+ ✓ src/lib/checkoutErrors.test.ts (3 tests) 2ms
+ ✓ src/lib/j5UnlockStraightToCheckout.test.ts (2 tests) 3ms
+ ✓ src/lib/mySportPacksClosed.test.ts (3 tests) 2ms
+ ✓ src/lib/sharedRanking.test.ts (1 test) 3ms
+ ✓ src/lib/metaExplicitConsent.test.ts (3 tests) 3ms
+ ✓ src/lib/betaTitle.test.ts (1 test) 2ms
+ ✓ src/lib/prodGuard.test.ts (7 tests) 4ms
+
+ Test Files  104 passed (104)
+      Tests  1459 passed | 7 skipped (1466)
+   Start at  18:56:07
+   Duration  7.63s (transform 2.88s, setup 0ms, collect 9.24s, tests 13.76s, environment 11.00s, prepare 6.12s)
+
+
+> romrx-io-app@0.1.0 build
+> tsc -b && vite build
+
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 1963 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.36 kB │ gzip:   0.64 kB
+dist/assets/index-CIHgIff3.css   40.89 kB │ gzip:   7.73 kB
+dist/assets/index-ClqnSsyf.js   834.99 kB │ gzip: 243.77 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/lib/supabase.ts is dynamically imported by src/lib/assessmentDraftStore.ts, src/lib/romood.ts, src/main.tsx but also statically imported by src/components/FeedbackWidget.tsx, src/components/ReminderOptIn.tsx, src/components/ResultsSurvey.tsx, src/components/SessionFeel.tsx, src/components/SoloChallenge.tsx, ..., dynamic import will not move module into another chunk.
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/pages/ROMood.tsx is dynamically imported by src/pages/AssessmentPhases.tsx but also statically imported by src/App.tsx, dynamic import will not move module into another chunk.
+
+✓ built in 1.19s
+​
+(build.command completed in 19.4s)
+​
+Functions bundling                                            
+────────────────────────────────────────────────────────────────
+​
+Packaging Functions from netlify/functions directory:
+ - consent-log.js
+ - investor-request.js
+ - meta-capi.js
+ - partner-inquiry.js
+ - waitlist.js
+​
+​
+(Functions bundling completed in 82ms)
+​
+Netlify Build Complete                                        
+────────────────────────────────────────────────────────────────
+​
+(Netlify Build completed in 20.1s)
+EXIT 0
