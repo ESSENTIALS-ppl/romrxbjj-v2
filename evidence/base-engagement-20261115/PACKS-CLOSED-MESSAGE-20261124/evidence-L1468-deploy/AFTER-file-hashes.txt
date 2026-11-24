@@ -1,0 +1,9 @@
+AFTER get_edge_function file hashes vs staged deploy-set-L1468, 2026-11-24 2:43 PM ET (EST).
+create-checkout-session v52 ezbr 36abc3ba418b2b0a10b65cc0d0aaad23fed5151b8adb8491adb3fb995cc717d9 verify_jwt=true
+
+path                      after sha256                                                       sha8     vs staged
+source/index.ts           3b706ba85582d52336ec375d045477e4e29a0b1277487fe10ca1034478969666  3b706ba8  MATCH (643e27f0)
+_shared/events.ts         49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  49f18652  MATCH (live v50)
+_shared/rate_limit.ts     f3a82f1d3576ef423094ec694e2bf8bd2ed3922713574e23553b2af7e6aac3d8  f3a82f1d  MATCH (live v50)
+_shared/arl_copy.ts       c06bd3153d91dbcd4c9ba9458e7c601dbbb763a3cd07322757ddf7046408b3f3  c06bd315  MATCH (live v50; not repo 6b550c27)
+source/packs_gate.ts      21bc6a5fae3e325a97fce7ab4efd9e2c846d8db4b17e588e9b78fa4b589b4ed5  21bc6a5f  MATCH (643e27f0)

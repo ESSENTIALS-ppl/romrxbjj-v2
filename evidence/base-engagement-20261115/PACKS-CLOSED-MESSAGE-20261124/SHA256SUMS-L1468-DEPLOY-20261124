@@ -1,0 +1,5 @@
+828a0d4df64878fea25a849d7a218571f37beb73252e636f453ca98b3fbb5868  ./RECEIPT-L1468-DEPLOY-20261124.md
+5707df23e5419c7c796baa5012a152fa9c41ade8c828f38a2dab983d24298e88  ./evidence-L1468-deploy/AFTER-file-hashes.txt
+160ca6c7dd74d30b34eff53527a070d9829e89f50f14751172cc91b93a2ef8dc  ./evidence-L1468-deploy/AFTER-function-list.txt
+d25625f8489ddc1a4774e25fee97ce9c53f43edd10fcf3451c6f44ccba157b4d  ./evidence-L1468-deploy/AFTER-function-list.json
+05837ddd1c8e12f7eae8ef133c476b375db31fb91bd251f58fb85499b206f033  ./evidence-L1468-deploy/BEFORE-function-list-at-deploy.json
