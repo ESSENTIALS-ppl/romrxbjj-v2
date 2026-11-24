@@ -1,0 +1,5 @@
+version 41 ezbr d5fef9ba13a20377188c326c73db8817daaf3736ba9a5fb09ffa79b870065bd3 verify_jwt False
+MATCH 68da5e9b source/index.ts expected 68da5e9b
+MATCH 49f18652 _shared/events.ts expected 49f18652
+MATCH 0f9d1019 _shared/email_footer.ts expected 0f9d1019
+files 3 expected 3 ALL_MATCH

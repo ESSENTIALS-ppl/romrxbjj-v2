@@ -1,0 +1,3 @@
+68da5e9b30150e877f0f2810affcdf71cbbdba00b70091ccea7d423a32ff5d7d  source/index.ts
+49f186528fdc3dbe15d7ffa056b3a679c96001df50ea1cd03b0aec8b4ab45b21  _shared/events.ts
+0f9d101999a6ec9971b6e5487b84485b902303c77d6396e9008d8fc61c61e03b  _shared/email_footer.ts

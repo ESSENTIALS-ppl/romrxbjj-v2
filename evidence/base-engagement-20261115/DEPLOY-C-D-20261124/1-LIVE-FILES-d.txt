@@ -1,0 +1,6 @@
+version 33 ezbr c7dd83a89e9ff9c3d69d407f5ecba3d7f6e7c0f6c838a55deb495ae12383b514 verify_jwt False
+MATCH c9eea026 source/index.ts expected c9eea026
+MATCH 7f360f7b source/logic.ts expected 7f360f7b
+MATCH f4ab656c source/email.ts expected f4ab656c
+MATCH 0f9d1019 _shared/email_footer.ts expected 0f9d1019
+files 4 expected 4 ALL_MATCH

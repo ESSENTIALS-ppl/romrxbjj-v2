@@ -1,0 +1,8 @@
+version 37 ezbr 9f1279483ad292b87989ac888a3e416565a23ac72bb2d088b5a7948e36f9f099 verify_jwt False
+MATCH 7132917a source/index.ts expected 7132917a
+MATCH f3a82f1d _shared/rate_limit.ts expected f3a82f1d
+MATCH 49f18652 _shared/events.ts expected 49f18652
+MATCH 5ae2cb84 source/email.ts expected 5ae2cb84
+MATCH 007cbe26 _shared/t1_narrow_bands.ts expected 007cbe26
+MATCH d14764c6 _shared/capture_methods.ts expected d14764c6
+files 6 expected 6 ALL_MATCH
