@@ -1,0 +1,387 @@
+{
+ "history": [
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "ankle_df",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "cervical_ext",
+   "left_value": 48,
+   "right_value": null,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "cervical_flex",
+   "left_value": 48,
+   "right_value": null,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "cervical_lat",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "hip_abd",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "hip_er",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "hip_flex",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "hip_ir",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "shoulder_er",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "assessment_id": "9ca55ad2-5c11-4daa-b0f8-b0421448396f",
+   "joint_key": "shoulder_flex",
+   "left_value": 48,
+   "right_value": 48,
+   "rom_total": 81,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "ankle_df",
+   "left_value": 44,
+   "right_value": 42,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "cervical_ext",
+   "left_value": 52,
+   "right_value": null,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "cervical_flex",
+   "left_value": 46,
+   "right_value": null,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "cervical_lat",
+   "left_value": 40,
+   "right_value": 38,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "hip_abd",
+   "left_value": 50,
+   "right_value": 48,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "hip_er",
+   "left_value": 52,
+   "right_value": 50,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "hip_flex",
+   "left_value": 60,
+   "right_value": 58,
+   "rom_total": 89,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "hip_ir",
+   "left_value": 46,
+   "right_value": 49,
+   "rom_total": 89,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "shoulder_er",
+   "left_value": 62,
+   "right_value": 58,
+   "rom_total": 89,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-10T17:00:00+00:00",
+   "assessment_id": "b0d68db1-5ef2-46fa-973b-6a10e12ce727",
+   "joint_key": "shoulder_flex",
+   "left_value": 120,
+   "right_value": 116,
+   "rom_total": 89,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "ankle_df",
+   "left_value": 48,
+   "right_value": 47,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "cervical_ext",
+   "left_value": 58,
+   "right_value": null,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "cervical_flex",
+   "left_value": 50,
+   "right_value": null,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "cervical_lat",
+   "left_value": 44,
+   "right_value": 42,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "hip_abd",
+   "left_value": 54,
+   "right_value": 52,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "hip_er",
+   "left_value": 56,
+   "right_value": 55,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "hip_flex",
+   "left_value": 72,
+   "right_value": 70,
+   "rom_total": 94,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "hip_ir",
+   "left_value": 50,
+   "right_value": 52,
+   "rom_total": 94,
+   "score": 3
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "shoulder_er",
+   "left_value": 74,
+   "right_value": 70,
+   "rom_total": 94,
+   "score": 1
+  },
+  {
+   "assessed_at": "2026-11-17T17:00:00+00:00",
+   "assessment_id": "a9b06108-c130-4ede-8c95-567546d6408d",
+   "joint_key": "shoulder_flex",
+   "left_value": 140,
+   "right_value": 136,
+   "rom_total": 94,
+   "score": 2
+  }
+ ],
+ "startNow": [
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 3,
+   "joint_key": "ankle_df",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 48,
+   "latest_right": 47,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": null,
+   "first_score": 3,
+   "joint_key": "cervical_ext",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 58,
+   "latest_right": null,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": null,
+   "first_score": 3,
+   "joint_key": "cervical_flex",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 50,
+   "latest_right": null,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 3,
+   "joint_key": "cervical_lat",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 44,
+   "latest_right": 42,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 3,
+   "joint_key": "hip_abd",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 54,
+   "latest_right": 52,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 3,
+   "joint_key": "hip_er",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 56,
+   "latest_right": 55,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 1,
+   "joint_key": "hip_flex",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 72,
+   "latest_right": 70,
+   "latest_score": 1
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 3,
+   "joint_key": "hip_ir",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 50,
+   "latest_right": 52,
+   "latest_score": 3
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 1,
+   "joint_key": "shoulder_er",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 74,
+   "latest_right": 70,
+   "latest_score": 1
+  },
+  {
+   "first_assessed_at": "2026-10-04T12:42:12.439+00:00",
+   "first_left": 48,
+   "first_right": 48,
+   "first_score": 1,
+   "joint_key": "shoulder_flex",
+   "latest_assessed_at": "2026-11-17T17:00:00+00:00",
+   "latest_left": 140,
+   "latest_right": 136,
+   "latest_score": 2
+  }
+ ],
+ "uid": "ebfe4f3d-0619-4460-a5f7-08217ea31909"
+}
