@@ -14,8 +14,13 @@ export const ARL_ACK_VERSION = "ca-arl-3c-2026-09-29-v3";
 
 /** Beta free period ends at this instant (2027-01-01 12:00 ET); same value as subscription_data.trial_end. */
 export const BETA_TRIAL_END_UNIX = 1798822800;
+/** BASE-IMMEDIATE-CHARGE-20261124: THE one cutover. From this instant new Base checkouts are charged at checkout (no
+ *  trial_end) and every free-period wording switch (inFreePeriod) flips with them. Wed Dec 30, 2026 12:00:00 PM ET,
+ *  per Stacy's clear STACY-JAN1-CHECKOUT-AND-LAUNCH-CLEAR-20261124-1414 (sha256 9162f3ab). To move the date, change
+ *  this one line (e.g. 1798822800 = Jan 1, 2027 12:00 PM ET keeps Jim's L663 "not charged before January 1" literally). */
+export const BASE_PAID_CUTOVER_UNIX = 1798650000;
 export function inFreePeriod(nowMs: number = Date.now()): boolean {
-  return nowMs < BETA_TRIAL_END_UNIX * 1000;
+  return nowMs < BASE_PAID_CUTOVER_UNIX * 1000;
 }
 
 export const SPORT_PACK_NAMES: Record<string, string> = {
@@ -163,4 +168,40 @@ ${items}
 /** Plain-text part of the 3c email. */
 export function ackText(basePrice: string, sportPack?: string | null, sportPrice?: string | null): string {
   return ["Your subscription terms", ...ackLines(basePrice, sportPack, sportPrice).map((l) => `- ${l}`), "", ackFooter()].join("\n");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// BASE-IMMEDIATE-CHARGE-20261124 (BUILD ONLY, not deployed): paid ROMRx Base (charged at checkout, no free period),
+// used from BASE_PAID_CUTOVER_UNIX on. Stacy's EXACT wording, STACY-JAN1-CHECKOUT-AND-LAUNCH-CLEAR-20261124-1414.md
+// (sha256 9162f3ab..., SUMS f6606283...) section 1.3: P1 (disclosure), P3 (consent label), P5 (ack). Only
+// {basePrice} is filled, from the live Stripe Price at runtime. Do not edit wording here without a new version string.
+export const ARL_BASE_PAID_DISCLOSURE_VERSION = "ca-arl-3b-2026-12-30-v4";
+export const ARL_BASE_PAID_ACK_VERSION = "ca-arl-3c-2026-12-30-v4";
+
+/** P1, Stripe custom_text.submit (bold wrap added by the caller). */
+export function disclosureBasePaid(basePrice: string): string {
+  return `${basePrice} per year for ROMRx Base, charged to your card today and on this date every year until you cancel. Your plan renews automatically for one year at a time. Cancel online anytime in Settings at https://romrx.io/app/dashboard/settings, or email hello@romrx.io. Canceling ends your access right away and stops future charges. All sales are final. We do not refund charges already made, except where the law requires a refund. We will email you before each yearly renewal.`;
+}
+
+/** P3, Stripe custom_text.terms_of_service_acceptance (the box itself is Stripe's, required). */
+export function consentTextBasePaid(basePrice: string): string {
+  return `I agree that ROMRx Base renews automatically every year at ${basePrice} until I cancel, and I agree to the [Terms](https://romrx.io/legal).`;
+}
+
+/** P5, 3c paid acknowledgment lines, in order. Subject is ackSubject(); footer is ackFooter(). */
+export function ackLinesBasePaid(basePrice: string): string[] {
+  return [
+    "Plan: ROMRx Base",
+    `Charged today: ${basePrice} for one year of ROMRx Base.`,
+    `Renewal: your plan renews automatically every year on this date at ${basePrice} until you cancel. We will tell you before any price change.`,
+    `How to cancel: cancel online anytime at ${CANCEL_LINK} or in the app under Settings > Subscription > Cancel subscription. You can also email ${SUPPORT_EMAIL} with the subject "Cancel."`,
+    "When you cancel: your access ends right away and you will not be charged again. All sales are final. We do not refund charges already made, except where the law requires a refund.",
+    "Reminders: we will email you before each yearly renewal.",
+  ];
+}
+export function ackHtmlBasePaid(basePrice: string): string {
+  return renderAckHtml(ackSubject(), null, ackLinesBasePaid(basePrice));
+}
+export function ackTextBasePaid(basePrice: string): string {
+  return ["Your subscription terms", ...ackLinesBasePaid(basePrice).map((l) => `- ${l}`), "", ackFooter()].join("\n");
 }

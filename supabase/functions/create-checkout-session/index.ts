@@ -1,3 +1,10 @@
+// BASE-IMMEDIATE-CHARGE-20261124 (feat/base-immediate-charge-20261124, BUILD ONLY, on 643e27f0): paid Base.
+//   From BASE_PAID_CUTOVER_UNIX (_shared/arl_copy.ts, the ONE cutover constant, same one inFreePeriod uses) mode=base
+//   charges $60/yr at checkout: no trial_end, Stacy's P1 disclosure + P3 consent label (ca-arl-3b-2026-12-30-v4),
+//   arl_period "paid", Base only (any pack request 403 packs_closed), promotion codes per BASE_PAID_ALLOW_PROMOTION_CODES
+//   (base_cutover.ts, default true = live). Fails closed (503, v50 text) if the consent box is refused or the ARL
+//   release gate is off. Between the v50 close (Dec 30, 2026 12:00 PM ET) and a later cutover: v50 503. Before both:
+//   unchanged (trial path).
 // 2026-11-24 (fix/no-pack-charge-on-live-20261124, BUILD ONLY): rebuilt JAN1-PACK-CHARGE (46e6648f) on this live v50
 //   source (ezbr 2b7dd0ce). packsCheckoutOpen stays false through Jan 1, 2027 12:00 PM ET even if
 //   PACKS_CHECKOUT_OPEN=true. Combo adds a pack line only when packs are open, and then omits trial_end.
@@ -38,7 +45,9 @@ import { enforceRateLimit } from "../_shared/rate_limit.ts";
 import {
   ARL_DISCLOSURE_VERSION, ARL_CONSENT_TEXT, SPORT_PACK_NAMES, formatUsd, disclosureBase, disclosureCombo,
   disclosureSport, disclosureSportPaid, inFreePeriod, BETA_TRIAL_END_UNIX,
+  ARL_BASE_PAID_DISCLOSURE_VERSION, consentTextBasePaid, disclosureBasePaid,
 } from "../_shared/arl_copy.ts";
+import { BASE_PAID_ALLOW_PROMOTION_CODES, baseCheckoutPhase, baseSubscriptionData } from "./base_cutover.ts";
 import { dropSportFields, packGateDecision, packsCheckoutOpen, packsClosedBody, PACKS_CLOSED_STATUS, planBaseCheckout, planUnlockTrialEndUnix } from "./packs_gate.ts";
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -208,10 +217,16 @@ Deno.serve(async (req: Request) => {
       const baseCaller = await getCallerUser(admin, req);
       if (!baseCaller || baseCaller.id !== body.user_id) return json(401, { error: "auth_required" });
     }
-    // Fail closed once the free period is over (or under Stripe's 48h trial_end minimum): the Base path always sends the
-    // fixed trial_end (Jan 1, 2027) and Legal has not supplied post-Jan-1 Base copy yet. Applies to live and test paths.
-    if (Date.now() > (BETA_TRIAL_END_UNIX - 48 * 3600) * 1000) {
+    // BASE-IMMEDIATE-CHARGE-20261124: "trial" (v50 path), "closed" (v50 503: under Stripe's 48h trial_end minimum and
+    // before the paid cutover) or "paid" (from BASE_PAID_CUTOVER_UNIX: charged at checkout). Live and test paths.
+    const basePhase = baseCheckoutPhase(Date.now());
+    if (basePhase === "closed") {
       return json(503, { error: "base_checkout_unavailable", message: "Base sign-up is temporarily unavailable. Please check back soon." });
+    }
+    // Paid Base is Base only: a pack line item is never added, whatever PACKS_CHECKOUT_OPEN says. Before any lead claim.
+    if (basePhase === "paid" && normalizePendingSport(body.pending_sport ?? body.add) !== null) {
+      await logEvent("checkout_packs_closed", { userId: body.user_id, props: { mode, reason: "base_paid_no_pack" } });
+      return json(PACKS_CLOSED_STATUS, packsClosedBody());
     }
     if (body.lead_token) {
       const claim = await claimLead(admin, body.lead_token, body.user_id, body.email);
@@ -235,6 +250,11 @@ Deno.serve(async (req: Request) => {
     const testMode = !!caller && caller.id === body.user_id && await callerIsTestFixture(admin, caller.email, testRequested);
     const s = testMode ? stripeTest! : stripe;
     if (!testMode && !ARL_LIVE) {
+      // Paid Base needs the ARL disclosure and consent box; the legacy path has neither, so it stays closed.
+      if (basePhase === "paid") {
+        await logEvent("checkout_base_paid_needs_arl", { userId: body.user_id, props: { mode } });
+        return json(503, { error: "base_checkout_unavailable", message: "Base sign-up is temporarily unavailable. Please check back soon." });
+      }
       // v32 (live) behavior, unchanged.
       const legacyItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: BASE_PRICE_ID, quantity: 1 }];
       if (packPlan.includePack && pendingSport) legacyItems.push({ price: SPORT_PRICE_IDS[pendingSport], quantity: 1 });
@@ -279,14 +299,18 @@ Deno.serve(async (req: Request) => {
       { price: basePrice.id, quantity: 1 },
     ];
     if (packPlan.includePack && sportPriceR) line_items.push({ price: sportPriceR.id, quantity: 1 });
-    const disclosure = packPlan.includePack && pendingSport && sportPriceR
+    const disclosure = basePhase === "paid"
+      ? disclosureBasePaid(formatUsd(basePrice.amount))
+      : packPlan.includePack && pendingSport && sportPriceR
       ? disclosureCombo(formatUsd(basePrice.amount), formatUsd(sportPriceR.amount), SPORT_PACK_NAMES[pendingSport])
       : disclosureBase(formatUsd(basePrice.amount));
+    const consentText = basePhase === "paid" ? consentTextBasePaid(formatUsd(basePrice.amount)) : ARL_CONSENT_TEXT;
+    const arlVersion = basePhase === "paid" ? ARL_BASE_PAID_DISCLOSURE_VERSION : ARL_DISCLOSURE_VERSION;
     const arlMeta: Record<string, string> = {
       ...meta,
-      arl_version: ARL_DISCLOSURE_VERSION,
+      arl_version: arlVersion,
       arl_offer: packPlan.includePack ? "combo" : "base",
-      arl_period: "free",
+      arl_period: basePhase === "paid" ? "paid" : "free",
       arl_price_ids: line_items.map((l) => l.price).join(","),
       arl_amounts: [basePrice.amount, ...(packPlan.includePack && sportPriceR ? [sportPriceR.amount] : [])].join(","),
       arl_ua: (req.headers.get("user-agent") ?? "").slice(0, 255),
@@ -299,15 +323,13 @@ Deno.serve(async (req: Request) => {
       const baseParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         line_items,
-        allow_promotion_codes: true,
+        allow_promotion_codes: basePhase === "paid" ? BASE_PAID_ALLOW_PROMOTION_CODES : true,
         client_reference_id: body.user_id,
         customer_email: body.email,
         success_url: successUrl,
         cancel_url: `${PUBLIC_ORIGIN}/app/dashboard?checkout=base_cancel`,
         metadata: arlMeta,
-        subscription_data: packPlan.trialEndUnix != null
-          ? { metadata: meta, trial_end: packPlan.trialEndUnix }
-          : { metadata: meta },
+        subscription_data: baseSubscriptionData(basePhase, meta, packPlan.trialEndUnix),
         payment_method_collection: "always",
       };
       let session: Stripe.Checkout.Session;
@@ -318,7 +340,7 @@ Deno.serve(async (req: Request) => {
           consent_collection: ARL_CONSENT,
           custom_text: {
             submit: { message: `**${disclosure}**` },
-            terms_of_service_acceptance: { message: ARL_CONSENT_TEXT },
+            terms_of_service_acceptance: { message: consentText },
           },
         });
       } catch (e) {
@@ -326,13 +348,17 @@ Deno.serve(async (req: Request) => {
         console.error("ARL consent unavailable (Terms URL missing in Stripe Public details?)", String((e as Error)?.message));
         consentOn = false;
         await logEvent("checkout_arl_consent_unavailable", { userId: body.user_id, props: { mode: "base", testmode: testMode } });
+        // A charge at checkout is never taken without the consent box: fail closed, no session.
+        if (basePhase === "paid") {
+          return json(503, { error: "base_checkout_unavailable", message: "Base sign-up is temporarily unavailable. Please check back soon." });
+        }
         session = await s.checkout.sessions.create({
           ...baseParams,
           metadata: { ...arlMeta, arl_consent: "unavailable" },
           custom_text: { submit: { message: `**${disclosure}**` } },
         });
       }
-      await logEvent("checkout_started", { userId: body.user_id, sport: pendingSport ?? "general", props: { mode: "base", pending_sport: pendingSport, lead_token: !!body.lead_token, arl_version: ARL_DISCLOSURE_VERSION, arl_consent: consentOn, testmode: testMode } });
+      await logEvent("checkout_started", { userId: body.user_id, sport: pendingSport ?? "general", props: { mode: "base", pending_sport: pendingSport, lead_token: !!body.lead_token, arl_version: arlVersion, arl_consent: consentOn, testmode: testMode } });
       return json(200, { url: session.url, pending_sport: pendingSport });
     } catch (e) {
       const err = e as { message?: string; type?: string; code?: string };

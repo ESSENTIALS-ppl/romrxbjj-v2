@@ -1,3 +1,8 @@
+// BASE-IMMEDIATE-CHARGE-20261124 (BUILD ONLY, not deployed; base = live v59 ezbr 3c60342d): a Base session created
+//   after the cutover (metadata arl_period "paid", charged at checkout, no trial) records billing_consents.trial_end
+//   NULL (not Jan 1, 2027) and gets Stacy's P5 paid 3c ack (ca-arl-3c-2026-12-30-v4), never the free-period ack. The
+//   test is the session's own arl_period, set by the same checkout condition that dropped trial_end (not the clock).
+//   Every other session is unchanged.
 // keyfix-20261028 (staged, NOT deployed): Stripe API key name fix + webhook secret trim + verify diagnostics + cancel failure logging and alert (same Resend path as the Base PAID alert).
 // 2026-10-22 (fix/webhook-arl-always-1022, HELD): ARL_LIVE_ENABLED gate removed. Every completed checkout (live or test)
 //   writes billing_consents and sends the 3c / 3c-2 acknowledgment; the old v41 live emails are gone.
@@ -39,6 +44,7 @@ import { logEvent } from "../_shared/events.ts";
 import {
   ARL_ACK_VERSION, SPORT_PACK_NAMES, formatUsd, ackSubject, ackHtml, ackText,
   ackSportSubject, ackSportHtml, ackSportText,
+  ARL_BASE_PAID_ACK_VERSION, ackHtmlBasePaid, ackTextBasePaid,
 } from "../_shared/arl_copy.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
@@ -134,6 +140,10 @@ async function cancelFailAlert(subId: string, status: string, code: string | nul
 async function sendArlAck(to: string, sessionId: string, basePrice: string, sportPack: string | null, sportPrice: string | null): Promise<string | null> {
   return await sendArlMail(to, `arl_ack-${sessionId}`, ackSubject(), ackHtml(basePrice, sportPack, sportPrice), ackText(basePrice, sportPack, sportPrice), "arl_ack");
 }
+/** BASE-IMMEDIATE-CHARGE-20261124: paid (post-cutover) Base ack. Same subject and idempotency key shape as sendArlAck. */
+async function sendArlAckBasePaid(to: string, sessionId: string, basePrice: string): Promise<string | null> {
+  return await sendArlMail(to, `arl_ack-${sessionId}`, ackSubject(), ackHtmlBasePaid(basePrice), ackTextBasePaid(basePrice), "arl_ack");
+}
 async function sendArlSportAck(to: string, sessionId: string, sportPrice: string, sportPack: string, freePeriod: boolean): Promise<string | null> {
   // packCancelsAlone = true: a sport unlock is its own Stripe subscription and can be canceled without Base.
   return await sendArlMail(to, `arl_ack_sport-${sessionId}`, ackSportSubject(sportPack),
@@ -205,6 +215,11 @@ async function arlAmounts(stripe: Stripe, meta: Record<string, string>, subId: s
   }
 }
 
+/** BASE-IMMEDIATE-CHARGE-20261124: Base session created after the cutover (charged at checkout, no trial). */
+function isBasePaidSession(meta: Record<string, string>): boolean {
+  return (meta.purpose ?? "").toLowerCase() === "base" && meta.arl_period === "paid";
+}
+
 /** v40: one consent record per Checkout Session (spec 4C). Service role only; never stores IP. */
 async function writeBillingConsent(supabase: ReturnType<typeof createClient>, obj: Record<string, unknown>, meta: Record<string, string>, userId: string, livemode: boolean, amounts: number[]) {
   const customText = (obj.custom_text ?? {}) as Record<string, { message?: string } | null>;
@@ -223,7 +238,8 @@ async function writeBillingConsent(supabase: ReturnType<typeof createClient>, ob
     amounts,
     currency: (obj.currency as string | undefined) ?? "usd",
     interval: "year",
-    trial_end: new Date(1798822800 * 1000).toISOString(),
+    // BASE-IMMEDIATE-CHARGE-20261124: a post-cutover Base session has no trial (charged at checkout).
+    trial_end: isBasePaidSession(meta) ? null : new Date(1798822800 * 1000).toISOString(),
     disclosure_text_version: meta.arl_version ?? "none (pre-ARL session)",
     disclosure_text: customText.submit?.message ?? null,
     consent_text: customText.terms_of_service_acceptance?.message ?? null,
@@ -492,7 +508,18 @@ Deno.serve(async (req: Request) => {
       // v40: consent record + 3c acknowledgment (replaces "You didn't buy a subscription...").
       const amounts = arlOn ? await arlAmounts(stripe, meta, subId) : [];
       if (arlOn) await writeBillingConsent(supabase, obj, meta, meta.user_id, !testEvent, amounts);
-      if (arlOn && email && amounts.length) {
+      if (arlOn && email && amounts.length && isBasePaidSession(meta)) {
+        // BASE-IMMEDIATE-CHARGE-20261124: paid Base gets Stacy's P5 ack only; never the free-period text, never a pack.
+        if (amounts.length === 1) {
+          const resendId = await sendArlAckBasePaid(email, obj.id as string, formatUsd(amounts[0]));
+          await logEvent("email_sent", { userId: meta.user_id, sport: "general", source: "stripe",
+            props: { email_id: "arl_ack", template_version: ARL_BASE_PAID_ACK_VERSION, base_paid: true, resend_id: resendId, checkout_session: obj.id, testmode: testEvent } });
+        } else {
+          console.error("ARL paid ack not sent: unexpected line items on a paid Base session", obj.id);
+          await logEvent("arl_ack_skipped_unexpected_items", { userId: meta.user_id, sport: "general", source: "stripe",
+            props: { email_id: "arl_ack", checkout_session: obj.id, testmode: testEvent, amounts_count: amounts.length } });
+        }
+      } else if (arlOn && email && amounts.length) {
         const sportPack = pendingSport && amounts.length > 1 ? SPORT_PACK_NAMES[pendingSport] : null;
         const sportPrice = sportPack ? formatUsd(amounts[1]) : null;
         const resendId = await sendArlAck(email, obj.id as string, formatUsd(amounts[0]), sportPack, sportPrice);
