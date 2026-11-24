@@ -1,0 +1,40 @@
+L1469 step 2 deploy call for p1-25-storage-drain: STAGED ONLY, NOT RUN. Needs its own release (pin, Vera precheck, Sable release relayed by Grant) before it is sent.
+
+Source: romrxbjj-v2 tip 4a6ee2a936dd10c935c92f002186211d04af6ed0 ONLY (git show of the two files; bytes unchanged by the later rename commit c5701df7).
+New function: p1-25-storage-drain does not exist live (BEFORE-function-list.txt, 41 functions, captured 2:43 PM ET). The call creates version 1.
+entrypoint_path is source/index.ts so the import "../_shared/p1_25_storage_drain_core.mjs" resolves to _shared/ (same layout as deploy-set-L1463). import_map_path is omitted (no import map, no deno.json).
+verify_jwt is FALSE on purpose: live public.cron_call_edge sends only Content-Type and x-cron-secret, no Authorization header. The function's own gate is x-cron-secret checked fail-closed against vault cron_webhook_secret via public.verify_webhook_secret (tests B2 to B4, mutants MB1 to MB5).
+
+Exact MCP call (not run):
+
+  namespace: user-Supabase
+  toolName: deploy_edge_function
+  arguments:
+    project_id: "cqzvqzwwevnflinxgnpp"
+    name: "p1-25-storage-drain"
+    entrypoint_path: "source/index.ts"
+    verify_jwt: false
+    files:
+      - name: "source/index.ts"
+        content: <exact bytes of deploy-set-L1469-drain/source/index.ts, sha256 bc562dfcefa2cc89e59bdda6bb28587251ed980b75e875fa57ad1da3b186a3e6, 2498 bytes>
+      - name: "_shared/p1_25_storage_drain_core.mjs"
+        content: <exact bytes of deploy-set-L1469-drain/_shared/p1_25_storage_drain_core.mjs, sha256 a94089d0c67676497ed32236151263978c2d4bd195d91ff78405ae321b5cefdb, 6213 bytes>
+  (Send each content as "$file:<absolute path>" so the bytes are exact.)
+
+Before check (re-run right before sending):
+  list_edge_functions project_id=cqzvqzwwevnflinxgnpp
+  p1-25-storage-drain must still be absent; the other 41 must match BEFORE-function-list.txt (name, version, ezbr, updated_at, verify_jwt).
+  public.p1_25_storage_delete_queue exists (applied 20261124194129) and its row count is recorded.
+
+After check (not run):
+  list_edge_functions: exactly one new slug p1-25-storage-drain, version 1, verify_jwt=false, status ACTIVE; record its ezbr and updated_at (ET). The other 41 unchanged.
+  get_edge_function function_slug=p1-25-storage-drain: entrypoint ends in source/index.ts; both files hash to bc562dfc and a94089d0.
+  No invoke as part of the deploy. No cron (8827ec3f is NOT part of this step).
+
+Rollback (not run): deleting the function needs Jim's yes, so rollback = deploy the no-op stub over it (same name):
+  deploy_edge_function project_id=cqzvqzwwevnflinxgnpp name="p1-25-storage-drain" entrypoint_path="source/index.ts" verify_jwt=true
+    files: - name: "source/index.ts" content: <exact bytes of rollback-stub/source/index.ts, sha256 ee6639be6d4c40df98f8c47ef75ed324dd8b559ed0e800a92696a15332705a9b, 396 bytes>
+  Why a stub and not "leave it disabled": none of our tools (MCP deploy/list/get, CLI) can disable a function short of delete, and the live drain can be reached by anyone who holds the cron secret. The stub removes every capability (no Storage, database or env access; always 503), and verify_jwt=true adds the gateway JWT check in front of it. Queue rows are left untouched for a later drain.
+  Confirm after rollback: version 2, verify_jwt=true, get_edge_function shows only source/index.ts = ee6639be.
+
+CLI is not required. The CLI token (romrx-cli-20261116) still returns 401.

@@ -1,0 +1,14 @@
+L1469 step 2 deploy set for p1-25-storage-drain (new function)
+Tip 4a6ee2a936dd10c935c92f002186211d04af6ed0 ONLY.
+Live: p1-25-storage-drain does not exist (list_edge_functions, 2:43 PM ET, 41 functions).
+Entrypoint: source/index.ts. import_map: none. verify_jwt: false.
+_shared: p1_25_storage_drain_core.mjs is a new file, not on origin main and imported by no other function in the repo (git grep on origin/main: 0 hits), so there is no live copy to take; the tip bytes are used. No other _shared file is imported (index.ts has 1 import; the core has 0).
+
+path                                   origin     sha8     sha256                                                            bytes  vs live
+-----------------------------------------------------------------------------------------------------------------------------------------------
+source/index.ts                        4a6ee2a9   bc562dfc bc562dfcefa2cc89e59bdda6bb28587251ed980b75e875fa57ad1da3b186a3e6   2498  new (no live function)
+_shared/p1_25_storage_drain_core.mjs   4a6ee2a9   a94089d0 a94089d0c67676497ed32236151263978c2d4bd195d91ff78405ae321b5cefdb   6213  new (not used by any function)
+rollback-stub/source/index.ts          new stub   ee6639be ee6639be6d4c40df98f8c47ef75ed324dd8b559ed0e800a92696a15332705a9b    396  rollback only
+
+deno check: source/index.ts and rollback-stub/source/index.ts both pass.
+RESULT: 2 files to upload, both byte-exact from 4a6ee2a9. OK to stage.
