@@ -1,0 +1,4 @@
+web-push 3.6.7
+web-push-testing 1.2.2
+http_ece 1.2.0
+jsonwebtoken 9.0.3

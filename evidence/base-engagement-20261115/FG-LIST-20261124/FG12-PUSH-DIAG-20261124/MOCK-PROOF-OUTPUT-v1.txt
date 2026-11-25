@@ -1,0 +1,12 @@
+PASS key file hashes equal live secret digests (8dcb59b6 / 7ebfe089 / 5a8b650b)
+live send-push-notification source: index.ts e7666666, handler.ts 9d0a6f71 (CLI download of deployed ezbr 96dfc872)
+PASS web-push 3.6.7 (same as live import npm:web-push@3.6.7)
+PASS mock subscription endpoint is local only (https://localhost:8090, self-signed, no FCM)
+payload = JSON.stringify(PUSH_COPY.protocol) = {"title":"ROMRx Base","body":"Time for today's session. Open ROMRx Base to see your plan."}
+PASS live liveSend() to the mock: {"ok":true} (mock checks Crypto key = applicationServerKey, ES256 VAPID JWT, aes128gcm)
+PASS mock decrypted exactly 1 message equal to the payload: ["{\"title\":\"ROMRx Base\",\"body\":\"Time for today's session. Open ROMRx Base to see your plan.\"}"]
+PASS negative control: a different VAPID key is rejected by the mock ({"ok":false,"gone":false}, still 1 message)
+live romrx.io/app/sw.js sha256 bff352dd03d7a8ec
+PASS live sw.js registers a push listener
+PASS sw.js push handler -> event.waitUntil(showNotification("ROMRx Base", {"body":"Time for today's session. Open ROMRx Base to see your plan."}))
+OVERALL PASS
