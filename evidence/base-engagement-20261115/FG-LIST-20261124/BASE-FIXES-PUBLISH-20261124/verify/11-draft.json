@@ -1,0 +1,9 @@
+{
+  "site_id": "d9bc6384-fc26-44fb-a51d-32aa8f28dd7b",
+  "site_name": "incomparable-pastelito-849104",
+  "deploy_id": "6b06318efa611ea6a3f31b5e",
+  "deploy_url": "https://6b06318efa611ea6a3f31b5e--incomparable-pastelito-849104.netlify.app",
+  "logs": "https://app.netlify.com/projects/incomparable-pastelito-849104/deploys/6b06318efa611ea6a3f31b5e",
+  "function_logs": "https://app.netlify.com/projects/incomparable-pastelito-849104/logs/functions?scope=deploy:6b06318efa611ea6a3f31b5e",
+  "edge_function_logs": "https://app.netlify.com/projects/incomparable-pastelito-849104/logs/edge-functions?scope=deployid:6b06318efa611ea6a3f31b5e"
+}

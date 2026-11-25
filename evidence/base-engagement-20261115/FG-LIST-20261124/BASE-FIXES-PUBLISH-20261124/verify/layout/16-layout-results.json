@@ -1,0 +1,142 @@
+{
+ "results": [
+  {
+   "size": "390x844",
+   "state": "closed",
+   "ok": true,
+   "url": "/app/dashboard/rombot",
+   "inputOnTop": true,
+   "sendOnTop": true,
+   "scrollY": 0,
+   "vvH": 844,
+   "innerH": 844,
+   "input": {
+    "top": 800,
+    "bottom": 844,
+    "left": 16,
+    "right": 319
+   },
+   "send": {
+    "top": 800,
+    "bottom": 844,
+    "left": 327,
+    "right": 374
+   },
+   "sendLabel": null,
+   "overlay": null,
+   "docScroll": 156
+  },
+  {
+   "size": "390x844",
+   "state": "keyboard-336px",
+   "ok": true,
+   "url": "/app/dashboard/rombot",
+   "inputOnTop": true,
+   "sendOnTop": true,
+   "scrollY": 0,
+   "vvH": 508,
+   "innerH": 508,
+   "input": {
+    "top": 464,
+    "bottom": 508,
+    "left": 16,
+    "right": 319
+   },
+   "send": {
+    "top": 464,
+    "bottom": 508,
+    "left": 327,
+    "right": 374
+   },
+   "sendLabel": null,
+   "overlay": null,
+   "docScroll": 156
+  },
+  {
+   "size": "375x667",
+   "state": "closed",
+   "ok": true,
+   "url": "/app/dashboard/rombot",
+   "inputOnTop": true,
+   "sendOnTop": true,
+   "scrollY": 0,
+   "vvH": 667,
+   "innerH": 667,
+   "input": {
+    "top": 623,
+    "bottom": 667,
+    "left": 16,
+    "right": 304
+   },
+   "send": {
+    "top": 623,
+    "bottom": 667,
+    "left": 312,
+    "right": 359
+   },
+   "sendLabel": null,
+   "overlay": null,
+   "docScroll": 156
+  },
+  {
+   "size": "375x667",
+   "state": "keyboard-260px",
+   "ok": true,
+   "url": "/app/dashboard/rombot",
+   "inputOnTop": true,
+   "sendOnTop": true,
+   "scrollY": 0,
+   "vvH": 407,
+   "innerH": 407,
+   "input": {
+    "top": 363,
+    "bottom": 407,
+    "left": 16,
+    "right": 304
+   },
+   "send": {
+    "top": 363,
+    "bottom": 407,
+    "left": 312,
+    "right": 359
+   },
+   "sendLabel": null,
+   "overlay": "1",
+   "docScroll": 0
+  }
+ ],
+ "supabase_requests_answered_locally": [
+  "GET /rest/v1/scoring_cutovers",
+  "POST /rest/v1/product_events",
+  "GET /rest/v1/user_ads_consent",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/consents",
+  "GET /rest/v1/protocol_sessions",
+  "GET /rest/v1/scoring_cutovers",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/protocol_sessions",
+  "GET /rest/v1/ai_conversations",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/protocol_sessions",
+  "GET /rest/v1/ai_conversations",
+  "GET /rest/v1/ai_conversations",
+  "GET /rest/v1/scoring_cutovers",
+  "POST /rest/v1/product_events",
+  "GET /rest/v1/user_ads_consent",
+  "GET /rest/v1/consents",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/protocol_sessions",
+  "GET /rest/v1/scoring_cutovers",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/protocol_sessions",
+  "POST /rest/v1/rpc/get_my_profile",
+  "GET /rest/v1/ai_conversations",
+  "GET /rest/v1/protocol_sessions",
+  "GET /rest/v1/ai_conversations",
+  "GET /rest/v1/ai_conversations"
+ ],
+ "non_get_non_rpc": [
+  "POST /rest/v1/product_events",
+  "POST /rest/v1/product_events"
+ ]
+}

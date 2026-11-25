@@ -1,0 +1,11 @@
+M	app/index.html
+A	app/src/hooks/useFitToViewport.ts
+M	app/src/index.css
+A	app/src/lib/__fixtures__/baseLibrary-20261124.json
+M	app/src/lib/sessionLength.test.ts
+M	app/src/lib/sessionLength.ts
+M	app/src/pages/MyProtocol.tsx
+M	app/src/pages/ROMBot.tsx
+A	app/src/pages/protocolLengthTiers.test.ts
+A	app/src/pages/rombotLayout.test.tsx
+files: tiers + ROMBot layout only: OK
