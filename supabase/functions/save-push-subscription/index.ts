@@ -44,7 +44,12 @@ Deno.serve((req) => handle(req, {
     if (error.code === "23514") return "limit";
     throw new Error("insert failed");
   },
-  remove: async (user_id, endpoint) => { const { error } = await admin.from("push_subscriptions").delete().eq("user_id", user_id).eq("endpoint", endpoint); if (error) throw new Error("remove failed"); },
+  remove: async (user_id, endpoint) => {
+    const { error } = await admin.from("push_subscriptions").delete().eq("user_id", user_id).eq("endpoint", endpoint);
+    if (error) throw new Error("remove failed");
+    const { error: legacyErr } = await admin.from("notification_preferences").update({ push_subscription: null }).eq("user_id", user_id).eq("push_subscription->>endpoint", endpoint);
+    if (legacyErr) throw new Error("remove failed");
+  },
   legacy: async (user_id, s) => {
     const { error } = await admin.from("notification_preferences").upsert({ user_id, push_subscription: s, push_reminders: true }, { onConflict: "user_id" });
     if (error) throw new Error("legacy failed");
